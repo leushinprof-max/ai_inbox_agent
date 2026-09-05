@@ -16,13 +16,20 @@ const navigation: { route: string; title: string; icon: IconName }[] = [
 
 export function InboxShell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { state, workspace, scope, switchWorkspace } = useInbox();
+  const { state, workspace, scope, switchWorkspace, basePath, mode } =
+    useInbox();
+  const member = state.memberships.find(
+    (m) => m.workspaceId === workspace.id && m.userId === scope.userId,
+  );
   const [switcher, setSwitcher] = useState(false);
-  const count = state.drafts.filter(
-    (d) =>
-      d.workspaceId === scope.workspaceId &&
-      ["ready", "needs_input"].includes(d.status),
-  ).length;
+  const count = state.paging
+    ? (state.paging.draftCounts.ready ?? 0) +
+      (state.paging.draftCounts.needs_input ?? 0)
+    : state.drafts.filter(
+        (d) =>
+          d.workspaceId === scope.workspaceId &&
+          ["ready", "needs_input"].includes(d.status),
+      ).length;
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -44,11 +51,11 @@ export function InboxShell({ children }: { children: ReactNode }) {
           {navigation.map((n) => (
             <Link
               key={n.route}
-              className={`nav-item ${path.includes(`/demo/${n.route}`) ? "active" : ""}`}
-              href={`/demo/${n.route}`}
+              className={`nav-item ${path.includes(`${basePath}/${n.route}`) ? "active" : ""}`}
+              href={`${basePath}/${n.route}`}
               aria-label={n.title}
               aria-current={
-                path.includes(`/demo/${n.route}`) ? "page" : undefined
+                path.includes(`${basePath}/${n.route}`) ? "page" : undefined
               }
             >
               <Icon name={n.icon} />
@@ -62,13 +69,23 @@ export function InboxShell({ children }: { children: ReactNode }) {
         <div className="sidebar-spacer" />
         <Link href="/workspaces" className="preview-trigger">
           <Icon name="info" />
-          <span>Demo · open your workspaces</span>
+          <span>
+            {mode === "demo"
+              ? "Demo · open your workspaces"
+              : "Your workspaces"}
+          </span>
         </Link>
         <div className="user-button">
-          <Avatar initials="IL" />
+          <Avatar
+            initials={(member?.name ?? "User")
+              .split(/\s+/)
+              .slice(0, 2)
+              .map((p) => p[0])
+              .join("")}
+          />
           <span className="grow">
-            <strong>Ivan Leushin</strong>
-            <small>Owner</small>
+            <strong>{member?.name ?? "Your account"}</strong>
+            <small>{member?.role ?? "Member"}</small>
           </span>
         </div>
       </aside>
@@ -95,7 +112,7 @@ export function InboxShell({ children }: { children: ReactNode }) {
               </button>
             ))}
             <Link
-              href="/demo/setup"
+              href={mode === "demo" ? "/demo/setup" : "/workspaces"}
               className="btn"
               onClick={() => setSwitcher(false)}
             >

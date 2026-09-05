@@ -1,8 +1,9 @@
 # Documentation
 
-- [Product contract](product.md): approved navigation, workflows and boundaries.
-- [Architecture](architecture.md): ownership, layers, persistence and transport rules.
-- [Implementation status](implementation.md): implemented work and the next integration stages.
-- [Visual acceptance](visual-acceptance.md): reference mapping and observed deviations.
+- [Product contract](product.md): approved navigation, workflows and scope.
+- [Architecture](architecture.md): boundaries, persistence, provider transport and concurrency.
+- [Implementation status](implementation.md): delivered behavior, checks and remaining acceptance.
+- [Development and operations](operations.md): isolated setup, worker, configuration and release procedure.
+- [Visual acceptance](visual-acceptance.md): reference-state observations and deviations.
 
-Current code and tests establish implemented behavior. The product contract establishes the intended target; it is not evidence that every target feature is implemented. The prototype is approved design input, not executable provider or security guidance.
+Current code, tests and migrations define implemented behavior. The prototype is approved design input, not provider documentation or security guidance. Nothing in these documents authorizes production operations.

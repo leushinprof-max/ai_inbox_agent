@@ -12,16 +12,20 @@ import {
   type IconName,
 } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
+import { LiveConnectionSettings, LiveImportSettings } from "./live-settings";
+import { MembersSettings } from "./members-settings";
+import { usePreferences } from "@/lib/preferences";
 
 const tabs: { id: string; label: string; icon: IconName }[] = [
   { id: "general", label: "General", icon: "settings" },
   { id: "connection", label: "HeyReach", icon: "link" },
   { id: "import", label: "Import history", icon: "inbox" },
   { id: "members", label: "Members", icon: "users" },
+  { id: "preferences", label: "Preferences", icon: "settings" },
 ];
 
 export function SettingsScreen() {
-  const { workspace, state, scope } = useInbox();
+  const { workspace, state, scope, mode } = useInbox();
   const [tab, setTab] = useState("general");
   return (
     <>
@@ -48,45 +52,121 @@ export function SettingsScreen() {
               </p>
             </div>
             {tab === "general" ? <GeneralSettings key={workspace.id} /> : null}
+            {tab === "preferences" ? <PersonalPreferences /> : null}
             {tab === "connection" ? (
-              <ConnectionSettings key={workspace.id} />
+              mode === "demo" ? (
+                <ConnectionSettings key={workspace.id} />
+              ) : (
+                <LiveConnectionSettings key={workspace.id} />
+              )
             ) : null}
-            {tab === "import" ? <ImportSettings /> : null}
+            {tab === "import" ? (
+              mode === "demo" ? (
+                <ImportSettings />
+              ) : (
+                <LiveImportSettings />
+              )
+            ) : null}
             {tab === "members" ? (
-              <div className="card">
-                <h2>Workspace members</h2>
-                <p className="page-description">
-                  Workspace access is independent of clients and sender
-                  accounts.
-                </p>
-                {state.memberships
-                  .filter((m) => m.workspaceId === scope.workspaceId)
-                  .map((m) => (
-                    <div className="account-line" key={m.userId}>
-                      <Avatar
-                        initials={m.name
-                          .split(" ")
-                          .map((x) => x[0])
-                          .join("")}
-                      />
-                      <div className="grow">
-                        <strong>{m.name}</strong>
-                        <br />
-                        <small>{m.email}</small>
+              mode !== "demo" ? (
+                <MembersSettings />
+              ) : (
+                <div className="card">
+                  <h2>Workspace members</h2>
+                  <p className="page-description">
+                    Workspace access is independent of clients and sender
+                    accounts.
+                  </p>
+                  {state.memberships
+                    .filter((m) => m.workspaceId === scope.workspaceId)
+                    .map((m) => (
+                      <div className="account-line" key={m.userId}>
+                        <Avatar
+                          initials={m.name
+                            .split(" ")
+                            .map((x) => x[0])
+                            .join("")}
+                        />
+                        <div className="grow">
+                          <strong>{m.name}</strong>
+                          <br />
+                          <small>{m.email}</small>
+                        </div>
+                        <Badge>{m.role}</Badge>
                       </div>
-                      <Badge>{m.role}</Badge>
-                    </div>
-                  ))}
-                <Notice title="Invitations come next">
-                  Member roles are included in the database foundation. Email
-                  invitations will be connected with authentication.
-                </Notice>
-              </div>
+                    ))}
+                  <Notice title="Demo members">
+                    Open your workspace to manage access and create invitation
+                    links.
+                  </Notice>
+                </div>
+              )
             ) : null}
           </section>
         </div>
       </div>
     </>
+  );
+}
+
+function PersonalPreferences() {
+  const { userId } = useInbox();
+  const { preferences, updatePreference } = usePreferences(userId);
+  const [error, setError] = useState("");
+  return (
+    <div className="stack">
+      <div className="card">
+        <p className="muted">Your preferences for this browser.</p>
+        {(
+          [
+            [
+              "autoNext",
+              "Open the next draft after sending",
+              "Keep moving through the review queue.",
+            ],
+            [
+              "details",
+              "Show lead details by default",
+              "Keep the contact panel open on wide screens.",
+            ],
+            [
+              "shortcuts",
+              "Keyboard shortcuts",
+              "Send with Ctrl or Command + Enter. Close dialogs with Escape.",
+            ],
+          ] as const
+        ).map(([key, title, help]) => (
+          <div className="setting-row" key={key}>
+            <div>
+              <h3>{title}</h3>
+              <p>{help}</p>
+            </div>
+            <button
+              className={`switch ${preferences[key] ? "on" : ""}`}
+              role="switch"
+              aria-label={title}
+              aria-checked={preferences[key]}
+              onClick={() => {
+                try {
+                  updatePreference(key, !preferences[key]);
+                  setError("");
+                } catch {
+                  setError("This browser could not save your preference.");
+                }
+              }}
+            />
+          </div>
+        ))}
+        {error ? <Notice variant="error">{error}</Notice> : null}
+      </div>
+      <div className="card">
+        <h3>Appearance</h3>
+        <div className="setting-row">
+          <span>Theme</span>
+          <Badge>Dark</Badge>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -126,7 +206,7 @@ function GeneralSettings() {
             <option key={t}>{t}</option>
           ))}
         </select>
-        <p className="help">Used for your workspace’s schedules.</p>
+        <p className="help">Used for snoozed drafts and activity timestamps.</p>
       </div>
       <div className="row between">
         <span className="small muted" role="status">

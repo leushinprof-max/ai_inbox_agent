@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
 import type { Agent } from "@/domain/inbox";
+import { selectDefaultAgent } from "@/server/agent-actions";
+import { LiveAgentTest } from "./live-agent-test";
 import {
   Badge,
   Button,
@@ -16,8 +18,15 @@ import {
 const steps = ["Basics", "Knowledge", "Follow-ups", "Test", "Launch"];
 
 export function AgentEditor({ id }: { id: string }) {
-  const { state, scope, repository } = useInbox();
+  const { state, scope, repository, basePath, mode, workspace } = useInbox();
   const router = useRouter();
+  const canManage = state.memberships.some(
+    (m) =>
+      m.workspaceId === scope.workspaceId &&
+      m.userId === scope.userId &&
+      ["owner", "admin"].includes(m.role),
+  );
+  const [saving, setSaving] = useState(false);
   const existing = state.agents.find(
     (a) => a.id === id && a.workspaceId === scope.workspaceId,
   );
@@ -52,6 +61,8 @@ export function AgentEditor({ id }: { id: string }) {
     setSaved(false);
   }
   async function save(status: Agent["status"] = agent.status) {
+    if (saving) return;
+    setSaving(true);
     try {
       setError("");
       const next = {
@@ -60,10 +71,20 @@ export function AgentEditor({ id }: { id: string }) {
         status,
       };
       await repository.saveAgent(scope, next);
+      if (mode !== "demo" && status === "active" && !workspace.defaultAgentId) {
+        const result = await selectDefaultAgent(scope.workspaceId, next.id);
+        if (!result.ok) throw new Error(result.error);
+        await repository.refresh?.();
+      }
+      setAgent(
+        repository.getSnapshot().agents.find((a) => a.id === next.id) ?? next,
+      );
       setSaved(true);
-      if (id === "new") router.replace(`/demo/agents/${next.id}`);
+      if (id === "new") router.replace(`${basePath}/agents/${next.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Agent could not be saved.");
+    } finally {
+      setSaving(false);
     }
   }
   return (
@@ -72,13 +93,13 @@ export function AgentEditor({ id }: { id: string }) {
         <IconButton
           label="Back to agents"
           icon="back"
-          onClick={() => router.push("/demo/agents")}
+          onClick={() => router.push(`${basePath}/agents`)}
         />
         <Badge color={agent.status === "active" ? "green" : ""}>
           {agent.status}
         </Badge>
-        <Button onClick={() => save()}>
-          {saved ? "Saved" : "Save changes"}
+        <Button disabled={!canManage || saving} onClick={() => save()}>
+          {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
         </Button>
       </Topbar>
       <div className="editor-tabs">
@@ -224,51 +245,58 @@ export function AgentEditor({ id }: { id: string }) {
             </div>
           ) : null}
           {step === 3 ? (
-            <>
-              <Notice title="Demo test">
-                This checks the form and Knowledge setup. It does not call an AI
-                model.
-              </Notice>
-              <div className="test-chat">
-                {testResult ? (
-                  <>
-                    <Badge color={agent.knowledge.trim() ? "green" : "amber"}>
-                      {agent.knowledge.trim()
-                        ? "Knowledge is available"
-                        : "Needs input"}
-                    </Badge>
-                    <p className="page-description">
-                      {agent.knowledge.trim()
-                        ? "The agent has approved information. A model-backed test will be connected in the runtime stage."
-                        : "Add approved product information before generating a reply."}
-                    </p>
-                  </>
-                ) : (
-                  <Empty title="Try a sample reply">
-                    Check the information your agent will have available.
-                  </Empty>
-                )}
-              </div>
-              <div className="field">
-                <label htmlFor="test-message">Incoming message</label>
-                <textarea
-                  id="test-message"
-                  value={test}
-                  onChange={(e) => {
-                    setTest(e.target.value);
-                    setTestResult(false);
-                  }}
-                  placeholder="Sounds interesting. How does pricing work?"
-                />
-              </div>
-              <Button
-                variant="primary"
-                disabled={!test.trim()}
-                onClick={() => setTestResult(true)}
-              >
-                Check setup
-              </Button>
-            </>
+            mode !== "demo" ? (
+              <LiveAgentTest
+                agent={agent}
+                dirty={JSON.stringify(agent) !== JSON.stringify(existing)}
+              />
+            ) : (
+              <>
+                <Notice title="Demo test">
+                  This checks the form and Knowledge setup. It does not call an
+                  AI model.
+                </Notice>
+                <div className="test-chat">
+                  {testResult ? (
+                    <>
+                      <Badge color={agent.knowledge.trim() ? "green" : "amber"}>
+                        {agent.knowledge.trim()
+                          ? "Knowledge is available"
+                          : "Needs input"}
+                      </Badge>
+                      <p className="page-description">
+                        {agent.knowledge.trim()
+                          ? "The demo agent has approved information. Open your workspace to run an AI test."
+                          : "Add approved product information before generating a reply."}
+                      </p>
+                    </>
+                  ) : (
+                    <Empty title="Try a sample reply">
+                      Check the information your agent will have available.
+                    </Empty>
+                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor="test-message">Incoming message</label>
+                  <textarea
+                    id="test-message"
+                    value={test}
+                    onChange={(e) => {
+                      setTest(e.target.value);
+                      setTestResult(false);
+                    }}
+                    placeholder="Sounds interesting. How does pricing work?"
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  disabled={!test.trim()}
+                  onClick={() => setTestResult(true)}
+                >
+                  Check setup
+                </Button>
+              </>
+            )
           ) : null}
           {step === 4 ? (
             <>
@@ -298,10 +326,53 @@ export function AgentEditor({ id }: { id: string }) {
                 New replies enter the review workflow. Your agent never sends a
                 message automatically.
               </Notice>
+              {mode !== "demo" ? (
+                <div className="card">
+                  <div className="card-header">
+                    <h2>Workspace replies</h2>
+                    <Badge
+                      color={
+                        workspace.defaultAgentId === agent.id ? "green" : ""
+                      }
+                    >
+                      {workspace.defaultAgentId === agent.id
+                        ? "Selected agent"
+                        : "Not selected"}
+                    </Badge>
+                  </div>
+                  <p className="page-description">
+                    One selected active agent prepares drafts for new incoming
+                    replies in this workspace.
+                  </p>
+                  {workspace.defaultAgentId !== agent.id ? (
+                    <Button
+                      disabled={
+                        agent.status !== "active" ||
+                        JSON.stringify(agent) !== JSON.stringify(existing)
+                      }
+                      onClick={async () => {
+                        const result = await selectDefaultAgent(
+                          scope.workspaceId,
+                          agent.id,
+                        );
+                        if (!result.ok) setError(result.error);
+                        else await repository.refresh?.();
+                      }}
+                    >
+                      Use for workspace replies
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="editor-next">
                 <Button
                   variant="primary"
-                  disabled={!agent.name.trim() || !agent.knowledge.trim()}
+                  disabled={
+                    !canManage ||
+                    saving ||
+                    !agent.name.trim() ||
+                    !agent.knowledge.trim()
+                  }
                   onClick={() =>
                     save(agent.status === "active" ? "paused" : "active")
                   }

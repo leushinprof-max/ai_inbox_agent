@@ -1,23 +1,34 @@
 # AI Inbox Agent
 
-Standalone Aster Inbox, rebuilt around the owner-approved design. This repository has no runtime dependency on LeadFleet, its client portal, profile assignments, billing, database, or workers.
+Standalone Aster Inbox, rebuilt around the [owner-approved design](https://aster-inbox-design.leushin-prof.chatgpt.site). It has no runtime dependency on LeadFleet, its database, client portal, profile assignments or workers.
 
-**Status: foundation implemented; live Inbox integration is not connected yet.** The interactive application uses an explicit demo adapter at `/demo`. The independent Supabase sign-in and workspace-creation paths live at `/login` and `/workspaces`. These paths never substitute demo data for a missing database.
+**Status: standalone application and runtime implemented and tested locally; hosted setup and controlled live-provider acceptance remain outstanding.** No new production deployment or migration has been made.
 
-## Run
+## What works
 
-Requires Node.js 22 or newer and npm.
+- Authenticated workspaces, password authentication/recovery, roles and email-bound invitation links.
+- Conversations with search, labels, paginated history, notes and manual replies.
+- Draft triage: Ready, Needs input and Later; edit, dismiss, snooze, redraft, cancel generation and send-and-next.
+- Versioned agents with Knowledge, workspace agent selection, pause/activation and model-backed Test.
+- HeyReach workspace-key verification, encrypted credentials, provider sender discovery and durable webhook ingestion.
+- Resumable history import and automatic classification. Historical imports never create drafts; new replies can create reviewable drafts.
+- Durable text sending: HTTP 200 means Sent, with no expiring readiness gate. Concurrent retries dispatch once. Ambiguous failures never automatically resend.
+- A separate worker and Docker image for sync, classification, generation, import and read-only send recovery.
+
+## Run the design demo
+
+Requires Node.js 22.18+ (Node 24 recommended), npm and Git.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:43600/demo/drafts`. The demo needs no keys, database, Docker, AI provider, or HeyReach account. Its changes survive navigation within the demo and reset on a full reload. Every simulated send is labelled. Stop the server with Ctrl+C.
+Open `http://127.0.0.1:43600/demo/drafts`. The demo needs no credentials or database and sends nothing externally. Its synthetic changes reset on reload. Authenticated routes never substitute demo data after a database failure.
 
-The previously approved hosted design remains at [Aster design preview](https://aster-inbox-design.leushin-prof.chatgpt.site). That is the design reference, not a deployment of this application.
+The approved hosted prototype is a design reference, not a deployment of this application. To run the persistent application, use the independent local stack in [development and operations](docs/operations.md).
 
-## Validate
+## Verify
 
 ```sh
 npm test
@@ -27,30 +38,24 @@ npm run build
 git diff --check
 ```
 
-Tests include the actual initial SQL migration running in an isolated in-memory PostgreSQL engine (PGlite), tenant and role isolation, optimistic draft edits, send deduplication, and fake-provider contracts. They make no external provider calls. They do not replace full Supabase integration and multi-session database tests before a production rollout.
-
-## Independent database
-
-Copy `.env.example` to `.env.local` and configure a **dedicated development Supabase project**. Do not use the existing LeadFleet production project. The public client configuration requires only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-
-The migration in `supabase/migrations/` creates workspaces, memberships, agents, connection status, conversations, messages and drafts, together with grants and row-level security. It has only been applied to the isolated test database. New hosted infrastructure and production migrations remain separate operations.
-
-With the schema and an Auth user provisioned in the development project, `/login` uses Supabase password authentication and `/workspaces` creates and lists real workspace records. Live conversation reads, provider connection setup and the runtime are the next implementation stage.
+`npm run test:integration` additionally requires the isolated local Supabase stack, `.env.local` and the web server. Stop the standalone worker before this suite: tests inject deterministic provider/model doubles. All fixtures are synthetic.
 
 ## Structure
 
 ```text
-src/app/                  Next.js routes and request boundaries
-src/components/           Shared visual primitives, shell and dialogs
-src/features/             Conversations, Drafts, Agents, Settings and onboarding
-src/domain/               Framework-independent types, permissions and operations
-src/integrations/heyreach/ Provider transport contract
-src/lib/                  UI gateway context and request-scoped Supabase client
-src/demo/                 Explicit synthetic data and in-memory gateway
-supabase/migrations/      New standalone schema; no copied LeadFleet migrations
-tests/                    Domain, provider and PostgreSQL contract tests
-design/reference/         Unmodified owner-approved 52-state prototype
-docs/                     Product decisions, architecture, delivery status and acceptance
+src/app/                  Routes, Auth callbacks and HTTP boundaries
+src/features/             Four product sections and workspace onboarding
+src/domain/               Domain types, permissions and send orchestration
+src/server/               Authenticated operations, encrypted credentials and job runtime
+src/integrations/         Validated HeyReach and OpenAI adapters
+src/lib/                  Live UI gateway, Supabase clients and generated types
+src/demo/                 Explicit synthetic gateway
+supabase/migrations/      Independent schema, RLS and transactional operations
+tests/                    Domain, adapter, SQL and real local Supabase integration tests
+tools/                    Guarded local seed and standalone worker
+Dockerfile.worker         Worker deployment image
+design/reference/         Unmodified approved prototype
+docs/                     Product, architecture, operations and acceptance evidence
 ```
 
-Start with [the documentation index](docs/README.md). The remaining integration work and current limitations are recorded in [implementation status](docs/implementation.md).
+See [documentation](docs/README.md), [implementation status](docs/implementation.md) and [visual acceptance](docs/visual-acceptance.md). Automatic outbound messages, follow-ups and outbound attachments are outside this release.

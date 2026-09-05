@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfig } from "@/lib/supabase/config";
@@ -21,7 +22,7 @@ export async function createWorkspace(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Sign in to create a workspace.", created: false };
-  const { error } = await supabase.rpc("create_workspace", {
+  const { data, error } = await supabase.rpc("create_workspace", {
     p_name: name,
     p_timezone: "UTC",
   });
@@ -32,5 +33,5 @@ export async function createWorkspace(
       created: false,
     };
   revalidatePath("/workspaces");
-  return { error: "", created: true };
+  redirect(`/w/${data}/setup`);
 }

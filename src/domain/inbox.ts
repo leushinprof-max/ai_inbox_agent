@@ -12,6 +12,7 @@ export interface Workspace {
   id: string;
   name: string;
   timezone: string;
+  defaultAgentId?: string | null;
 }
 export interface Membership {
   workspaceId: string;
@@ -65,6 +66,7 @@ export interface Conversation {
   revision: number;
   messages: Message[];
   notes: string;
+  notesRevision?: number;
   archived: boolean;
 }
 export interface Draft {
@@ -86,6 +88,46 @@ export interface InboxState {
   agents: Agent[];
   conversations: Conversation[];
   drafts: Draft[];
+  senders?: { id: number; name: string; authValid: boolean }[];
+  imports?: {
+    id: string;
+    days: number;
+    status: string;
+    inspected: number;
+    imported: number;
+    classified: number;
+    error: string | null;
+    startedAt: string;
+  }[];
+  agentActivity?: Record<string, number>;
+  generations?: {
+    id: string;
+    conversationId: string;
+    status: string;
+    error: string | null;
+    draftId: string | null;
+    resultRevision: number;
+  }[];
+  unresolvedSends?: {
+    id: string;
+    conversationId: string;
+    body: string;
+    status: string;
+    createdAt: string;
+  }[];
+  paging?: {
+    conversationIds: string[];
+    conversationNext: PageCursor | null;
+    draftIds?: string[];
+    draftNext: PageCursor | null;
+    conversationTotal: number;
+    draftCounts: Record<string, number>;
+    messageNext: Record<string, PageCursor | null>;
+  };
+}
+export interface PageCursor {
+  at: string;
+  id: string;
 }
 export interface Scope {
   workspaceId: string;

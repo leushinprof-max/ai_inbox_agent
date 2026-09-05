@@ -39,9 +39,9 @@ export default async function WorkspacesPage() {
           Each workspace has its own team, HeyReach connection and agents.
         </p>
         {error || !parsed.success ? (
-          <Notice variant="error" title="Database setup required">
-            The standalone schema is not available. Apply this repository’s
-            migration to the dedicated development database.
+          <Notice variant="error" title="Workspaces could not be loaded">
+            Please try again in a moment.{" "}
+            <a href="/workspaces">Reload workspaces</a>
           </Notice>
         ) : (
           <div className="workspace-cards">
@@ -52,10 +52,9 @@ export default async function WorkspacesPage() {
                 </span>
                 <h2 style={{ marginTop: 18 }}>{w.name}</h2>
                 <p className="page-description">{w.timezone}</p>
-                <p className="demo-note">
-                  Created and saved. Live Inbox data and connection setup are
-                  the next implementation stage.
-                </p>
+                <Link className="btn primary" href={`/w/${w.id}/drafts`}>
+                  Open workspace
+                </Link>
               </div>
             ))}
           </div>

@@ -1,38 +1,160 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation, Draft } from "@/domain/inbox";
 import { Button, IconButton, Notice, Spark } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
+import { inspectSend } from "@/server/send-actions";
+import {
+  requestGeneration,
+  cancelGeneration,
+} from "@/server/generation-actions";
+import { usePreferences } from "@/lib/preferences";
 
 export function Composer({
   conversation,
-  draft,
+  draft: suppliedDraft,
   onDone,
 }: {
   conversation: Conversation;
   draft?: Draft;
   onDone?: () => void;
 }) {
-  const { repository, scope } = useInbox();
+  const { repository, scope, state, mode: environment } = useInbox();
+  const { preferences } = usePreferences(scope.userId);
+  const draft =
+    suppliedDraft ??
+    state.drafts.find(
+      (d) =>
+        d.conversationId === conversation.id &&
+        ["ready", "needs_input", "snoozed"].includes(d.status),
+    );
+  const [reviewedDraft, setReviewedDraft] = useState(draft);
   const [mode, setMode] = useState<"draft" | "edit" | "manual">(
     draft ? "draft" : "manual",
   );
   const [text, setText] = useState(draft?.body ?? "");
   const [answer, setAnswer] = useState("");
   const [remember, setRemember] = useState(false);
+  const [instructions, setInstructions] = useState("");
+  const [redrafting, setRedrafting] = useState(false);
+  const [generationId, setGenerationId] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const generation =
+    state.generations?.find((g) => g.id === generationId) ??
+    state.generations?.find(
+      (g) => g.conversationId === conversation.id && g.status === "queued",
+    );
+  const generating = requesting || generation?.status === "queued";
+  const writable = state.memberships.some(
+    (m) =>
+      m.workspaceId === scope.workspaceId &&
+      m.userId === scope.userId &&
+      m.role !== "viewer",
+  );
+  const canRemember = state.memberships.some(
+    (m) =>
+      m.workspaceId === scope.workspaceId &&
+      m.userId === scope.userId &&
+      ["owner", "admin"].includes(m.role),
+  );
   const [status, setStatus] = useState<"idle" | "sending" | "unknown">("idle");
   const [error, setError] = useState("");
-  const [modal, setModal] = useState<"snooze" | "dismiss" | null>(null);
+  const [modal, setModal] = useState<
+    "snooze" | "dismiss" | "send-absent" | null
+  >(null);
+  const unresolved = state.unresolvedSends?.find(
+    (o) => o.conversationId === conversation.id,
+  );
+  const lastOperation = useRef<string | null>(null);
+  const observedUnresolved = useRef(false);
+  useEffect(() => {
+    if (unresolved) observedUnresolved.current = true;
+    else if (observedUnresolved.current) {
+      observedUnresolved.current = false;
+      setStatus("idle");
+    }
+  }, [unresolved]);
   const lock = useRef(false);
-  const stale = !!draft && draft.sourceRevision !== conversation.revision;
+  useEffect(() => {
+    if (generation?.status !== "queued") return;
+    const timer = setInterval(
+      () =>
+        void repository
+          .refresh?.()
+          .catch(() =>
+            setError(
+              "Draft progress could not be loaded. Your current reply is preserved.",
+            ),
+          ),
+      2000,
+    );
+    return () => clearInterval(timer);
+  }, [generation?.id, generation?.status, repository]);
+  const generatedDraft = state.drafts.find(
+    (d) =>
+      d.id === generation?.draftId &&
+      d.revision >= (generation?.resultRevision ?? 1),
+  );
+  if (
+    generationId &&
+    generation &&
+    generation.status !== "queued" &&
+    (generation.status !== "completed" || generatedDraft)
+  ) {
+    if (generation.status === "completed" && generatedDraft) {
+      setReviewedDraft(generatedDraft);
+      setText(generatedDraft.body);
+      setMode("draft");
+      setRedrafting(false);
+      setAnswer("");
+      setError("");
+    }
+    if (generation.status === "failed") {
+      const reasons: Record<string, string> = {
+        model_not_configured: "AI is not configured on the server yet.",
+        context_changed:
+          "The conversation or draft changed. Review the latest version and try again.",
+        agent_changed:
+          "The selected agent changed. Try generating with its latest version.",
+        no_reply_needed:
+          "The latest incoming message is already answered or does not need a reply.",
+      };
+      setError(
+        reasons[generation.error ?? ""] ??
+          "A draft could not be generated. Your previous reply is preserved.",
+      );
+    }
+    setGenerationId(null);
+  }
+
+  const stale =
+    !!reviewedDraft &&
+    (reviewedDraft.sourceRevision !== conversation.revision ||
+      reviewedDraft.revision !== draft?.revision);
+  const canSend =
+    writable &&
+    (environment === "demo" ||
+      state.connections.some(
+        (c) => c.workspaceId === scope.workspaceId && c.status === "connected",
+      ));
   const editable = mode !== "draft";
 
   async function run(action: () => void | Promise<void>) {
     try {
       setError("");
       await action();
+      if (draft) {
+        const latest = repository
+          .getSnapshot()
+          .drafts.find((d) => d.id === draft.id);
+        if (latest) {
+          setReviewedDraft(latest);
+          if (draft.status === "needs_input" && latest.status === "ready")
+            setText(latest.body);
+        }
+      }
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "The change could not be saved.",
@@ -40,21 +162,35 @@ export function Composer({
     }
   }
   async function send() {
-    if (lock.current || status === "unknown") return;
+    if (
+      lock.current ||
+      status === "unknown" ||
+      unresolved ||
+      !canSend ||
+      !text.trim() ||
+      generating ||
+      redrafting ||
+      (stale && mode !== "manual") ||
+      (draft?.status === "needs_input" && mode !== "manual")
+    )
+      return;
     lock.current = true;
     setStatus("sending");
     setError("");
     try {
+      const operationId = crypto.randomUUID();
+      lastOperation.current = operationId;
       const outcome = await repository.send(scope, {
-        operationId: crypto.randomUUID(),
+        operationId,
         conversationId: conversation.id,
         body: text,
         ...(draft && mode !== "manual"
           ? {
               draft: {
                 id: draft.id,
-                revision: draft.revision,
-                sourceRevision: draft.sourceRevision,
+                revision: reviewedDraft?.revision ?? draft.revision,
+                sourceRevision:
+                  reviewedDraft?.sourceRevision ?? draft.sourceRevision,
               },
             }
           : {}),
@@ -76,12 +212,114 @@ export function Composer({
       lock.current = false;
     }
   }
+  async function generate(approvedAnswer = "") {
+    if (requesting || generation?.status === "queued") return;
+    setRequesting(true);
+    setError("");
+    const id = crypto.randomUUID();
+    try {
+      const result = await requestGeneration({
+        workspaceId: scope.workspaceId,
+        id,
+        conversationId: conversation.id,
+        sourceRevision: conversation.revision,
+        ...(draft
+          ? {
+              draftId: draft.id,
+              draftRevision: reviewedDraft?.revision ?? draft.revision,
+            }
+          : {}),
+        instructions,
+        answer: approvedAnswer,
+        remember: !!approvedAnswer && remember,
+      });
+      if (!result.ok) throw new Error(result.error);
+      setGenerationId(id);
+      await repository.refresh?.();
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "A draft could not be requested.",
+      );
+    } finally {
+      setRequesting(false);
+    }
+  }
 
   const needsInput = draft?.status === "needs_input" && mode !== "manual";
   return (
-    <div className="composer-wrap">
+    <div
+      className="composer-wrap"
+      onKeyDown={(e) => {
+        if (
+          preferences.shortcuts &&
+          (e.ctrlKey || e.metaKey) &&
+          e.key === "Enter"
+        ) {
+          e.preventDefault();
+          void send();
+        }
+      }}
+    >
       <div className="composer">
-        {needsInput ? (
+        {generating ? (
+          <>
+            <div className="composer-title">
+              <Spark />
+              Preparing a draft
+            </div>
+            <p className="draft-text">
+              Using this conversation and your agent’s approved information.
+            </p>
+            <div className="composer-actions">
+              <span className="small muted">
+                Your current draft is preserved.
+              </span>
+              <Button
+                disabled={!generation}
+                onClick={() =>
+                  void run(async () => {
+                    if (!generation) return;
+                    const result = await cancelGeneration(
+                      scope.workspaceId,
+                      generation.id,
+                    );
+                    if (!result.ok) throw new Error(result.error);
+                    await repository.refresh?.();
+                  })
+                }
+              >
+                Cancel generation
+              </Button>
+            </div>
+          </>
+        ) : redrafting ? (
+          <>
+            <div className="composer-title">
+              <Spark />
+              Redraft with instructions
+            </div>
+            <div className="field">
+              <label htmlFor="redraft-instructions">What should change?</label>
+              <textarea
+                id="redraft-instructions"
+                value={instructions}
+                maxLength={2000}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="For example, make it shorter and offer a demo."
+              />
+            </div>
+            <div className="modal-actions">
+              <Button onClick={() => setRedrafting(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                disabled={!instructions.trim() || !writable}
+                onClick={() => void generate()}
+              >
+                Generate draft
+              </Button>
+            </div>
+          </>
+        ) : needsInput ? (
           <>
             <div className="composer-title">
               <Spark />
@@ -106,6 +344,7 @@ export function Composer({
                 <input
                   type="checkbox"
                   checked={remember}
+                  disabled={!canRemember}
                   onChange={(e) => setRemember(e.target.checked)}
                 />
                 Save this answer to the agent’s Knowledge
@@ -124,14 +363,24 @@ export function Composer({
               <Button
                 variant="primary"
                 icon="spark"
-                disabled={!answer.trim()}
+                disabled={!answer.trim() || !writable}
                 onClick={() =>
-                  run(() =>
-                    repository.supplyAnswer(scope, draft.id, answer, remember),
-                  )
+                  environment !== "demo"
+                    ? void generate(answer)
+                    : run(() =>
+                        repository.supplyAnswer(
+                          scope,
+                          draft.id,
+                          answer,
+                          remember,
+                          reviewedDraft?.revision,
+                        ),
+                      )
                 }
               >
-                Use approved answer
+                {environment === "demo"
+                  ? "Use approved answer"
+                  : "Generate draft"}
               </Button>
             </div>
           </>
@@ -157,14 +406,76 @@ export function Composer({
               <p className="draft-text">{text}</p>
             )}
             {stale && mode !== "manual" ? (
-              <Notice title="A new reply arrived">
-                Review the latest message, then write an updated reply.
+              <Notice title="This draft’s context changed">
+                Your text is preserved. Review the latest conversation and draft
+                before continuing.
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setReviewedDraft(draft);
+                    setText(draft?.body ?? "");
+                    setMode("draft");
+                    setError("");
+                  }}
+                >
+                  Load latest draft
+                </Button>
               </Notice>
             ) : null}
-            {status === "unknown" ? (
+            {status === "unknown" || unresolved ? (
               <Notice title="Send status unavailable">
                 We did not receive a response. Check this conversation in
                 HeyReach before trying again.
+                {environment !== "demo" ? (
+                  <div className="row wrap">
+                    <Button
+                      variant="ghost small"
+                      onClick={() =>
+                        void run(async () => {
+                          const id = unresolved?.id ?? lastOperation.current;
+                          if (id) {
+                            const result = await inspectSend(
+                              scope.workspaceId,
+                              id,
+                              "check",
+                            );
+                            if (!result.ok) throw new Error(result.error);
+                          }
+                          await repository.refresh?.();
+                        })
+                      }
+                    >
+                      Check status
+                    </Button>
+                    {unresolved ? (
+                      <Button
+                        variant="ghost small"
+                        onClick={() => setModal("send-absent")}
+                      >
+                        I checked HeyReach: message is absent
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost small"
+                        onClick={() =>
+                          void run(async () => {
+                            await repository.refresh?.();
+                            if (
+                              !repository
+                                .getSnapshot()
+                                .unresolvedSends?.some(
+                                  (o) => o.conversationId === conversation.id,
+                                )
+                            )
+                              setStatus("idle");
+                          })
+                        }
+                      >
+                        Refresh conversation
+                      </Button>
+                    )}
+                  </div>
+                ) : null}
               </Notice>
             ) : null}
             <div className="composer-actions">
@@ -179,6 +490,15 @@ export function Composer({
                     >
                       Edit
                     </Button>
+                    {environment !== "demo" ? (
+                      <Button
+                        variant="ghost small"
+                        disabled={status !== "idle" || !writable}
+                        onClick={() => setRedrafting(true)}
+                      >
+                        Redraft
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost small"
                       onClick={() => {
@@ -198,7 +518,7 @@ export function Composer({
                         await repository.editDraft(
                           scope,
                           draft.id,
-                          draft.revision,
+                          reviewedDraft?.revision ?? draft.revision,
                           text,
                         );
                         setMode("draft");
@@ -213,6 +533,16 @@ export function Composer({
                     Sending as {conversation.senderName}
                   </span>
                 )}
+                {mode === "manual" && environment !== "demo" ? (
+                  <Button
+                    variant="ghost small"
+                    icon="spark"
+                    disabled={!writable || status !== "idle"}
+                    onClick={() => void generate()}
+                  >
+                    Draft
+                  </Button>
+                ) : null}
               </div>
               <div className="row">
                 {draft ? (
@@ -237,6 +567,8 @@ export function Composer({
                   onClick={send}
                   disabled={
                     !text.trim() ||
+                    !canSend ||
+                    !!unresolved ||
                     status !== "idle" ||
                     (stale && mode !== "manual")
                   }
@@ -249,7 +581,11 @@ export function Composer({
               <span>
                 {conversation.senderName} → {conversation.contact.name}
               </span>
-              <span>Demo · no real message is sent</span>
+              <span>
+                {environment === "demo"
+                  ? "Demo · no real message is sent"
+                  : "Send from this conversation’s LinkedIn account"}
+              </span>
             </div>
           </>
         )}
@@ -259,7 +595,40 @@ export function Composer({
           </div>
         ) : null}
       </div>
-      {modal && draft ? (
+      {modal === "send-absent" && unresolved ? (
+        <Dialog
+          title="Confirm the message is absent"
+          onClose={() => setModal(null)}
+        >
+          <p>
+            Only continue after checking this conversation in HeyReach. This
+            clears the unresolved request; it does not send another message.
+          </p>
+          <blockquote>{unresolved.body}</blockquote>
+          <div className="modal-actions">
+            <Button onClick={() => setModal(null)}>Keep checking</Button>
+            <Button
+              onClick={() =>
+                void run(async () => {
+                  const result = await inspectSend(
+                    scope.workspaceId,
+                    unresolved.id,
+                    "absent",
+                  );
+                  if (!result.ok) throw new Error(result.error);
+                  await repository.refresh?.();
+                  setStatus("idle");
+                  setModal(null);
+                })
+              }
+            >
+              Message is absent
+            </Button>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {modal && modal !== "send-absent" && draft ? (
         <Dialog
           title={modal === "dismiss" ? "Dismiss this draft?" : "Snooze draft"}
           onClose={() => setModal(null)}
@@ -276,7 +645,11 @@ export function Composer({
                   variant="danger"
                   onClick={() =>
                     run(async () => {
-                      await repository.dismiss(scope, draft.id, draft.revision);
+                      await repository.dismiss(
+                        scope,
+                        draft.id,
+                        reviewedDraft?.revision ?? draft.revision,
+                      );
                       setModal(null);
                       onDone?.();
                     })
@@ -300,7 +673,7 @@ export function Composer({
                       await repository.snooze(
                         scope,
                         draft.id,
-                        draft.revision,
+                        reviewedDraft?.revision ?? draft.revision,
                         new Date(
                           Date.now() + Number(hours) * 3_600_000,
                         ).toISOString(),

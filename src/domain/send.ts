@@ -53,6 +53,12 @@ export async function sendReply(
   } catch {
     outcome = { status: "unknown" };
   }
-  await repository.complete(scope, request.operationId, outcome);
+  try {
+    await repository.complete(scope, request.operationId, outcome);
+  } catch {
+    // The provider acknowledgement remains true if local persistence fails.
+    // A durable reservation must schedule recovery before transport dispatch.
+    if (outcome.status !== "sent") return { status: "unknown" as const };
+  }
   return outcome;
 }

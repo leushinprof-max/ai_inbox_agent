@@ -1,28 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { displayDate } from "@/lib/display-date";
 import { useInbox } from "@/lib/inbox-context";
-import { Avatar, Button, Empty, Icon, Topbar } from "@/components/ui";
+import { Avatar, Button, Empty, Icon, Topbar, Notice } from "@/components/ui";
 import {
   ConversationThread,
   ContactContext,
 } from "@/features/conversations/thread";
 import { Composer } from "./composer";
+import { usePreferences } from "@/lib/preferences";
 
 export function DraftsScreen() {
-  const { state, scope, repository } = useInbox();
+  const { state, scope, repository, basePath, workspace } = useInbox();
+  const { preferences } = usePreferences(scope.userId);
+  const [awaitingSelection, setAwaitingSelection] = useState(false);
+  const [error, setError] = useState("");
   const [queue, setQueue] = useState("ready");
   const [selectedId, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [details, setDetails] = useState(true);
+  useEffect(() => {
+    if (!repository.searchDrafts) return;
+    let active = true;
+    const timer = setTimeout(
+      () =>
+        void repository.searchDrafts!(query, queue)
+          .then(() => {
+            if (active) setError("");
+          })
+          .catch(() => {
+            if (active) setError("Drafts could not be loaded.");
+          }),
+      200,
+    );
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [repository, query, queue]);
+  const [detailsOverride, setDetails] = useState<boolean | null>(null);
+  const details = detailsOverride ?? preferences.details;
   const [mobileThread, setMobileThread] = useState(false);
   const drafts = state.drafts.filter(
     (d) =>
       d.workspaceId === scope.workspaceId &&
       !["sent", "dismissed"].includes(d.status),
   );
-  const visible = drafts
+  const orderedDrafts = state.paging?.draftIds
+    ? state.paging.draftIds
+        .map((id) => drafts.find((d) => d.id === id))
+        .filter((d): d is NonNullable<typeof d> => !!d)
+    : drafts;
+  const visible = orderedDrafts
     .filter((d) => d.status === queue)
     .filter((d) => {
       const contact = state.conversations.find(
@@ -32,22 +62,32 @@ export function DraftsScreen() {
         .toLowerCase()
         .includes(query.toLowerCase());
     });
-  const selected = visible.find((d) => d.id === selectedId) ?? visible[0];
+  const selected = awaitingSelection
+    ? undefined
+    : (visible.find((d) => d.id === selectedId) ?? visible[0]);
+  const currentId = selected?.id;
+  if (currentId && currentId !== selectedId) setSelected(currentId);
   const conversation = selected
     ? state.conversations.find((c) => c.id === selected.conversationId)!
     : null;
-  const toReview = drafts.filter((d) => d.status !== "snoozed").length;
+  const toReview = state.paging
+    ? (state.paging.draftCounts.ready ?? 0) +
+      (state.paging.draftCounts.needs_input ?? 0)
+    : drafts.filter((d) => d.status !== "snoozed").length;
   return (
     <>
       <Topbar title="Drafts">
         <span className="small muted">{toReview} to review</span>
       </Topbar>
-      {!drafts.length ? (
+      {error ? <Notice variant="error">{error}</Notice> : null}
+      {!(state.paging
+        ? Object.values(state.paging.draftCounts).reduce((a, b) => a + b, 0)
+        : drafts.length) ? (
         <Empty
           title="You’re all caught up"
           icon="check"
           action={
-            <Link href="/demo/conversations" className="btn primary">
+            <Link href={`${basePath}/conversations`} className="btn primary">
               View conversations
             </Link>
           }
@@ -73,12 +113,14 @@ export function DraftsScreen() {
                     className={`tab ${queue === id ? "active" : ""}`}
                     onClick={() => {
                       setQueue(id);
+                      setAwaitingSelection(false);
                       setSelected(null);
                     }}
                   >
                     {label}
                     <span className="num">
-                      {drafts.filter((d) => d.status === id).length}
+                      {state.paging?.draftCounts[id] ??
+                        drafts.filter((d) => d.status === id).length}
                     </span>
                   </button>
                 ))}
@@ -104,6 +146,7 @@ export function DraftsScreen() {
                     className={`queue-item ${selected?.id === draft.id ? "selected" : ""}`}
                     onClick={() => {
                       setSelected(draft.id);
+                      setAwaitingSelection(false);
                       setMobileThread(true);
                     }}
                   >
@@ -118,7 +161,12 @@ export function DraftsScreen() {
                           {c.contact.company}
                         </span>
                       </span>
-                      <span className="time">Today</span>
+                      <span className="time">
+                        {displayDate(
+                          c.messages.at(-1)?.createdAt,
+                          workspace.timezone,
+                        )}
+                      </span>
                     </span>
                     <span className="snippet">{c.messages.at(-1)?.body}</span>
                     <span
@@ -151,6 +199,17 @@ export function DraftsScreen() {
               ) : null}
             </div>
             <div className="queue-footer">
+              {state.paging?.draftNext ? (
+                <Button
+                  onClick={() =>
+                    void repository
+                      .moreDrafts?.()
+                      .catch(() => setError("More drafts could not be loaded."))
+                  }
+                >
+                  Load more
+                </Button>
+              ) : null}
               <span>Newest replies first</span>
               <span>{visible.length} conversations</span>
             </div>
@@ -168,20 +227,32 @@ export function DraftsScreen() {
                       Snoozed until{" "}
                       {new Date(selected.snoozedUntil!).toLocaleString(
                         "en-GB",
-                        { timeZone: "UTC" },
+                        { timeZone: workspace.timezone },
                       )}
                     </p>
                     <div className="composer-actions">
                       <Button
                         variant="primary"
                         onClick={async () => {
-                          await repository.restore(
-                            scope,
-                            selected.id,
-                            selected.revision,
-                          );
-                          setQueue("ready");
-                          setSelected(selected.id);
+                          try {
+                            await repository.restore(
+                              scope,
+                              selected.id,
+                              selected.revision,
+                            );
+                            const restored = repository
+                              .getSnapshot()
+                              .drafts.find((d) => d.id === selected.id);
+                            setQueue(restored?.status ?? "ready");
+                            setSelected(selected.id);
+                            setError("");
+                          } catch (e) {
+                            setError(
+                              e instanceof Error
+                                ? e.message
+                                : "Draft could not be restored.",
+                            );
+                          }
                         }}
                       >
                         Move to Ready
@@ -191,11 +262,12 @@ export function DraftsScreen() {
                 </div>
               ) : (
                 <Composer
-                  key={`${selected.id}:${selected.revision}`}
+                  key={selected.id}
                   conversation={conversation}
                   draft={selected}
                   onDone={() => {
                     setSelected(null);
+                    setAwaitingSelection(!preferences.autoNext);
                     setMobileThread(false);
                   }}
                 />
@@ -203,8 +275,15 @@ export function DraftsScreen() {
             </ConversationThread>
           ) : (
             <div className="thread-empty">
-              <Empty title="Queue cleared" icon="check">
-                Choose another queue or come back when new drafts arrive.
+              <Empty
+                title={
+                  awaitingSelection ? "Choose the next draft" : "Queue cleared"
+                }
+                icon="check"
+              >
+                {awaitingSelection
+                  ? "Your reply was sent. Select a conversation when you’re ready."
+                  : "Choose another queue or come back when new drafts arrive."}
               </Empty>
             </div>
           )}

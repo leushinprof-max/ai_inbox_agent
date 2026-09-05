@@ -20,7 +20,7 @@ Ready, Needs input and Later separate actionable work. Editing, explicit dismiss
 
 An actually new incoming message invalidates a draft created for the previous inbound state. Our own outgoing acknowledgement does not count as a new reply. Manual writing remains available after reviewing the latest history.
 
-Missing approved information produces Needs input. Operators can supply an answer. Saving that information into shared Agent Knowledge requires workspace admin authority. AI generation must not invent a missing answer.
+Missing approved information produces Needs input. Operators can supply an approved answer and request a new draft; cancellation preserves the current reply. Saving that information into shared Agent Knowledge requires workspace admin authority. AI generation must not invent a missing answer.
 
 ## Sending
 
@@ -37,6 +37,8 @@ Basics, Knowledge, Follow-ups, Test and Launch stay inside the agent editor. Kno
 ## Workspace onboarding
 
 Name → connect the exact HeyReach workspace → configure its webhook → optionally import history → create an agent. Waiting for the first webhook event is expected and must not block setup completion.
+
+Invitations are email-bound shareable links; team roles are independent of provider sender accounts. Personal queue/layout/shortcut preferences are saved per user in the current browser.
 
 Historical import reads a bounded period and classifies the latest conversation state. It does not create a backlog of historical drafts. The worker must resume interrupted imports, expose useful progress and avoid duplicate messages.
 

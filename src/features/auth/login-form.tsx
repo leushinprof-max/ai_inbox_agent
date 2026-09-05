@@ -5,7 +5,15 @@ import { useActionState } from "react";
 import { signIn } from "./actions";
 import { Notice } from "@/components/ui";
 
-export function LoginForm({ configured }: { configured: boolean }) {
+export function LoginForm({
+  configured,
+  next = "/workspaces",
+  linkError = false,
+}: {
+  configured: boolean;
+  next?: string;
+  linkError?: boolean;
+}) {
   const [state, action, pending] = useActionState(signIn, { error: "" });
   return (
     <main className="login-page">
@@ -22,7 +30,14 @@ export function LoginForm({ configured }: { configured: boolean }) {
           </Notice>
         ) : null}
         {state.error ? <Notice variant="error">{state.error}</Notice> : null}
+        {linkError ? (
+          <Notice variant="error">
+            This link expired or was opened in a different browser. Request a
+            new link and open it in the browser where you started.
+          </Notice>
+        ) : null}
         <form action={action}>
+          <input type="hidden" name="next" value={next} />
           <div className="field">
             <label htmlFor="email">Email</label>
             <input
@@ -54,6 +69,12 @@ export function LoginForm({ configured }: { configured: boolean }) {
             {pending ? "Signing in…" : "Sign in"}
           </button>
         </form>
+        <div className="row between" style={{ marginTop: 20 }}>
+          <Link href="/forgot-password">Forgot password?</Link>
+          <Link href={`/signup?next=${encodeURIComponent(next)}`}>
+            Create account
+          </Link>
+        </div>
         <div className="divider" />
         <Link className="btn" href="/demo/drafts">
           Explore the demo

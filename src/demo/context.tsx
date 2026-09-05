@@ -15,13 +15,14 @@ function createDemoGateway(repository: DemoRepository): InboxGateway {
     dismiss: async (...args) => repository.dismiss(...args),
     snooze: async (...args) => repository.snooze(...args),
     restore: async (...args) => repository.restore(...args),
-    note: async (...args) => repository.note(...args),
+    note: async (scope, id, notes) => repository.note(scope, id, notes),
     saveAgent: async (...args) => repository.saveAgent(...args),
     addWorkspace: async (...args) => repository.addWorkspace(...args),
     renameWorkspace: async (...args) => repository.renameWorkspace(...args),
     connect: async (...args) => repository.connect(...args),
     disconnect: async (...args) => repository.disconnect(...args),
-    supplyAnswer: async (...args) => repository.supplyAnswer(...args),
+    supplyAnswer: async (scope, id, answer, remember) =>
+      repository.supplyAnswer(scope, id, answer, remember),
     send: (scope, request) =>
       sendReply(
         repository,

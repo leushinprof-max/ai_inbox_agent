@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation } from "@/domain/inbox";
-import { Avatar, Badge, Button, IconButton, Spark } from "@/components/ui";
+import {
+  Avatar,
+  Badge,
+  Button,
+  IconButton,
+  Spark,
+  Notice,
+} from "@/components/ui";
 
 export function ConversationThread({
   conversation,
@@ -17,10 +24,32 @@ export function ConversationThread({
   onBack: () => void;
   onToggleDetails: () => void;
 }) {
+  const { repository, state, workspace } = useInbox();
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(!!repository.openConversation);
+  useEffect(() => {
+    if (!repository.openConversation) return;
+    let active = true;
+    void repository
+      .openConversation(conversation.id)
+      .then(() => {
+        if (active) setLoading(false);
+      })
+      .catch(() => {
+        if (active) {
+          setLoading(false);
+          setLoadError("Messages could not be loaded.");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [conversation.id, repository]);
   const scroll = useRef<HTMLDivElement>(null);
+  const latestMessageId = conversation.messages.at(-1)?.id;
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [conversation.id, conversation.messages.length]);
+  }, [conversation.id, latestMessageId]);
   return (
     <section className="thread">
       <header className="thread-header">
@@ -51,6 +80,38 @@ export function ConversationThread({
         aria-label="Conversation messages"
       >
         <div className="thread-content">
+          {loadError ? (
+            <Notice variant="error">
+              {loadError}
+              <Button
+                onClick={() =>
+                  void repository
+                    .openConversation?.(conversation.id)
+                    .then(() => setLoadError(""))
+                    .catch(() =>
+                      setLoadError("Messages are still unavailable."),
+                    )
+                }
+              >
+                Retry
+              </Button>
+            </Notice>
+          ) : null}
+          {loading ? <p role="status">Loading conversation…</p> : null}
+          {state.paging?.messageNext[conversation.id] ? (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                void repository
+                  .olderMessages?.(conversation.id)
+                  .catch(() =>
+                    setLoadError("Older messages could not be loaded."),
+                  )
+              }
+            >
+              Load earlier messages
+            </Button>
+          ) : null}
           {conversation.messages.map((message, index) => (
             <div key={message.id}>
               {index === 0 ||
@@ -60,7 +121,7 @@ export function ConversationThread({
                   {new Date(message.createdAt).toLocaleDateString("en-GB", {
                     day: "numeric",
                     month: "long",
-                    timeZone: "UTC",
+                    timeZone: workspace.timezone,
                   })}
                 </div>
               ) : null}
@@ -71,7 +132,11 @@ export function ConversationThread({
                   <Avatar
                     initials={
                       message.direction === "outbound"
-                        ? "JR"
+                        ? conversation.senderName
+                            .split(/\s+/)
+                            .slice(0, 2)
+                            .map((p) => p[0])
+                            .join("")
                         : conversation.contact.initials
                     }
                     color={
@@ -89,7 +154,7 @@ export function ConversationThread({
                     {new Date(message.createdAt).toLocaleTimeString("en-GB", {
                       hour: "2-digit",
                       minute: "2-digit",
-                      timeZone: "UTC",
+                      timeZone: workspace.timezone,
                     })}
                   </time>
                 </div>
@@ -116,9 +181,11 @@ export function ContactContext({
   conversation: Conversation;
   onClose: () => void;
 }) {
-  const { state, repository, scope } = useInbox();
+  const { state, repository, scope, basePath } = useInbox();
   const [notes, setNotes] = useState(conversation.notes);
+  const noteRevision = useRef(conversation.notesRevision);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
   const draft = state.drafts.find((d) => d.conversationId === conversation.id);
   const agent = state.agents.find((a) => a.id === draft?.agentId);
   return (
@@ -142,11 +209,10 @@ export function ContactContext({
         {[
           ["Company", conversation.contact.company],
           ["Industry", conversation.contact.industry],
-          ["Language", "English"],
         ].map(([label, value]) => (
           <div className="details-row" key={label}>
             <span>{label}</span>
-            <span>{value}</span>
+            <span>{value || "—"}</span>
           </div>
         ))}
       </div>
@@ -177,7 +243,7 @@ export function ContactContext({
       {agent ? (
         <div className="context-section">
           <p className="eyebrow">Assigned agent</p>
-          <Link className="agent-link" href={`/demo/agents/${agent.id}`}>
+          <Link className="agent-link" href={`${basePath}/agents/${agent.id}`}>
             <Spark />
             <span className="grow">
               <strong>{agent.name}</strong>
@@ -203,12 +269,43 @@ export function ContactContext({
         <Button
           variant="ghost small"
           onClick={async () => {
-            await repository.note(scope, conversation.id, notes);
-            setSaved(true);
+            try {
+              await repository.note(
+                scope,
+                conversation.id,
+                notes,
+                noteRevision.current,
+              );
+              noteRevision.current = repository
+                .getSnapshot()
+                .conversations.find(
+                  (c) => c.id === conversation.id,
+                )?.notesRevision;
+              setSaved(true);
+              setError("");
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Could not save note.");
+            }
           }}
         >
           {saved ? "Saved" : "Save note"}
         </Button>
+        {error ? (
+          <Notice variant="error">
+            {error}
+            <Button
+              variant="ghost small"
+              onClick={() => {
+                setNotes(conversation.notes);
+                noteRevision.current = conversation.notesRevision;
+                setError("");
+                setSaved(false);
+              }}
+            >
+              Load saved note
+            </Button>
+          </Notice>
+        ) : null}
       </div>
     </aside>
   );

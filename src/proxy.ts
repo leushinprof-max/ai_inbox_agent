@@ -7,6 +7,7 @@ export async function proxy(request: NextRequest) {
   if (!config) return NextResponse.next();
   let response = NextResponse.next({ request });
   const supabase = createServerClient(config.url, config.key, {
+    cookieOptions: { name: config.cookieName },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (values) => {
@@ -23,5 +24,14 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 export const config = {
-  matcher: ["/login", "/workspaces/:path*", "/auth/:path*"],
+  matcher: [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/invites/:path*",
+    "/workspaces/:path*",
+    "/w/:path*",
+    "/api/inbox/:path*",
+  ],
 };

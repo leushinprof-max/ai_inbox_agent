@@ -23,12 +23,14 @@ export function InboxProvider({
   initialWorkspaceId,
   userId,
   mode,
+  onWorkspaceChange,
   children,
 }: {
   repository: InboxGateway;
   initialWorkspaceId: string;
   userId: string;
   mode: "demo" | "live";
+  onWorkspaceChange?: (id: string) => void;
   children: ReactNode;
 }) {
   const [workspaceId, setWorkspace] = useState(initialWorkspaceId);
@@ -39,7 +41,8 @@ export function InboxProvider({
         .memberships.some((m) => m.workspaceId === id && m.userId === userId)
     )
       throw new Error("Workspace is not available.");
-    setWorkspace(id);
+    if (onWorkspaceChange) onWorkspaceChange(id);
+    else setWorkspace(id);
   }
   return (
     <Context.Provider
@@ -67,5 +70,6 @@ export function useInbox() {
     state,
     scope,
     workspace: state.workspaces.find((w) => w.id === context.workspaceId)!,
+    basePath: context.mode === "demo" ? "/demo" : `/w/${context.workspaceId}`,
   };
 }

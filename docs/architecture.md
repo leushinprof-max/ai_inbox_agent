@@ -1,41 +1,51 @@
 # Architecture
 
-## Layers
+## Boundaries
 
-Next.js 16 and React 19 provide the application shell and routes. Feature components consume `InboxGateway`; they do not instantiate HeyReach transports, hold API keys, or determine tenancy. The explicit `/demo` layout supplies a synthetic gateway. A persistent authenticated gateway is a pending integration, not an implicit fallback.
+Next.js 16 and React 19 render four product sections. Components consume `InboxGateway`; the authenticated `LiveGateway` maintains a replaceable browser snapshot and calls server actions or authenticated read routes. It holds neither provider credentials nor authority. `/demo` explicitly supplies a separate in-memory adapter.
 
-Domain modules own typed entities, draft transitions, membership checks and the send orchestration contract. Provider response normalization lives in `integrations/heyreach`. The current transport has a fixed endpoint, bounded timeout, disabled redirects, sanitized outcomes, and no automatic retries.
+Supabase owns Auth and PostgreSQL. Auth cookies use an Inbox-specific, database-host-and-port namespace so separate local apps do not overwrite each other. The callback exchanges its one-time code directly and redirects to the configured canonical application origin, without refreshing an unrelated old session first. The proxy validates users immediately after creating its SSR client; every server operation authenticates again. RLS checks current database membership, so removing access also blocks an existing JWT. Signup, password recovery and invitation acceptance use allowlisted redirects. Invitations bind to a verified Auth email, not editable user metadata. Invitation tokens are stored as hashes and shared manually; the app does not send invitation emails.
 
-Supabase owns Auth and the new relational database. The server client is created per request. Auth refresh uses `getUser()` immediately after client creation in `proxy.ts`. Server actions independently validate identity. UI session claims alone never establish workspace access.
+All tenant rows carry `workspace_id`; composite foreign keys prevent cross-tenant conversation, sender and agent references. Exposed tables have explicit grants and RLS. Browser users cannot write provider messages or forge send completion. Privileged `server_*` functions only permit the server role. Human RPCs additionally check `auth.uid()` and the required role. Security-definer functions use an empty search path.
 
-## Data ownership
+The API key is verified against HeyReach, encrypted with AES-256-GCM and workspace-bound associated data, then stored in a private schema. The encryption key and Supabase privileged key exist only on the server/worker. Reconnect rotates the webhook secret and connection revision. Sends and in-flight provider reads verify that revision. Reconnect cannot replace credentials while a send remains unresolved.
 
-Every workspace-owned row carries `workspace_id`. Child rows use composite foreign keys so they cannot refer to another workspace's conversation or agent. Sender identity is unique inside `(workspace_id, sender_id, provider_conversation_id)`.
+## Ingestion and jobs
 
-All exposed tables have explicit grants and RLS. Anonymous users have no table access. Membership creation and workspace creation are transactional. Membership rows cannot be edited directly by browser clients. Provider-owned messages and draft terminal send states cannot be forged through client table writes.
+The webhook authenticates a private random URL token, bounds its body to 256 KB and stores only a routing hint in a durable queue. The worker reads the canonical conversation through the workspace API key. Webhook text never directly becomes a message. The private URL must be redacted from hosting access logs.
 
-The role lookup is a narrow security-definer helper in a non-exposed schema, with a fixed empty search path, a real `auth.uid()` predicate and explicit execute grants. Privileged workspace/draft functions revoke default public execution and check workspace membership internally.
+HeyReach payloads are validated, bounded and normalized before admission. Sender IDs belong to the HeyReach workspace; there are no LeadFleet assignment checks or static sender allowlists. A new sender is discovered through the provider account list. Unsupported direction/routing/group-chat shapes fail visibly.
 
-## Revision boundaries
+The documented chat message shape has no stable message ID. Ingestion fingerprints normalized timestamp, direction, body and ancillary content, with occurrence ordinals to preserve identical messages. Duplicate hints are safe. A repeated hint after completion schedules a new read, and another hint during a claimed read requests a subsequent read.
 
-An inbound revision belongs to the conversation. Draft revision belongs to the draft content and review state. Agent version belongs to configuration. These are distinct counters.
+PostgreSQL jobs use `SKIP LOCKED`, a three-minute lease and a token that prevents stale workers from finishing another claim. Transient failures retry up to five attempts; final errors appear on imports or generation requests. Side effects remain revision-fenced even after lease expiry. The worker never retries a message POST.
 
-Draft edits require the expected revision. The initial SQL RPC uses one conditional update and returns a conflict when a concurrent edit wins. Snoozing and editing are not allowed to transition a draft to Sent. Actual send completion requires the later durable transport transaction.
+History imports freeze the window, scan in bounded pages and persist each item's ingestion/classification progress. They classify latest conversation state without historical drafts. Interrupted imports can replay idempotently. Cancellation stops further admission; already imported history stays. The current scan cap is 10,000 inspected conversations and 5,000 messages per chat. Full chat context is retained for conversations active in the selected window; the window is not a per-message deletion filter.
 
-## Send contract
+## Drafts and model calls
 
-`sendReply` asks `SendRepository.reserve` to atomically authorize and reserve a request. It then calls the provider once and completes the persisted operation. Existing requests return their previous state. The production repository must also recover a worker crash after reservation or an accepted send followed by a persistence failure.
+Conversation inbound revision, draft revision, immutable agent version and connection revision are separate counters. Our own outgoing message does not increment the inbound revision. Human edits, saved notes and agent updates use optimistic concurrency. Application conflicts use `PT409`, avoiding PostgREST serialization retries for ordinary review conflicts.
 
-`DemoRepository` demonstrates these semantics for UI development and unit tests only. Its process-local operations and synthetic message identifiers must never be used for production persistence, cross-process locking or provider message identity.
+The worker classifies new inbound state, using the selected active agent when one exists. Approved Knowledge and untrusted transcript are separate model inputs. The OpenAI Responses request uses a strict output schema, `store: false`, a bounded transcript and timeout. Classification cannot invent missing approved information. Missing facts become Needs input. Without an active agent, historical classification can still label conversations, but no automatic draft is created.
 
-HTTP 200 produces an outbound acknowledgement with `source = accepted_send`, not a fabricated provider message ID. The later ingestion adapter must correlate readback without presenting duplicate messages, while keeping uncertainty honest where HeyReach provides no stable message ID.
+Explicit generation stores the immutable agent version, expected conversation/draft revisions and operator instructions. The current draft remains usable while a replacement is prepared. Cancellation and concurrent edits prevent late results from replacing reviewed text. Adding an approved answer to shared Knowledge requires admin authority. Test invokes the saved agent and never sends a message to HeyReach.
 
-## Provider authority
+The UI refreshes its own queries, retaining loaded pages, selected conversation and unsaved composition. It does not revalidate the entire server layout on every poll. Personal layout/shortcut preferences are browser-local and keyed by user.
 
-The [official HeyReach API collection](https://documenter.getpostman.com/view/23808049/2sA2xb5F75) documents the JSON SendMessage shape and empty-body success. The request uses `message`, `subject`, `conversationId` and `linkedInAccountId`. The adapter includes an empty subject for ordinary text; live compatibility belongs to the later controlled integration test. The owner approved the 200-to-Sent product behavior.
+## Sending
 
-No provider credential, webhook, model call or real send was performed while building this foundation. Read/import/webhook schemas must be verified against current official documentation before their adapters are implemented. The [Supabase SSR guide](https://supabase.com/docs/guides/auth/server-side/creating-a-client?queryGroups=framework&framework=nextjs) and [RLS guide](https://supabase.com/docs/guides/database/postgres/row-level-security) informed the new Auth/data boundary.
+The server resolves both the conversation and sender; the browser submits only approved text, conversation ID, request UUID and optional draft revision. A transactional reservation checks tenant/role, current sender connection, stale draft state and request identity. One unresolved operation per conversation prevents concurrent duplicate dispatch.
 
-## Deployment boundary
+The provider is called once. HTTP 200 immediately means Sent, stores an outbound acknowledgement and completes applicable drafts. The composer clears and can send the next message without a timed authorization. Database completion can retry because it is idempotent; the provider POST cannot. A known 200 remains a successful response even if local completion is temporarily unavailable, with a durable recovery job already scheduled before dispatch.
 
-Use separate development and production environments for the standalone application. Do not link it to the LeadFleet Vercel project, Supabase project or Railway worker. The existing hosted design preview remains a design reference. Production setup, migration application, provider connection and controlled test sends remain explicit operations after implementation and review.
+Timeouts and ambiguous responses retain Unknown. Read-only recovery or an operator's explicit confirmation that the message is absent resolves the uncertainty; absence confirmation is unavailable during the first 90 seconds and never sends anything itself. The UI does not claim delivery or read receipts from HTTP 200.
+
+Provider readback correlates exactly one same-body, time-bounded operation and converts the acknowledgement into a provider message without duplication. Ambiguous matches are not guessed. Late completion only closes drafts based on inbound state no newer than the original send reservation.
+
+## Provider references
+
+- [Official HeyReach API collection](https://documenter.getpostman.com/view/23808049/2sA2xb5F75): CheckApiKey, GetAll accounts, GetConversationsV2, GetChatroom and SendMessage. The send body includes `message`, `subject`, `conversationId` and `linkedInAccountId`; ordinary text uses an empty subject.
+- [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client) and [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
+- [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs): strict Responses output schema.
+
+These contracts have deterministic adapter tests. Real credentials, hosted compatibility, model quality and a controlled outbound send still require separate live acceptance.

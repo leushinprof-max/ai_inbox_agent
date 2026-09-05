@@ -6,7 +6,13 @@ import { useInbox } from "@/lib/inbox-context";
 import { Badge, Empty, Icon, Spark, Topbar } from "@/components/ui";
 
 export function AgentsScreen() {
-  const { state, scope } = useInbox();
+  const { state, scope, basePath } = useInbox();
+  const canManage = state.memberships.some(
+    (m) =>
+      m.workspaceId === scope.workspaceId &&
+      m.userId === scope.userId &&
+      ["owner", "admin"].includes(m.role),
+  );
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const all = state.agents.filter((a) => a.workspaceId === scope.workspaceId);
@@ -27,10 +33,12 @@ export function AgentsScreen() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <Link className="btn primary" href="/demo/agents/new">
-          <Icon name="plus" />
-          Create agent
-        </Link>
+        {canManage ? (
+          <Link className="btn primary" href={`${basePath}/agents/new`}>
+            <Icon name="plus" />
+            Create agent
+          </Link>
+        ) : null}
       </Topbar>
       <div className="content-scroll">
         <div className="page-content">
@@ -56,7 +64,7 @@ export function AgentsScreen() {
               <Link
                 className="agent-card"
                 key={agent.id}
-                href={`/demo/agents/${agent.id}`}
+                href={`${basePath}/agents/${agent.id}`}
               >
                 <div className="row">
                   <Spark />
@@ -80,11 +88,12 @@ export function AgentsScreen() {
                 <div className="agent-bottom">
                   <div>
                     <div className="metric">
-                      {
-                        state.drafts.filter(
-                          (d) => d.agentId === agent.id && d.status === "sent",
-                        ).length
-                      }
+                      {state.agentActivity
+                        ? (state.agentActivity[agent.id] ?? 0)
+                        : state.drafts.filter(
+                            (d) =>
+                              d.agentId === agent.id && d.status === "sent",
+                          ).length}
                     </div>
                     <div className="metric-label">Reviewed replies sent</div>
                   </div>
@@ -99,9 +108,11 @@ export function AgentsScreen() {
                 all.length ? "No matching agents" : "Create your first agent"
               }
               action={
-                <Link className="btn primary" href="/demo/agents/new">
-                  Create agent
-                </Link>
+                canManage ? (
+                  <Link className="btn primary" href={`${basePath}/agents/new`}>
+                    Create agent
+                  </Link>
+                ) : undefined
               }
             >
               Give your agent a clear goal and approved Knowledge. It will

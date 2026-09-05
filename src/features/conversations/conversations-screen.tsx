@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { displayDate } from "@/lib/display-date";
 import { useInbox } from "@/lib/inbox-context";
 import {
   Avatar,
@@ -9,27 +10,52 @@ import {
   Icon,
   IconButton,
   Topbar,
+  Button,
+  Notice,
 } from "@/components/ui";
 import { ConversationThread, ContactContext } from "./thread";
 import { Composer } from "@/features/drafts/composer";
+import { usePreferences } from "@/lib/preferences";
 
 export function ConversationsScreen({ initialId }: { initialId?: string }) {
-  const { state, scope } = useInbox();
+  const { state, scope, repository, workspace } = useInbox();
+  const { preferences } = usePreferences(scope.userId);
+  const [error, setError] = useState("");
   const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
   const [query, setQuery] = useState("");
   const [label, setLabel] = useState("all");
-  const [details, setDetails] = useState(true);
+  const [detailsOverride, setDetails] = useState<boolean | null>(null);
+  const details = detailsOverride ?? preferences.details;
   const conversations = state.conversations.filter(
     (c) => c.workspaceId === scope.workspaceId && !c.archived,
   );
   const selected = conversations.find((c) => c.id === selectedId);
-  const filtered = conversations.filter(
-    (c) =>
-      `${c.contact.name} ${c.contact.company} ${c.messages.at(-1)?.body}`
-        .toLowerCase()
-        .includes(query.toLowerCase()) &&
-      (label === "all" || c.labels.some((l) => l === label)),
-  );
+  useEffect(() => {
+    if (!repository.searchConversations) return;
+    const timer = setTimeout(() => {
+      void repository.searchConversations!(query, label).catch(() =>
+        setError("Search could not be loaded. Try again."),
+      );
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, label, repository]);
+  useEffect(() => {
+    if (initialId && repository.openConversation)
+      void repository
+        .openConversation(initialId)
+        .catch(() => setError("Conversation could not be loaded."));
+  }, [initialId, repository]);
+  const filtered = state.paging
+    ? state.paging.conversationIds
+        .map((id) => conversations.find((c) => c.id === id))
+        .filter((c): c is NonNullable<typeof c> => !!c)
+    : conversations.filter(
+        (c) =>
+          `${c.contact.name} ${c.contact.company} ${c.messages.at(-1)?.body}`
+            .toLowerCase()
+            .includes(query.toLowerCase()) &&
+          (label === "all" || c.labels.some((l) => l === label)),
+      );
   if (selected)
     return (
       <>
@@ -61,7 +87,10 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   return (
     <>
       <Topbar title="Conversations">
-        <span className="count">{conversations.length} conversations</span>
+        <span className="count">
+          {state.paging?.conversationTotal ?? conversations.length}{" "}
+          conversations
+        </span>
         <label className="search">
           <Icon name="search" />
           <input
@@ -74,6 +103,21 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
       </Topbar>
       <div className="content-scroll">
         <div className="page-content">
+          {error ? (
+            <Notice variant="error">
+              {error}
+              <Button
+                onClick={() =>
+                  void repository
+                    .refresh?.()
+                    .then(() => setError(""))
+                    .catch(() => setError("Still unavailable. Try again."))
+                }
+              >
+                Retry
+              </Button>
+            </Notice>
+          ) : null}
           <div className="row between" style={{ marginBottom: 24 }}>
             <div className="tabs">
               <button className="tab active">All conversations</button>
@@ -89,11 +133,23 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
                 "Information Request",
                 "Meeting Request",
                 "Referral",
+                "Not interested",
               ].map((l) => (
                 <option key={l}>{l}</option>
               ))}
             </select>
           </div>
+          {state.paging?.conversationNext ? (
+            <Button
+              onClick={() =>
+                void repository
+                  .moreConversations?.()
+                  .catch(() => setError("Could not load more conversations."))
+              }
+            >
+              Load more conversations
+            </Button>
+          ) : null}
           <div className="conversation-list">
             {filtered.map((c) => (
               <button
@@ -117,7 +173,12 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
                   ))}
                 </span>
                 <span className="snippet">{c.messages.at(-1)?.body}</span>
-                <time>Today</time>
+                <time>
+                  {displayDate(
+                    c.messages.at(-1)?.createdAt,
+                    workspace.timezone,
+                  )}
+                </time>
               </button>
             ))}
           </div>

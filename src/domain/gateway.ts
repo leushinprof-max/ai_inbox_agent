@@ -3,6 +3,13 @@ import type { SendOutcome, SendRequest } from "./send";
 
 /** UI-facing application boundary. Implementations own persistence and transport. */
 export interface InboxGateway {
+  refresh?(): Promise<void>;
+  searchConversations?(query: string, label: string): Promise<void>;
+  moreConversations?(): Promise<void>;
+  searchDrafts?(query: string, status: string): Promise<void>;
+  moreDrafts?(): Promise<void>;
+  openConversation?(id: string): Promise<void>;
+  olderMessages?(id: string): Promise<void>;
   getSnapshot(): InboxState;
   subscribe(listener: () => void): () => void;
   editDraft(
@@ -19,7 +26,12 @@ export interface InboxGateway {
     until: string,
   ): Promise<void>;
   restore(scope: Scope, id: string, revision: number): Promise<void>;
-  note(scope: Scope, id: string, notes: string): Promise<void>;
+  note(
+    scope: Scope,
+    id: string,
+    notes: string,
+    revision?: number,
+  ): Promise<void>;
   saveAgent(scope: Scope, agent: Agent): Promise<void>;
   addWorkspace(userId: string, id: string, name: string): Promise<void>;
   renameWorkspace(scope: Scope, name: string, timezone: string): Promise<void>;
@@ -30,6 +42,7 @@ export interface InboxGateway {
     id: string,
     answer: string,
     remember: boolean,
+    revision?: number,
   ): Promise<void>;
   send(
     scope: Scope,

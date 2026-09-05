@@ -110,6 +110,32 @@ test("An ambiguous timeout is not automatically retried", async () => {
   assert.equal(repository.getSnapshot().drafts[0].status, "ready");
 });
 
+test("A known HTTP 200 remains Sent when local completion is unavailable, without a second provider POST", async () => {
+  const repository = new DemoRepository(createDemoState());
+  let posts = 0;
+  const unavailableCompletion = {
+    reserve: repository.reserve.bind(repository),
+    async complete() {
+      throw new Error("Database unavailable after dispatch");
+    },
+  };
+  const transport = {
+    async send() {
+      posts++;
+      return { status: "sent" as const };
+    },
+  };
+  assert.deepEqual(
+    await sendReply(unavailableCompletion, transport, scope, request),
+    { status: "sent" },
+  );
+  assert.equal(
+    (await sendReply(unavailableCompletion, transport, scope, request)).status,
+    "sending",
+  );
+  assert.equal(posts, 1);
+});
+
 test("Provider errors never leak raw response bodies", async () => {
   for (const status of [400, 401, 403, 404, 429, 500, 202]) {
     const transport = createHeyReachTransport(
