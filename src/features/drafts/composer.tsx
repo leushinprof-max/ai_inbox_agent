@@ -69,6 +69,20 @@ export function Composer({
     (o) => o.conversationId === conversation.id,
   );
   const locked = status !== "idle" || !!unresolved;
+  // A first incoming draft can arrive while this conversation is already open.
+  // Adopt it only into an untouched empty composer; never replace typed text.
+  if (
+    !reviewedDraft &&
+    draft &&
+    mode === "manual" &&
+    text === "" &&
+    !locked &&
+    !generationId
+  ) {
+    setReviewedDraft(draft);
+    setText(draft.body);
+    setMode("draft");
+  }
   const lastOperation = useRef<string | null>(null);
   const observedUnresolved = useRef(false);
   useEffect(() => {

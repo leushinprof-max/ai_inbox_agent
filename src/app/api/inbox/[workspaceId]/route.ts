@@ -6,6 +6,7 @@ import {
   conversationPage,
   cursor,
   draftDto,
+  draftCounts,
   draftPage,
   readConversation,
   readWorkspace,
@@ -51,13 +52,16 @@ export async function GET(
         );
       }
       case "drafts": {
-        const page = await draftPage(
-          db,
-          workspaceId,
-          before,
-          q.get("status") ?? undefined,
-          q.get("q") ?? "",
-        );
+        const [page, counts] = await Promise.all([
+          draftPage(
+            db,
+            workspaceId,
+            before,
+            q.get("status") ?? undefined,
+            q.get("q") ?? "",
+          ),
+          before ? undefined : draftCounts(db, workspaceId),
+        ]);
         const ids = [...new Set(page.rows.map((d) => d.conversation_id))];
         const rows = ids.length
           ? await db
@@ -70,6 +74,7 @@ export async function GET(
         return NextResponse.json(
           {
             items: page.rows.map(draftDto),
+            ...(counts ? { counts } : {}),
             conversations: await withPreviews(db, workspaceId, rows.data ?? []),
             next: page.next,
           },

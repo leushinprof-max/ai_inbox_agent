@@ -258,11 +258,13 @@ export class LiveGateway implements InboxGateway {
     let before: PageCursor | null = null;
     const drafts: Draft[] = [];
     const conversations: Conversation[] = [];
+    let counts: Record<string, number> | undefined;
     for (let page = 0; page < pages; page++) {
       const result: {
         items: Draft[];
         conversations: Conversation[];
         next: PageCursor | null;
+        counts?: Record<string, number>;
       } = await this.read({
         view: "drafts",
         q: this.draftSearch.query,
@@ -270,6 +272,7 @@ export class LiveGateway implements InboxGateway {
         ...(before ? { before: JSON.stringify(before) } : {}),
       });
       drafts.push(...result.items);
+      if (result.counts) counts = result.counts;
       conversations.push(...result.conversations);
       before = result.next;
       if (!before) break;
@@ -283,6 +286,7 @@ export class LiveGateway implements InboxGateway {
         ...this.state.paging!,
         draftNext: before,
         draftIds: drafts.map((d) => d.id),
+        ...(counts ? { draftCounts: counts } : {}),
       },
     });
   }

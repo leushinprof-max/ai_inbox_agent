@@ -8,6 +8,7 @@ import type { Database } from "../../src/lib/supabase/database.types";
 // @ts-expect-error Node-only safety helper requires the isolated local project.
 import { localConfig } from "../../tools/local-config.mjs";
 import { readWorkspace, readConversation } from "../../src/server/inbox-read";
+import { LiveGateway } from "../../src/lib/live-gateway";
 
 const local = localConfig();
 const admin = createClient<Database>(local.API_URL, local.SERVICE_ROLE_KEY, {
@@ -358,4 +359,113 @@ test("HTTP workspace API enforces cookie authentication and tenant ownership", a
     ).status,
     403,
   );
+});
+
+test("Draft searches refresh empty-state counts and queue transitions without a workspace reload", async () => {
+  must(
+    await admin
+      .from("drafts")
+      .update({ status: "dismissed" })
+      .eq("id", draftId),
+  );
+  const initial = await readWorkspace(clients.owner, userIds.owner, workspace);
+  assert.equal(initial.paging?.draftCounts.ready, 0);
+  const gateway = new LiveGateway(initial, workspace, userIds.owner);
+  const jar = new Map<string, string>();
+  const ssr = createServerClient(local.API_URL, local.ANON_KEY, {
+    cookieOptions: { name: inboxAuthCookieName(local.API_URL) },
+    cookies: {
+      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+      setAll: (values) => values.forEach((v) => jar.set(v.name, v.value)),
+    },
+  });
+  must(
+    await ssr.auth.signInWithPassword({
+      email: `test-${run}-owner@inbox.example`,
+      password,
+    }),
+  );
+  const headers = { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") };
+  const originalFetch = globalThis.fetch;
+  let workspaceReloads = 0;
+  globalThis.fetch = (input, init) => {
+    if (
+      typeof input === "string" &&
+      input.startsWith(`/api/inbox/${workspace}?`)
+    ) {
+      const url = new URL(input, "http://127.0.0.1:43600");
+      if (!url.searchParams.has("view")) workspaceReloads++;
+      return originalFetch(url, { ...init, headers });
+    }
+    return originalFetch(input, init);
+  };
+  try {
+    // The worker has produced a first draft after the browser took its snapshot.
+    must(
+      await admin.from("drafts").update({ status: "ready" }).eq("id", draftId),
+    );
+    await gateway.searchDrafts("", "ready");
+    assert.deepEqual(gateway.getSnapshot().paging?.draftCounts, {
+      ready: 1,
+      needs_input: 0,
+      snoozed: 0,
+    });
+    assert.equal(gateway.getSnapshot().drafts[0].id, draftId);
+
+    await gateway.searchDrafts("no matching contact", "ready");
+    assert.equal(gateway.getSnapshot().drafts.length, 0);
+    assert.equal(
+      gateway.getSnapshot().paging?.draftCounts.ready,
+      1,
+      "Queue totals are independent of search",
+    );
+    await gateway.searchDrafts("", "ready");
+    must(
+      await clients.owner.rpc("act_on_draft", {
+        p_workspace: workspace,
+        p_id: draftId,
+        p_action: "snooze",
+        p_revision: gateway.getSnapshot().drafts[0].revision,
+        p_until: new Date(Date.now() + 3600_000).toISOString(),
+      }),
+    );
+    await gateway.searchDrafts("", "snoozed");
+    assert.deepEqual(gateway.getSnapshot().paging?.draftCounts, {
+      ready: 0,
+      needs_input: 0,
+      snoozed: 1,
+    });
+    must(
+      await clients.owner.rpc("act_on_draft", {
+        p_workspace: workspace,
+        p_id: draftId,
+        p_action: "restore",
+        p_revision: gateway.getSnapshot().drafts[0].revision,
+      }),
+    );
+    await gateway.searchDrafts("", "ready");
+    assert.deepEqual(gateway.getSnapshot().paging?.draftCounts, {
+      ready: 1,
+      needs_input: 0,
+      snoozed: 0,
+    });
+    assert.equal(workspaceReloads, 0);
+    assert.equal(
+      (
+        await originalFetch(
+          `http://127.0.0.1:43600/api/inbox/${otherWorkspace}?view=drafts`,
+          { headers },
+        )
+      ).status,
+      403,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    must(
+      await admin
+        .from("drafts")
+        .update({ status: "ready", snoozed_until: null })
+        .eq("id", draftId),
+    );
+  }
 });

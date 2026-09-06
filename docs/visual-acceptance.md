@@ -101,3 +101,15 @@ The owner confirmed their email, signed in and created Restaff in their own brow
 ## 2026-09-06 reply eligibility check
 
 Local authenticated Conversations at 1280 × 720 used three synthetic histories: outreach only, a lead reply, and a lead reply followed by a team answer. The rendered list and counter showed exactly the latter two. The outreach-only row was absent. Result: behavior matched the owner-requested rule; the existing `conversations/list` reference deviation remains because live data and filters differ from the prototype. No component markup, styles or design assets changed. Search, pagination, hidden direct reads and a first reply restoring full history were also verified through the actual database/application integration tests. The temporary fixture and screenshot are not tracked.
+
+## 2026-09-06 live draft refresh repair
+
+Local authenticated browser checks used an isolated synthetic workspace and the production build at 1280 × 720. No styles, markup or reference assets changed. Screenshots were inspected and remain untracked.
+
+| Frame | Result | Observation |
+| --- | --- | --- |
+| drafts/empty-to-ready | matched | A first draft arrived after the initial empty snapshot. Normal navigation showed Ready 1, the matching row and its reply without reloading the page. Existing live-versus-prototype action placement differences remain. |
+| conversations/first-draft | matched | An already-open empty manual composer adopted the arriving suggested reply after the normal background refresh. |
+| conversations/typing-during-refresh | matched | A draft arrived while a manual answer was being typed. The new draft badge and controls appeared while the full unsaved human text remained intact. |
+
+Separately, the authenticated hosted walkthrough verified three saved-agent Test results, automatic draft creation after a real webhook, snooze/restore/edit/save, one approved send and a reusable composer. These live observations complete the provider interaction checks, not the remaining reference-frame screenshots or final owner design review.
