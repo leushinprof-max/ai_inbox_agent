@@ -18,11 +18,13 @@ export function ConversationThread({
   children,
   onBack,
   onToggleDetails,
+  mobileOpen = false,
 }: {
   conversation: Conversation;
   children: ReactNode;
   onBack: () => void;
   onToggleDetails: () => void;
+  mobileOpen?: boolean;
 }) {
   const { repository, state, workspace } = useInbox();
   const [loadError, setLoadError] = useState("");
@@ -49,7 +51,7 @@ export function ConversationThread({
   const latestMessageId = conversation.messages.at(-1)?.id;
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [conversation.id, latestMessageId]);
+  }, [conversation.id, latestMessageId, mobileOpen]);
   return (
     <section className="thread">
       <header className="thread-header">

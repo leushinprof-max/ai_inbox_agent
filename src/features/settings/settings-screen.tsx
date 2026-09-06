@@ -15,6 +15,7 @@ import { Dialog } from "@/components/dialog";
 import { LiveConnectionSettings, LiveImportSettings } from "./live-settings";
 import { MembersSettings } from "./members-settings";
 import { usePreferences } from "@/lib/preferences";
+import { ImportRunCard, ImportWindow } from "./import-history";
 
 const tabs: { id: string; label: string; icon: IconName }[] = [
   { id: "general", label: "General", icon: "settings" },
@@ -24,9 +25,11 @@ const tabs: { id: string; label: string; icon: IconName }[] = [
   { id: "preferences", label: "Preferences", icon: "settings" },
 ];
 
-export function SettingsScreen() {
+export function SettingsScreen({
+  initialTab = "general",
+}: { initialTab?: string } = {}) {
   const { workspace, state, scope, mode } = useInbox();
-  const [tab, setTab] = useState("general");
+  const [tab, setTab] = useState(initialTab);
   return (
     <>
       <Topbar title="Settings" />
@@ -337,6 +340,20 @@ function ConnectionSettings() {
 
 function ImportSettings() {
   const [days, setDays] = useState(7);
+  const { state, workspace, basePath } = useInbox();
+  if (state.imports?.length)
+    return (
+      <div className="stack">
+        {state.imports.map((run) => (
+          <ImportRunCard
+            key={run.id}
+            run={run}
+            timezone={workspace.timezone}
+            conversationsPath={`${basePath}/conversations`}
+          />
+        ))}
+      </div>
+    );
   return (
     <div className="card">
       <h2>Import conversation history</h2>
@@ -344,27 +361,13 @@ function ImportSettings() {
         Bring past conversations into your inbox and classify their latest
         replies.
       </p>
-      <div className="field" style={{ marginTop: 24 }}>
-        <label>History window</label>
-        <div className="row wrap">
-          {[7, 14, 30, 90].map((d) => (
-            <Button
-              key={d}
-              variant={days === d ? "primary" : ""}
-              onClick={() => setDays(d)}
-            >
-              {d} days
-            </Button>
-          ))}
-        </div>
-      </div>
+      <ImportWindow days={days} onChange={setDays} />
       <Notice title="Import and classify">
         Historical messages do not create drafts. New replies can create drafts
         once an agent is active.
       </Notice>
       <p className="demo-note">
-        The import worker is part of the next integration stage. No import is
-        started by this screen.
+        This is a demo. Connect a workspace to import real conversations.
       </p>
       <div className="row" style={{ justifyContent: "flex-end" }}>
         <Button disabled>Start import</Button>

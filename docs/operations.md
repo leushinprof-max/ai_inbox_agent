@@ -2,7 +2,7 @@
 
 ## Demo
 
-Node.js 22.18+ is required; Node 24 is the worker image runtime. Run `npm ci` and `npm run dev`, then open `http://127.0.0.1:43600/demo/drafts`. No database or provider access is used by this route.
+Node.js 22.18+ is required; Node 24 is the worker image runtime. Run `npm ci` and `npm run dev`, then open `http://127.0.0.1:43600/demo/drafts`. No database or provider access is used by this route. Open `/demo/states` for deterministic loading, failure, generation, sending and import-state previews.
 
 ## Isolated persistent development
 
@@ -57,7 +57,7 @@ Imports keep their original window and progress; retry replays failed work idemp
 
 ## Hosted release boundary
 
-This repository is not linked to a new hosted deployment. Before live use, configure dedicated web/worker/Supabase projects, confirm HTTPS application and Auth callback URLs, enable email confirmation and configure SMTP. Local signup confirmation is disabled for synthetic development; hosted invitations rely on verified email and must not use that development setting.
+This repository is not linked to a new hosted deployment. The concrete resource plan and checked configuration files are documented in [hosted development](dev-environment.md). Before live use, configure dedicated web/worker/Supabase projects, confirm HTTPS application and Auth callback URLs, enable email confirmation and configure SMTP. Local signup confirmation is disabled for synthetic development; hosted invitations rely on verified email and must not use that development setting.
 
 Review the exact migration/branch diff and run all applicable local checks before publishing. Applying hosted migrations, setting credentials/domains/webhooks, activating a real workspace and performing a test send require the owner's scoped authorization. The current draft PR is not merged and changes no LeadFleet production service.
 

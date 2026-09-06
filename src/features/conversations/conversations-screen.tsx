@@ -16,6 +16,7 @@ import {
 import { ConversationThread, ContactContext } from "./thread";
 import { Composer } from "@/features/drafts/composer";
 import { usePreferences } from "@/lib/preferences";
+import { useContactDetails } from "@/lib/use-contact-details";
 
 export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const { state, scope, repository, workspace } = useInbox();
@@ -24,8 +25,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
   const [query, setQuery] = useState("");
   const [label, setLabel] = useState("all");
-  const [detailsOverride, setDetails] = useState<boolean | null>(null);
-  const details = detailsOverride ?? preferences.details;
+  const [details, setDetails] = useContactDetails(preferences.details);
   const conversations = state.conversations.filter(
     (c) => c.workspaceId === scope.workspaceId && !c.archived,
   );

@@ -61,12 +61,14 @@ export function Composer({
   );
   const [status, setStatus] = useState<"idle" | "sending" | "unknown">("idle");
   const [error, setError] = useState("");
+  const [sendRejected, setSendRejected] = useState(false);
   const [modal, setModal] = useState<
     "snooze" | "dismiss" | "send-absent" | null
   >(null);
   const unresolved = state.unresolvedSends?.find(
     (o) => o.conversationId === conversation.id,
   );
+  const locked = status !== "idle" || !!unresolved;
   const lastOperation = useRef<string | null>(null);
   const observedUnresolved = useRef(false);
   useEffect(() => {
@@ -133,6 +135,10 @@ export function Composer({
     !!reviewedDraft &&
     (reviewedDraft.sourceRevision !== conversation.revision ||
       reviewedDraft.revision !== draft?.revision);
+  const needsFreshDraft =
+    !!draft &&
+    reviewedDraft?.revision === draft.revision &&
+    draft.sourceRevision !== conversation.revision;
   const canSend =
     writable &&
     (environment === "demo" ||
@@ -177,6 +183,7 @@ export function Composer({
     lock.current = true;
     setStatus("sending");
     setError("");
+    setSendRejected(false);
     try {
       const operationId = crypto.randomUUID();
       lastOperation.current = operationId;
@@ -202,6 +209,7 @@ export function Composer({
       } else if (outcome.status === "unknown" || outcome.status === "sending")
         setStatus("unknown");
       else {
+        setSendRejected(true);
         setError(outcome.reason);
         setStatus("idle");
       }
@@ -267,15 +275,17 @@ export function Composer({
               <Spark />
               Preparing a draft
             </div>
-            <p className="draft-text">
-              Using this conversation and your agent’s approved information.
-            </p>
+            <div role="status" aria-label="Preparing a draft">
+              <div className="skeleton wide" />
+              <div className="skeleton wide" />
+              <div className="skeleton medium" />
+            </div>
             <div className="composer-actions">
               <span className="small muted">
                 Your current draft is preserved.
               </span>
               <Button
-                disabled={!generation}
+                disabled={!generation || environment === "demo"}
                 onClick={() =>
                   void run(async () => {
                     if (!generation) return;
@@ -388,7 +398,13 @@ export function Composer({
           <>
             <div className="composer-title">
               <Spark />
-              {mode === "manual" ? "Your reply" : "Suggested reply"}
+              {status === "sending"
+                ? "Sending…"
+                : status === "unknown" || unresolved
+                  ? "Send status unavailable"
+                  : mode === "manual"
+                    ? "Your reply"
+                    : "Suggested reply"}
               {draft ? (
                 <span className="version">Draft {draft.revision}</span>
               ) : null}
@@ -399,26 +415,42 @@ export function Composer({
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 maxLength={8000}
-                disabled={status !== "idle"}
+                disabled={locked}
                 placeholder="Write a message…"
               />
             ) : (
               <p className="draft-text">{text}</p>
             )}
+            {error ? (
+              <Notice
+                variant="error"
+                title={sendRejected ? "Message was not sent" : undefined}
+              >
+                {error}
+              </Notice>
+            ) : null}
             {stale && mode !== "manual" ? (
               <Notice title="This draft’s context changed">
                 Your text is preserved. Review the latest conversation and draft
                 before continuing.
                 <Button
                   variant="ghost"
+                  disabled={
+                    locked ||
+                    (needsFreshDraft && (environment === "demo" || !writable))
+                  }
                   onClick={() => {
+                    if (needsFreshDraft) {
+                      void generate();
+                      return;
+                    }
                     setReviewedDraft(draft);
                     setText(draft?.body ?? "");
                     setMode("draft");
                     setError("");
                   }}
                 >
-                  Load latest draft
+                  {needsFreshDraft ? "Update draft" : "Load latest draft"}
                 </Button>
               </Notice>
             ) : null}
@@ -486,14 +518,14 @@ export function Composer({
                       variant="ghost small"
                       icon="edit"
                       onClick={() => setMode("edit")}
-                      disabled={status !== "idle"}
+                      disabled={locked}
                     >
                       Edit
                     </Button>
                     {environment !== "demo" ? (
                       <Button
                         variant="ghost small"
-                        disabled={status !== "idle" || !writable}
+                        disabled={locked || !writable}
                         onClick={() => setRedrafting(true)}
                       >
                         Redraft
@@ -505,7 +537,7 @@ export function Composer({
                         setMode("manual");
                         setText("");
                       }}
-                      disabled={status !== "idle"}
+                      disabled={locked}
                     >
                       Reply manually
                     </Button>
@@ -524,7 +556,7 @@ export function Composer({
                         setMode("draft");
                       })
                     }
-                    disabled={status !== "idle"}
+                    disabled={locked}
                   >
                     Save draft
                   </Button>
@@ -550,13 +582,13 @@ export function Composer({
                     <IconButton
                       label="Dismiss draft"
                       icon="close"
-                      disabled={status !== "idle"}
+                      disabled={locked}
                       onClick={() => setModal("dismiss")}
                     />
                     <IconButton
                       label="Snooze draft"
                       icon="clock"
-                      disabled={status !== "idle"}
+                      disabled={locked}
                       onClick={() => setModal("snooze")}
                     />
                   </>
@@ -573,7 +605,11 @@ export function Composer({
                     (stale && mode !== "manual")
                   }
                 >
-                  {status === "sending" ? "Sending…" : "Send"}
+                  {status === "sending"
+                    ? "Sending…"
+                    : sendRejected
+                      ? "Try again"
+                      : "Send"}
                 </Button>
               </div>
             </div>
@@ -589,7 +625,7 @@ export function Composer({
             </div>
           </>
         )}
-        {error ? (
+        {error && (generating || redrafting || needsInput) ? (
           <div className="form-error">
             <Notice variant="error">{error}</Notice>
           </div>

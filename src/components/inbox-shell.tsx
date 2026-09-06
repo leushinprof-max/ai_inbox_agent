@@ -51,11 +51,14 @@ export function InboxShell({ children }: { children: ReactNode }) {
           {navigation.map((n) => (
             <Link
               key={n.route}
-              className={`nav-item ${path.includes(`${basePath}/${n.route}`) ? "active" : ""}`}
+              className={`nav-item ${path.includes(`${basePath}/${n.route}`) || (mode === "demo" && path.includes(`/demo/states/${n.route}/`)) ? "active" : ""}`}
               href={`${basePath}/${n.route}`}
               aria-label={n.title}
               aria-current={
-                path.includes(`${basePath}/${n.route}`) ? "page" : undefined
+                path.includes(`${basePath}/${n.route}`) ||
+                (mode === "demo" && path.includes(`/demo/states/${n.route}/`))
+                  ? "page"
+                  : undefined
               }
             >
               <Icon name={n.icon} />

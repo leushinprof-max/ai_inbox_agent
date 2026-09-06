@@ -4,10 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { InboxProvider } from "@/lib/inbox-context";
 import type { InboxGateway } from "@/domain/gateway";
 import { sendReply } from "@/domain/send";
-import { createDemoState, DEMO_USER } from "./data";
+import { DEMO_USER } from "./data";
+import { createScenarioState, type DemoScenario } from "./scenarios";
 import { DemoRepository } from "./repository";
 
-function createDemoGateway(repository: DemoRepository): InboxGateway {
+function createDemoGateway(
+  repository: DemoRepository,
+  scenario?: DemoScenario,
+): InboxGateway {
   return {
     getSnapshot: repository.getSnapshot,
     subscribe: repository.subscribe,
@@ -26,16 +30,36 @@ function createDemoGateway(repository: DemoRepository): InboxGateway {
     send: (scope, request) =>
       sendReply(
         repository,
-        { send: async () => ({ status: "sent" }) },
+        {
+          send: async () => {
+            // Deliberately unresolved until navigation: a stable UI-only pending fixture.
+            if (scenario === "sending") return new Promise(() => {});
+            if (scenario === "send-error")
+              return {
+                status: "rejected",
+                reason:
+                  "HeyReach could not send this message. Your reply is saved here. Try again.",
+              };
+            return { status: "sent" };
+          },
+        },
         scope,
         request,
       ),
   };
 }
 
-export function DemoProvider({ children }: { children: ReactNode }) {
-  const [repository] = useState(() => new DemoRepository(createDemoState()));
-  const [gateway] = useState(() => createDemoGateway(repository));
+export function DemoProvider({
+  children,
+  scenario,
+}: {
+  children: ReactNode;
+  scenario?: DemoScenario;
+}) {
+  const [repository] = useState(
+    () => new DemoRepository(createScenarioState(scenario)),
+  );
+  const [gateway] = useState(() => createDemoGateway(repository, scenario));
   useEffect(() => {
     const wake = () =>
       repository

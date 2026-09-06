@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar, Badge, Button, Notice } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
+import { ImportWindow, ImportRunCard } from "./import-history";
 import {
   connectHeyReach,
   webhookSetup,
@@ -251,23 +252,8 @@ export function LiveConnectionSettings({
   );
 }
 
-const importErrors: Record<string, string> = {
-  model_not_configured:
-    "AI is not configured on the server. Configure it, then retry this import.",
-  provider_unauthorized:
-    "The HeyReach key is no longer valid. Reconnect the workspace, then retry.",
-  connection_changed:
-    "The connection changed. Retry to continue with the current connection.",
-  connection_unavailable: "Reconnect HeyReach before continuing.",
-  scan_limit:
-    "The scan reached its limit of 10,000 conversations. The import is incomplete.",
-  attempts_exhausted:
-    "Processing could not complete after several attempts. Retry to continue.",
-  provider_rate_limited:
-    "HeyReach temporarily limited requests. Retry in a moment.",
-};
 export function LiveImportSettings() {
-  const { state, scope } = useInbox();
+  const { state, scope, workspace, basePath } = useInbox();
   const { busy, error, run } = useSettingsAction();
   const [days, setDays] = useState(7);
   const connected = state.connections[0]?.status === "connected";
@@ -288,20 +274,11 @@ export function LiveImportSettings() {
           Import and classify conversations active during this period.
           Historical import does not create drafts or send messages.
         </p>
-        <div className="field">
-          <label htmlFor="import-window">History window</label>
-          <select
-            id="import-window"
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-          >
-            {[7, 14, 30, 90].map((d) => (
-              <option key={d} value={d}>
-                {d} days
-              </option>
-            ))}
-          </select>
-        </div>
+        <ImportWindow
+          days={days}
+          onChange={setDays}
+          disabled={busy || active || !admin}
+        />
         {!connected ? <Notice>Connect HeyReach first.</Notice> : null}
         <div
           className="row"
@@ -326,84 +303,40 @@ export function LiveImportSettings() {
         </div>
       </div>
       {(state.imports ?? []).map((r) => (
-        <div className="card" key={r.id}>
-          <div className="card-header">
-            <h2>{r.days}-day import</h2>
-            <Badge
-              color={
-                r.status === "completed"
-                  ? "green"
-                  : r.status === "failed"
-                    ? "amber"
-                    : ""
-              }
-            >
-              {r.status}
-            </Badge>
-          </div>
-          <p className="help">
-            Started {new Date(r.startedAt).toLocaleString()}
-          </p>
-          <div className="two-col">
-            <div>
-              <strong>{r.imported}</strong>
-              <p className="help">Conversations imported</p>
-            </div>
-            <div>
-              <strong>{r.classified}</strong>
-              <p className="help">Classified</p>
-            </div>
-          </div>
-          <p className="help">{r.inspected} conversations checked</p>
-          {r.error ? (
-            <Notice variant="error">
-              {importErrors[r.error] ??
-                "Processing stopped. Retry to continue from the saved import."}
-            </Notice>
-          ) : null}
-          {admin ? (
-            <div
-              className="row"
-              style={{ justifyContent: "flex-end", marginTop: 16 }}
-            >
-              {r.status === "failed" && r.error !== "scan_limit" ? (
-                <Button
-                  disabled={busy || !connected || active}
-                  onClick={() =>
-                    void run(async () => {
-                      const result = await controlHistory(
-                        scope.workspaceId,
-                        r.id,
-                        "retry",
-                      );
-                      if (!result.ok) throw new Error(result.error);
-                    })
-                  }
-                >
-                  Retry import
-                </Button>
-              ) : null}
-              {["queued", "running"].includes(r.status) ? (
-                <Button
-                  disabled={busy}
-                  variant="ghost"
-                  onClick={() =>
-                    void run(async () => {
-                      const result = await controlHistory(
-                        scope.workspaceId,
-                        r.id,
-                        "cancel",
-                      );
-                      if (!result.ok) throw new Error(result.error);
-                    })
-                  }
-                >
-                  Cancel import
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        <ImportRunCard
+          key={r.id}
+          run={r}
+          timezone={workspace.timezone}
+          busy={busy}
+          canRetry={connected && !active}
+          conversationsPath={`${basePath}/conversations`}
+          onRetry={
+            admin
+              ? () =>
+                  void run(async () => {
+                    const result = await controlHistory(
+                      scope.workspaceId,
+                      r.id,
+                      "retry",
+                    );
+                    if (!result.ok) throw new Error(result.error);
+                  })
+              : undefined
+          }
+          onCancel={
+            admin
+              ? () =>
+                  void run(async () => {
+                    const result = await controlHistory(
+                      scope.workspaceId,
+                      r.id,
+                      "cancel",
+                    );
+                    if (!result.ok) throw new Error(result.error);
+                  })
+              : undefined
+          }
+        />
       ))}
       {error ? <Notice variant="error">{error}</Notice> : null}
     </div>

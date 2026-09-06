@@ -131,9 +131,15 @@
 .conversation-detail-layout > .context {
   width: 280px;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .conversation-detail-layout > .context {
-    display: none;
+    position: absolute;
+    top: 60px;
+    bottom: 0;
+    right: 0;
+    width: min(280px, calc(100vw - var(--sidebar)));
+    z-index: 25;
+    box-shadow: -20px 0 60px #0008;
   }
 }
 @media (max-width: 760px) {
@@ -154,4 +160,46 @@
     padding: 6px;
     margin: 0;
   }
+}
+
+.import-window {
+  border: 0;
+  padding: 0;
+  margin: 24px 0;
+  min-width: 0;
+}
+.import-window legend {
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.import-actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.progress.indeterminate > span {
+  animation: import-progress 1.8s ease-in-out infinite alternate;
+}
+@keyframes import-progress {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(210%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress.indeterminate > span {
+    animation: none;
+  }
+}
+
+.state-catalog {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.skeleton-avatar {
+  background: #202027;
+  border: 0;
 }

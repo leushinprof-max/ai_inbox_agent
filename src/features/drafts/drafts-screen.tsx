@@ -11,6 +11,7 @@ import {
 } from "@/features/conversations/thread";
 import { Composer } from "./composer";
 import { usePreferences } from "@/lib/preferences";
+import { useContactDetails } from "@/lib/use-contact-details";
 
 export function DraftsScreen() {
   const { state, scope, repository, basePath, workspace } = useInbox();
@@ -39,8 +40,7 @@ export function DraftsScreen() {
       clearTimeout(timer);
     };
   }, [repository, query, queue]);
-  const [detailsOverride, setDetails] = useState<boolean | null>(null);
-  const details = detailsOverride ?? preferences.details;
+  const [details, setDetails] = useContactDetails(preferences.details);
   const [mobileThread, setMobileThread] = useState(false);
   const drafts = state.drafts.filter(
     (d) =>
@@ -216,6 +216,7 @@ export function DraftsScreen() {
           </aside>
           {conversation && selected ? (
             <ConversationThread
+              mobileOpen={mobileThread}
               conversation={conversation}
               onBack={() => setMobileThread(false)}
               onToggleDetails={() => setDetails(!details)}
