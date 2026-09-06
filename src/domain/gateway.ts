@@ -6,7 +6,7 @@ export interface InboxGateway {
   refresh?(): Promise<void>;
   searchConversations?(query: string, label: string): Promise<void>;
   moreConversations?(): Promise<void>;
-  searchDrafts?(query: string, status: string): Promise<void>;
+  searchDrafts?(query: string, status: string, label?: string): Promise<void>;
   moreDrafts?(): Promise<void>;
   openConversation?(id: string): Promise<void>;
   olderMessages?(id: string): Promise<void>;

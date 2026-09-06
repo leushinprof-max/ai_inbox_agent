@@ -2,7 +2,9 @@
 import { useState } from "react";
 import type { Agent } from "@/domain/inbox";
 import type { Classification } from "@/integrations/ai/classify";
-import { Badge, Button, Empty, Notice } from "@/components/ui";
+import { Button, Empty, Notice } from "@/components/ui";
+import { LabelBadge } from "@/components/label-badge";
+import { useInbox } from "@/lib/inbox-context";
 import { testAgent } from "@/server/agent-actions";
 
 export function LiveAgentTest({
@@ -12,6 +14,7 @@ export function LiveAgentTest({
   agent: Agent;
   dirty: boolean;
 }) {
+  const { state } = useInbox();
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<Classification | null>(null);
   const [error, setError] = useState("");
@@ -26,11 +29,9 @@ export function LiveAgentTest({
         {result ? (
           <>
             <div className="row">
-              {result.labels.map((l) => (
-                <Badge key={l} color="purple">
-                  {l}
-                </Badge>
-              ))}
+              <LabelBadge
+                label={state.labelCatalog?.find((l) => l.id === result.labelId)}
+              />
             </div>
             {result.missingKnowledge ? (
               <Notice title="Needs input">{result.missingKnowledge}</Notice>
@@ -38,7 +39,10 @@ export function LiveAgentTest({
               <p className="draft-text">{result.draft}</p>
             ) : (
               <p className="page-description">
-                No reply is needed for this message.
+                {result.noReplyReason ||
+                  (result.labelId
+                    ? "No draft is eligible for this result."
+                    : "Intent could not be determined.")}
               </p>
             )}
           </>

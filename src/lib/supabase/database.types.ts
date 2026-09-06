@@ -7,6 +7,31 @@ export type Json =
   | Json[];
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       agent_versions: {
@@ -50,6 +75,7 @@ export type Database = {
           knowledge: string;
           language: string;
           name: string;
+          reply_groups: string[];
           reply_policy: string;
           status: string;
           version: number;
@@ -63,6 +89,7 @@ export type Database = {
           knowledge?: string;
           language?: string;
           name: string;
+          reply_groups?: string[];
           reply_policy?: string;
           status?: string;
           version?: number;
@@ -76,6 +103,7 @@ export type Database = {
           knowledge?: string;
           language?: string;
           name?: string;
+          reply_groups?: string[];
           reply_policy?: string;
           status?: string;
           version?: number;
@@ -84,6 +112,152 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "agents_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_config_publications: {
+        Row: {
+          actor: string | null;
+          created_at: string;
+          id: number;
+          version_id: number;
+        };
+        Insert: {
+          actor?: string | null;
+          created_at?: string;
+          id?: never;
+          version_id: number;
+        };
+        Update: {
+          actor?: string | null;
+          created_at?: string;
+          id?: never;
+          version_id?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_config_publications_version_id_fkey";
+            columns: ["version_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_config_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_config_release: {
+        Row: {
+          revision: number;
+          singleton: boolean;
+          version_id: number;
+        };
+        Insert: {
+          revision?: number;
+          singleton?: boolean;
+          version_id: number;
+        };
+        Update: {
+          revision?: number;
+          singleton?: boolean;
+          version_id?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_config_release_version_id_fkey";
+            columns: ["version_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_config_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_config_versions: {
+        Row: {
+          configuration: Json;
+          created_at: string;
+          created_by: string | null;
+          id: number;
+        };
+        Insert: {
+          configuration: Json;
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+        };
+        Update: {
+          configuration?: Json;
+          created_at?: string;
+          created_by?: string | null;
+          id?: never;
+        };
+        Relationships: [];
+      };
+      ai_runs: {
+        Row: {
+          agent_id: string | null;
+          agent_version: number | null;
+          catalog_revision: number;
+          completed_at: string | null;
+          configuration_version: number;
+          conversation_id: string | null;
+          created_at: string;
+          error_code: string | null;
+          id: string;
+          model: string;
+          scenario: string;
+          status: string;
+          workspace_id: string;
+        };
+        Insert: {
+          agent_id?: string | null;
+          agent_version?: number | null;
+          catalog_revision: number;
+          completed_at?: string | null;
+          configuration_version: number;
+          conversation_id?: string | null;
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          model: string;
+          scenario: string;
+          status?: string;
+          workspace_id: string;
+        };
+        Update: {
+          agent_id?: string | null;
+          agent_version?: number | null;
+          catalog_revision?: number;
+          completed_at?: string | null;
+          configuration_version?: number;
+          conversation_id?: string | null;
+          created_at?: string;
+          error_code?: string | null;
+          id?: string;
+          model?: string;
+          scenario?: string;
+          status?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_configuration_version_fkey";
+            columns: ["configuration_version"];
+            isOneToOne: false;
+            referencedRelation: "ai_config_versions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_runs_workspace_id_conversation_id_fkey";
+            columns: ["workspace_id", "conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["workspace_id", "id"];
+          },
+          {
+            foreignKeyName: "ai_runs_workspace_id_fkey";
             columns: ["workspace_id"];
             isOneToOne: false;
             referencedRelation: "workspaces";
@@ -134,14 +308,27 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_position: string;
+          contact_stopped: boolean;
           created_at: string;
+          evidence_message_id: string | null;
+          evidence_quote: string;
           id: string;
           inbound_revision: number;
+          label_assignment_revision: number;
+          label_id: string | null;
+          label_source: string | null;
+          label_state: string;
           labels: string[];
           last_message_at: string | null;
+          no_reply_reason: string;
           notes: string;
           notes_revision: number;
           provider_conversation_id: string;
+          reply_agent_id: string | null;
+          reply_agent_version: number | null;
+          reply_catalog_revision: number | null;
+          reply_config_version: number | null;
+          reply_decision_revision: number | null;
           sender_id: number;
           sender_name: string;
           workspace_id: string;
@@ -153,14 +340,27 @@ export type Database = {
           contact_company?: string;
           contact_name: string;
           contact_position?: string;
+          contact_stopped?: boolean;
           created_at?: string;
+          evidence_message_id?: string | null;
+          evidence_quote?: string;
           id?: string;
           inbound_revision?: number;
+          label_assignment_revision?: number;
+          label_id?: string | null;
+          label_source?: string | null;
+          label_state?: string;
           labels?: string[];
           last_message_at?: string | null;
+          no_reply_reason?: string;
           notes?: string;
           notes_revision?: number;
           provider_conversation_id: string;
+          reply_agent_id?: string | null;
+          reply_agent_version?: number | null;
+          reply_catalog_revision?: number | null;
+          reply_config_version?: number | null;
+          reply_decision_revision?: number | null;
           sender_id: number;
           sender_name: string;
           workspace_id: string;
@@ -172,19 +372,39 @@ export type Database = {
           contact_company?: string;
           contact_name?: string;
           contact_position?: string;
+          contact_stopped?: boolean;
           created_at?: string;
+          evidence_message_id?: string | null;
+          evidence_quote?: string;
           id?: string;
           inbound_revision?: number;
+          label_assignment_revision?: number;
+          label_id?: string | null;
+          label_source?: string | null;
+          label_state?: string;
           labels?: string[];
           last_message_at?: string | null;
+          no_reply_reason?: string;
           notes?: string;
           notes_revision?: number;
           provider_conversation_id?: string;
+          reply_agent_id?: string | null;
+          reply_agent_version?: number | null;
+          reply_catalog_revision?: number | null;
+          reply_config_version?: number | null;
+          reply_decision_revision?: number | null;
           sender_id?: number;
           sender_name?: string;
           workspace_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "conversation_label_fk";
+            columns: ["workspace_id", "label_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace_labels";
+            referencedColumns: ["workspace_id", "id"];
+          },
           {
             foreignKeyName: "conversations_workspace_id_fkey";
             columns: ["workspace_id"];
@@ -532,6 +752,53 @@ export type Database = {
           },
         ];
       };
+      workspace_labels: {
+        Row: {
+          archived: boolean;
+          color: string;
+          enabled: boolean;
+          id: string;
+          instruction: string;
+          intent_group: string;
+          name: string;
+          revision: number;
+          system_key: string | null;
+          workspace_id: string;
+        };
+        Insert: {
+          archived?: boolean;
+          color: string;
+          enabled?: boolean;
+          id?: string;
+          instruction?: string;
+          intent_group: string;
+          name: string;
+          revision?: number;
+          system_key?: string | null;
+          workspace_id: string;
+        };
+        Update: {
+          archived?: boolean;
+          color?: string;
+          enabled?: boolean;
+          id?: string;
+          instruction?: string;
+          intent_group?: string;
+          name?: string;
+          revision?: number;
+          system_key?: string | null;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workspace_labels_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspaces";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       workspace_members: {
         Row: {
           created_at: string;
@@ -566,6 +833,7 @@ export type Database = {
           created_at: string;
           default_agent_id: string | null;
           id: string;
+          label_revision: number;
           name: string;
           timezone: string;
         };
@@ -573,6 +841,7 @@ export type Database = {
           created_at?: string;
           default_agent_id?: string | null;
           id?: string;
+          label_revision?: number;
           name: string;
           timezone?: string;
         };
@@ -580,6 +849,7 @@ export type Database = {
           created_at?: string;
           default_agent_id?: string | null;
           id?: string;
+          label_revision?: number;
           name?: string;
           timezone?: string;
         };
@@ -618,6 +888,16 @@ export type Database = {
           sent: number;
         }[];
       };
+      assign_conversation_label: {
+        Args: {
+          p_assignment: number;
+          p_conversation: string;
+          p_label: string;
+          p_revision: number;
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
       cancel_draft_generation: {
         Args: { p_id: string; p_workspace: string };
         Returns: undefined;
@@ -646,14 +926,27 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_position: string;
+          contact_stopped: boolean;
           created_at: string;
+          evidence_message_id: string | null;
+          evidence_quote: string;
           id: string;
           inbound_revision: number;
+          label_assignment_revision: number;
+          label_id: string | null;
+          label_source: string | null;
+          label_state: string;
           labels: string[];
           last_message_at: string | null;
+          no_reply_reason: string;
           notes: string;
           notes_revision: number;
           provider_conversation_id: string;
+          reply_agent_id: string | null;
+          reply_agent_version: number | null;
+          reply_catalog_revision: number | null;
+          reply_config_version: number | null;
+          reply_decision_revision: number | null;
           sender_id: number;
           sender_name: string;
           workspace_id: string;
@@ -706,6 +999,7 @@ export type Database = {
         Args: {
           p_before?: string;
           p_before_id?: string;
+          p_label?: string;
           p_limit?: number;
           p_query?: string;
           p_status?: string;
@@ -732,6 +1026,7 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      is_platform_owner: { Args: never; Returns: boolean };
       list_workspace_invites: {
         Args: { p_workspace: string };
         Returns: {
@@ -750,6 +1045,10 @@ export type Database = {
           user_id: string;
           workspace_id: string;
         }[];
+      };
+      publish_ai_configuration: {
+        Args: { p_revision: number; p_version: number };
+        Returns: undefined;
       };
       request_draft_generation: {
         Args: {
@@ -787,6 +1086,10 @@ export type Database = {
         Args: { p_id: string; p_workspace: string };
         Returns: undefined;
       };
+      retry_classification: {
+        Args: { p_conversation: string; p_workspace: string };
+        Returns: undefined;
+      };
       retry_history_import: {
         Args: { p_run: string; p_workspace: string };
         Returns: undefined;
@@ -804,6 +1107,10 @@ export type Database = {
         };
         Returns: number;
       };
+      save_ai_configuration: {
+        Args: { p_configuration: Json };
+        Returns: number;
+      };
       save_note: {
         Args: {
           p_id: string;
@@ -812,6 +1119,15 @@ export type Database = {
           p_workspace: string;
         };
         Returns: number;
+      };
+      save_workspace_label: {
+        Args: {
+          p_id: string;
+          p_revision: number;
+          p_value: Json;
+          p_workspace: string;
+        };
+        Returns: string;
       };
       server_apply_classification: {
         Args: {
@@ -829,6 +1145,22 @@ export type Database = {
         };
         Returns: boolean;
       };
+      server_apply_intent: {
+        Args: {
+          p_agent: string;
+          p_agent_version: number;
+          p_assignment: number;
+          p_catalog: number;
+          p_config: number;
+          p_conversation: string;
+          p_generate: boolean;
+          p_result: Json;
+          p_revision: number;
+          p_run?: string;
+          p_workspace: string;
+        };
+        Returns: boolean;
+      };
       server_claim_job: { Args: never; Returns: Json };
       server_complete_generation: {
         Args: {
@@ -836,6 +1168,21 @@ export type Database = {
           p_id: string;
           p_missing: string;
           p_should_reply: boolean;
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
+      server_complete_generation_v2: {
+        Args: {
+          p_assignment: number;
+          p_body: string;
+          p_catalog: number;
+          p_config: number;
+          p_id: string;
+          p_missing: string;
+          p_reason: string;
+          p_should_reply: boolean;
+          p_stopped: boolean;
           p_workspace: string;
         };
         Returns: undefined;
@@ -893,6 +1240,13 @@ export type Database = {
           p_workspace: string;
         };
         Returns: Json;
+      };
+      server_intent_backfill_status: {
+        Args: never;
+        Returns: {
+          runs: number;
+          status: string;
+        }[];
       };
       server_refresh_senders: {
         Args: { p_revision: number; p_senders: Json; p_workspace: string };
@@ -1046,6 +1400,9 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

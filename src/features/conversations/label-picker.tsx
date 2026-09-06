@@ -1,0 +1,82 @@
+"use client";
+import { useState } from "react";
+import type { Conversation } from "@/domain/inbox";
+import { useInbox } from "@/lib/inbox-context";
+import { ConversationLabel } from "@/components/label-badge";
+import { Button, Notice } from "@/components/ui";
+import { assignLabel, retryClassification } from "@/server/label-actions";
+export function LabelPicker({ conversation }: { conversation: Conversation }) {
+  const { state, scope, mode, repository } = useInbox();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const writable =
+    mode === "live" &&
+    state.memberships.some(
+      (m) =>
+        m.workspaceId === scope.workspaceId &&
+        m.userId === scope.userId &&
+        m.role !== "viewer",
+    );
+  async function act(action: () => Promise<{ ok: boolean; error?: string }>) {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await action();
+      if (!r.ok) throw new Error(r.error);
+      await repository.refresh?.();
+      await repository.openConversation?.(conversation.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update label.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="stack">
+      <ConversationLabel conversation={conversation} />
+      <select
+        aria-label="Change conversation label"
+        disabled={!writable || busy}
+        value={conversation.labelId ?? ""}
+        onChange={(e) =>
+          void act(() =>
+            assignLabel(
+              scope.workspaceId,
+              conversation.id,
+              e.target.value || null,
+              conversation.revision,
+              conversation.labelAssignmentRevision ?? 0,
+            ),
+          )
+        }
+      >
+        <option value="">No label</option>
+        {(state.labelCatalog ?? [])
+          .filter(
+            (l) => (l.enabled && !l.archived) || l.id === conversation.labelId,
+          )
+          .map((l) => (
+            <option value={l.id} key={l.id} disabled={!l.enabled || l.archived}>
+              {l.name}
+            </option>
+          ))}
+      </select>
+      <small className="muted">
+        Manual corrections stay until the next lead reply.
+      </small>
+      {conversation.labelState === "failed" && (
+        <Button
+          disabled={!writable || busy}
+          onClick={() =>
+            void act(() =>
+              retryClassification(scope.workspaceId, conversation.id),
+            )
+          }
+        >
+          Retry classification
+        </Button>
+      )}
+      {error && <Notice variant="error">{error}</Notice>}
+    </div>
+  );
+}

@@ -9,3 +9,5 @@ coverage/
 .artifacts/
 supabase/.temp/
 supabase/.branches/
+
+.playwright-mcp/

@@ -1,17 +1,11 @@
 "use client";
 
+import { LabelPicker } from "./label-picker";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation } from "@/domain/inbox";
-import {
-  Avatar,
-  Badge,
-  Button,
-  IconButton,
-  Spark,
-  Notice,
-} from "@/components/ui";
+import { Avatar, Button, IconButton, Spark, Notice } from "@/components/ui";
 
 export function ConversationThread({
   conversation,
@@ -229,17 +223,8 @@ export function ContactContext({
           <span>{conversation.senderName}</span>
         </div>
         <div className="details-row">
-          <span>Labels</span>
-          <span className="row wrap">
-            {conversation.labels.map((label) => (
-              <Badge
-                key={label}
-                color={label === "Interested" ? "green" : "purple"}
-              >
-                {label}
-              </Badge>
-            ))}
-          </span>
+          <span>Label</span>
+          <LabelPicker conversation={conversation} />
         </div>
       </div>
       {agent ? (

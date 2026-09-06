@@ -10,6 +10,7 @@ import {
   ContactContext,
 } from "@/features/conversations/thread";
 import { Composer } from "./composer";
+import { ConversationLabel } from "@/components/label-badge";
 import { usePreferences } from "@/lib/preferences";
 import { useContactDetails } from "@/lib/use-contact-details";
 
@@ -21,12 +22,13 @@ export function DraftsScreen() {
   const [queue, setQueue] = useState("ready");
   const [selectedId, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [label, setLabel] = useState("all");
   useEffect(() => {
     if (!repository.searchDrafts) return;
     let active = true;
     const timer = setTimeout(
       () =>
-        void repository.searchDrafts!(query, queue)
+        void repository.searchDrafts!(query, queue, label)
           .then(() => {
             if (active) setError("");
           })
@@ -39,7 +41,7 @@ export function DraftsScreen() {
       active = false;
       clearTimeout(timer);
     };
-  }, [repository, query, queue]);
+  }, [repository, query, queue, label]);
   const [details, setDetails] = useContactDetails(preferences.details);
   const [mobileThread, setMobileThread] = useState(false);
   const drafts = state.drafts.filter(
@@ -54,6 +56,18 @@ export function DraftsScreen() {
     : drafts;
   const visible = orderedDrafts
     .filter((d) => d.status === queue)
+    .filter((d) => {
+      if (state.paging || label === "all") return true;
+      const c = state.conversations.find((c) => c.id === d.conversationId);
+      return (
+        c &&
+        (c.labelId === label ||
+          (label === "uncategorized" && c.labelState === "uncategorized") ||
+          state.labelCatalog?.some(
+            (l) => l.id === c.labelId && `group:${l.group}` === label,
+          ))
+      );
+    })
     .filter((d) => {
       const contact = state.conversations.find(
         (c) => c.id === d.conversationId,
@@ -134,6 +148,27 @@ export function DraftsScreen() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </label>
+              <select
+                aria-label="Filter drafts by label"
+                value={label}
+                onChange={(e) => {
+                  setLabel(e.target.value);
+                  setSelected(null);
+                }}
+              >
+                <option value="all">All labels</option>
+                {["positive", "neutral", "negative"].map((g) => (
+                  <option key={g} value={`group:${g}`}>
+                    {g} intent
+                  </option>
+                ))}
+                <option value="uncategorized">Unable to categorize</option>
+                {(state.labelCatalog ?? []).map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="queue-list">
               {visible.map((draft) => {
@@ -169,6 +204,7 @@ export function DraftsScreen() {
                       </span>
                     </span>
                     <span className="snippet">{c.messages.at(-1)?.body}</span>
+                    <ConversationLabel conversation={c} />
                     <span
                       className={`queue-status ${draft.status === "needs_input" ? "warning" : ""}`}
                     >

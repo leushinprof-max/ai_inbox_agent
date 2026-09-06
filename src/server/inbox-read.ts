@@ -7,12 +7,13 @@ import type {
   Conversation,
   Draft,
   InboxState,
-  Label,
   Message,
   PageCursor,
   Role,
 } from "@/domain/inbox";
 import { InboxError } from "@/domain/inbox";
+import { intentGroup } from "@/domain/labels";
+import { loadLabelCatalog, publishedAI } from "./ai-context";
 import { databaseError } from "./session";
 
 export const uuid = z.uuid();
@@ -21,15 +22,7 @@ export const cursor = z.object({
   id: uuid,
 });
 const roles = z.enum(["owner", "admin", "member", "viewer"]);
-const labels = z.array(
-  z.enum([
-    "Interested",
-    "Information Request",
-    "Meeting Request",
-    "Referral",
-    "Not interested",
-  ]),
-);
+
 type DB = SupabaseClient<Database>;
 const PAGE_SIZE = 50;
 
@@ -67,7 +60,22 @@ export function conversationDto(
       color: "purple",
     },
     campaign: c.campaign,
-    labels: labels.parse(c.labels) as Label[],
+    labelId: c.label_id,
+    labelState:
+      c.classified_revision !== c.inbound_revision && c.label_state !== "failed"
+        ? "pending"
+        : (c.label_state as Conversation["labelState"]),
+    labelAssignmentRevision: c.label_assignment_revision,
+    labelSource: c.label_source,
+    contactStopped: c.contact_stopped,
+    noReplyReason: c.no_reply_reason,
+    replyDecision: {
+      revision: c.reply_decision_revision,
+      agentId: c.reply_agent_id,
+      agentVersion: c.reply_agent_version,
+      catalogRevision: c.reply_catalog_revision,
+      configVersion: c.reply_config_version,
+    },
     revision: c.inbound_revision,
     notes: c.notes,
     notesRevision: c.notes_revision,
@@ -91,7 +99,7 @@ export function agentDto(a: Tables<"agents">): Agent {
     status: z.enum(["draft", "active", "paused"]).parse(a.status),
     goal: a.goal,
     language: a.language,
-    replyPolicy: z.enum(["positive", "all"]).parse(a.reply_policy),
+    replyGroups: z.array(intentGroup).parse(a.reply_groups),
     knowledge: a.knowledge,
     version: a.version,
   };
@@ -181,11 +189,13 @@ export async function draftPage(
   before?: PageCursor,
   status?: string,
   query = "",
+  label = "all",
 ) {
   if (before) cursor.parse(before);
   const { data, error } = await db.rpc("draft_page", {
     p_workspace: workspaceId,
     p_query: query,
+    p_label: label === "all" ? null! : label,
     ...(status ? { p_status: status } : {}),
     ...(before ? { p_before: before.at, p_before_id: before.id } : {}),
     p_limit: PAGE_SIZE + 1,
@@ -307,6 +317,16 @@ export async function readWorkspace(
     generations,
     activity,
   ].forEach((r) => databaseError(r.error));
+  const published = await publishedAI();
+  const catalogVersion = await db
+    .from("workspaces")
+    .select("label_revision")
+    .eq("id", workspaceId)
+    .single();
+  databaseError(catalogVersion.error);
+  const labelCatalog = await loadLabelCatalog(db, workspaceId, published);
+  const owner = await db.rpc("is_platform_owner");
+  databaseError(owner.error);
   const missingIds = [
     ...new Set(drafts.rows.map((d) => d.conversation_id)),
   ].filter((id) => !conversations.rows.some((c) => c.id === id));
@@ -361,6 +381,11 @@ export async function readWorkspace(
     })),
     agents: (agents.data ?? []).map(agentDto),
     conversations: combined,
+    labelCatalog,
+    aiConfigVersion: published.version,
+    labelCatalogRevision: catalogVersion.data!.label_revision,
+    platformOwner: owner.data ?? false,
+    agentDefaults: published.configuration.defaults,
     drafts: drafts.rows.map(draftDto),
     senders: (senders.data ?? []).map((s) => ({
       id: s.provider_id,

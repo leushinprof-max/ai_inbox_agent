@@ -105,7 +105,7 @@ before(async () => {
     .conversationId;
   assert.equal(await classify(outreachId, 0, oldRun), true);
   assert.equal(await classify(repliedId, 1, oldRun), true);
-  for (const file of files.slice(fix))
+  for (const file of files.slice(fix, fix + 1))
     await db.exec(readFileSync(new URL(file, dir), "utf8"));
 });
 after(() => db.close());

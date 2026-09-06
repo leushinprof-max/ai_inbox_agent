@@ -125,7 +125,17 @@ for (const c of fixture.conversations.filter(
     contact_company: c.contact.company,
     contact_position: c.contact.position,
     campaign: c.campaign,
-    labels: c.labels,
+    label_id:
+      (
+        await admin
+          .from("workspace_labels")
+          .select("id")
+          .eq("workspace_id", workspaceId)
+          .eq("system_key", c.labelId ?? "")
+          .maybeSingle()
+      ).data?.id ?? null,
+    label_state: "classified",
+    classified_revision: c.revision,
     inbound_revision: c.revision,
     notes: c.notes,
     last_message_at: c.messages.at(-1)?.createdAt,

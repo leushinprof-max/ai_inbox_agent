@@ -13,11 +13,13 @@ import {
 } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { LiveConnectionSettings, LiveImportSettings } from "./live-settings";
+import { LabelsSettings } from "./labels-settings";
 import { MembersSettings } from "./members-settings";
 import { usePreferences } from "@/lib/preferences";
 import { ImportRunCard, ImportWindow } from "./import-history";
 
 const tabs: { id: string; label: string; icon: IconName }[] = [
+  { id: "labels", label: "Labels", icon: "settings" },
   { id: "general", label: "General", icon: "settings" },
   { id: "connection", label: "HeyReach", icon: "link" },
   { id: "import", label: "Import history", icon: "inbox" },
@@ -54,6 +56,7 @@ export function SettingsScreen({
                 Manage {workspace.name} and your team’s workflow.
               </p>
             </div>
+            {tab === "labels" ? <LabelsSettings /> : null}
             {tab === "general" ? <GeneralSettings key={workspace.id} /> : null}
             {tab === "preferences" ? <PersonalPreferences /> : null}
             {tab === "connection" ? (

@@ -59,6 +59,7 @@ export async function GET(
             before,
             q.get("status") ?? undefined,
             q.get("q") ?? "",
+            q.get("label") ?? "all",
           ),
           before ? undefined : draftCounts(db, workspaceId),
         ]);

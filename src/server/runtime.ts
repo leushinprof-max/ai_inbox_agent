@@ -7,6 +7,8 @@ import {
   ProviderError,
 } from "@/integrations/heyreach/client";
 import { ModelError, type InboxModel } from "@/integrations/ai/classify";
+import { runRecordedAI } from "./ai-run";
+import { loadAIContext } from "./ai-context";
 import { decryptConnection } from "./credentials";
 import { databaseError } from "./session";
 
@@ -22,7 +24,7 @@ const agentConfig = z.object({
   name: z.string(),
   goal: z.string(),
   language: z.string(),
-  replyPolicy: z.enum(["positive", "all"]),
+  replyGroups: z.array(z.enum(["positive", "neutral", "negative"])),
   knowledge: z.string(),
 });
 type Provider = ReturnType<typeof createHeyReachClient>;
@@ -49,12 +51,14 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
     databaseError(connection.error);
     if (
       !connection.data ||
-      (connection.data.status !== "connected" && job.kind !== "generate")
+      (connection.data.status !== "connected" &&
+        !["generate", "classify"].includes(job.kind))
     )
       throw new Error("connection_unavailable");
     const revision = connection.data.revision;
     connectionRevision = revision;
     if (
+      !["generate", "classify"].includes(job.kind) &&
       job.payload.connectionRevision !== undefined &&
       job.payload.connectionRevision !== revision
     )
@@ -177,12 +181,12 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             .single(),
           db
             .from("messages")
-            .select("direction,body")
+            .select("id,direction,body")
             .eq("workspace_id", job.workspace_id)
             .eq("conversation_id", g.conversation_id)
             .order("occurred_at", { ascending: false })
             .order("id", { ascending: false })
-            .limit(50),
+            .limit(51),
           g.expected_draft_id
             ? db
                 .from("drafts")
@@ -193,27 +197,55 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             : Promise.resolve({ data: null, error: null }),
         ]);
         [version, messages, draft].forEach((r) => databaseError(r.error));
-        const output = await deps.model.classify({
-          agent: agentConfig.parse(version.data?.configuration),
-          messages: (messages.data ?? []).reverse().map((m) => ({
-            body: m.body,
-            direction: z.enum(["inbound", "outbound"]).parse(m.direction),
-          })),
-          generateDraft: true,
-          operator: {
-            instructions: g.instructions,
-            approvedAnswer: g.approved_answer,
-            currentDraft: draft.data?.body ?? "",
+        const ai = await loadAIContext(db, job.workspace_id, g.conversation_id);
+        const output = await runRecordedAI(
+          db,
+          deps.model,
+          {
+            ...ai,
+            scenario: g.approved_answer
+              ? "needs_input"
+              : draft.data
+                ? "rewrite"
+                : "reply",
+            agent: agentConfig.parse(version.data?.configuration),
+            historyTruncated: (messages.data?.length ?? 0) > 50,
+            messages: (messages.data ?? [])
+              .slice(0, 50)
+              .reverse()
+              .map((m) => ({
+                id: m.id,
+                body: m.body,
+                direction: z.enum(["inbound", "outbound"]).parse(m.direction),
+              })),
+            generateDraft: true,
+            operator: {
+              instructions: g.instructions,
+              approvedAnswer: g.approved_answer,
+              currentDraft: draft.data?.body ?? "",
+            },
           },
-        });
+          {
+            workspaceId: job.workspace_id,
+            conversationId: g.conversation_id,
+            catalogRevision: ai.catalogRevision,
+            agentId: g.agent_id,
+            agentVersion: g.agent_version,
+          },
+        );
         databaseError(
           (
-            await db.rpc("server_complete_generation", {
+            await db.rpc("server_complete_generation_v2", {
               p_workspace: job.workspace_id,
               p_id: g.id,
               p_body: output.draft,
               p_missing: output.missingKnowledge,
               p_should_reply: output.shouldReply,
+              p_config: ai.configurationVersion,
+              p_catalog: ai.catalogRevision,
+              p_assignment: ai.assignmentRevision,
+              p_reason: output.noReplyReason,
+              p_stopped: output.contactStopped,
             })
           ).error,
         );
@@ -247,7 +279,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           .eq("conversation_id", payload.conversationId)
           .order("occurred_at", { ascending: false })
           .order("id", { ascending: false })
-          .limit(50),
+          .limit(51),
       ]);
       [conversation, workspace, messages].forEach((r) =>
         databaseError(r.error),
@@ -281,49 +313,62 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
       const matches =
         payload.revision > 0 &&
         conversation.data?.inbound_revision === payload.revision;
-      const context = [...(messages.data ?? [])];
-      if (matches && !context.some((m) => m.direction === "inbound")) {
-        // The latest lead reply can predate the last page of team messages.
-        const inbound = await db
-          .from("messages")
-          .select("direction,body,occurred_at,id")
-          .eq("workspace_id", job.workspace_id)
-          .eq("conversation_id", payload.conversationId)
-          .eq("direction", "inbound")
-          .order("occurred_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        databaseError(inbound.error);
-        if (inbound.data) {
-          context.splice(49);
-          context.push(inbound.data);
-        }
-      }
+      const context = (messages.data ?? []).slice(0, 50);
       const transcript = context.reverse().map((m) => ({
+        id: m.id,
         body: m.body,
         direction: z.enum(["inbound", "outbound"]).parse(m.direction),
       }));
+      const ai = await loadAIContext(
+        db,
+        job.workspace_id,
+        payload.conversationId,
+      );
       const result = matches
-        ? await deps.model.classify({
-            agent: config,
-            messages: transcript,
-            generateDraft: payload.generateDraft && !!config,
-          })
-        : { labels: [], draft: "", missingKnowledge: "", shouldReply: false };
+        ? await runRecordedAI(
+            db,
+            deps.model,
+            {
+              ...ai,
+              agent: config,
+              messages: transcript,
+              historyTruncated: (messages.data?.length ?? 0) > 50,
+              generateDraft: payload.generateDraft && !!config,
+            },
+            {
+              workspaceId: job.workspace_id,
+              conversationId: payload.conversationId,
+              catalogRevision: ai.catalogRevision,
+              agentId,
+              agentVersion,
+              scenario: payload.generateDraft
+                ? "classify_and_reply"
+                : "classify_only",
+            },
+          )
+        : {
+            labelId: null,
+            evidenceMessageId: null,
+            evidenceQuote: "",
+            draft: "",
+            missingKnowledge: "",
+            shouldReply: false,
+            noReplyReason: "",
+            contactStopped: false,
+          };
       databaseError(
         (
-          await db.rpc("server_apply_classification", {
+          await db.rpc("server_apply_intent", {
             p_workspace: job.workspace_id,
             p_conversation: payload.conversationId,
             p_revision: payload.revision,
-            p_connection_revision: revision,
-            p_labels: result.labels,
+            p_assignment: ai.assignmentRevision,
+            p_catalog: ai.catalogRevision,
+            p_config: ai.configurationVersion,
+            p_result: { ...result },
             p_agent: agentId!,
             p_agent_version: agentVersion,
-            p_draft: result.draft,
-            p_missing: result.missingKnowledge,
-            p_generate: payload.generateDraft && result.shouldReply,
+            p_generate: payload.generateDraft,
             ...(payload.runId ? { p_run: payload.runId } : {}),
           })
         ).error,

@@ -5,7 +5,6 @@ import { displayDate } from "@/lib/display-date";
 import { useInbox } from "@/lib/inbox-context";
 import {
   Avatar,
-  Badge,
   Empty,
   Icon,
   IconButton,
@@ -13,6 +12,7 @@ import {
   Button,
   Notice,
 } from "@/components/ui";
+import { ConversationLabel } from "@/components/label-badge";
 import { ConversationThread, ContactContext } from "./thread";
 import { Composer } from "@/features/drafts/composer";
 import { usePreferences } from "@/lib/preferences";
@@ -54,7 +54,12 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
           `${c.contact.name} ${c.contact.company} ${c.messages.at(-1)?.body}`
             .toLowerCase()
             .includes(query.toLowerCase()) &&
-          (label === "all" || c.labels.some((l) => l === label)),
+          (label === "all" ||
+            c.labelId === label ||
+            (label === "uncategorized" && c.labelState === "uncategorized") ||
+            state.labelCatalog?.some(
+              (l) => l.id === c.labelId && `group:${l.group}` === label,
+            )),
       );
   if (selected)
     return (
@@ -128,14 +133,16 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
               aria-label="Filter by label"
             >
               <option value="all">All labels</option>
-              {[
-                "Interested",
-                "Information Request",
-                "Meeting Request",
-                "Referral",
-                "Not interested",
-              ].map((l) => (
-                <option key={l}>{l}</option>
+              {["positive", "neutral", "negative"].map((g) => (
+                <option value={`group:${g}`} key={g}>
+                  {g} intent
+                </option>
+              ))}
+              <option value="uncategorized">Unable to categorize</option>
+              {(state.labelCatalog ?? []).map((l) => (
+                <option value={l.id} key={l.id}>
+                  {l.name}
+                </option>
               ))}
             </select>
           </div>
@@ -163,14 +170,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
                   <small>{c.contact.company}</small>
                 </span>
                 <span>
-                  {c.labels.map((l) => (
-                    <Badge
-                      key={l}
-                      color={l === "Interested" ? "green" : "purple"}
-                    >
-                      {l}
-                    </Badge>
-                  ))}
+                  <ConversationLabel conversation={c} />
                 </span>
                 <span className="snippet">{c.messages.at(-1)?.body}</span>
                 <time>

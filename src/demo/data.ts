@@ -1,4 +1,5 @@
-import type { InboxState, Label } from "@/domain/inbox";
+import { systemLabels, demoLabels } from "@/domain/labels";
+import type { InboxState } from "@/domain/inbox";
 
 export const DEMO_USER = "demo-user";
 const contacts = [
@@ -101,6 +102,7 @@ export function createDemoState(): InboxState {
         lastEventAt: null,
       },
     ],
+    labelCatalog: demoLabels("aster"),
     agents: [
       {
         id: "reply-handler",
@@ -111,7 +113,7 @@ export function createDemoState(): InboxState {
         status: "active",
         goal: "Book a discovery call",
         language: "English",
-        replyPolicy: "positive",
+        replyGroups: ["positive"],
         knowledge:
           "We help outbound teams manage LinkedIn conversations in a shared inbox. Every suggested reply is reviewed by a person before sending. Ask about the team’s needs before proposing a demo. Never invent pricing, availability or product capabilities.",
         version: 1,
@@ -139,7 +141,8 @@ export function createDemoState(): InboxState {
           id === "priya" || id === "sophie"
             ? "Founder Network"
             : "SaaS Leaders — Q3",
-        labels: [label as Label],
+        labelId: systemLabels.find((l) => l.name === label)?.key ?? null,
+        labelState: "classified",
         revision: 1,
         notes: "",
         archived: false,

@@ -1,6 +1,7 @@
 # Documentation
 
 - [Product contract](product.md): approved navigation, workflows and scope.
+- [Labels and AI configuration](labels-and-ai-configuration.md): single intent, custom rules, platform prompt versions, validation and coordinated rollout.
 - [Architecture](architecture.md): boundaries, persistence, provider transport and concurrency.
 - [Implementation status](implementation.md): delivered behavior, checks and remaining acceptance.
 - [Development and operations](operations.md): isolated setup, worker, configuration and release procedure.

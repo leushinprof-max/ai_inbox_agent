@@ -10,6 +10,7 @@ Standalone Aster Inbox, rebuilt around the [owner-approved design](https://aster
 - Conversations with at least one lead reply, search, labels, paginated history, notes and manual replies. Outbound-only outreach stays outside the inbox and classification.
 - Draft triage: Ready, Needs input and Later; edit, dismiss, snooze, redraft, cancel generation and send-and-next.
 - Versioned agents with Knowledge, workspace agent selection, pause/activation and model-backed Test.
+- One current intent label, three intent groups, custom rules and manual corrections; platform-owner prompt editing with versioned publication and full-request preview. See the [feature and rollout notes](docs/labels-and-ai-configuration.md) for the coordinated database/worker update.
 - HeyReach workspace-key verification, encrypted credentials, provider sender discovery and durable webhook ingestion.
 - Resumable history import and automatic classification. Historical imports never create drafts; new replies can create reviewable drafts.
 - Durable text sending: HTTP 200 means Sent, with no expiring readiness gate. Concurrent retries dispatch once. Ambiguous failures never automatically resend.

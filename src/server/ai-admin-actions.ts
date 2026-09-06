@@ -1,0 +1,217 @@
+"use server";
+import { z } from "zod";
+import { authenticatedClient, databaseError } from "./session";
+import { authorizeWorkspace } from "./inbox-read";
+import { adminClient } from "./admin";
+import { runRecordedAI } from "./ai-run";
+import { loadAIContext } from "./ai-context";
+import { validateConfiguration } from "@/integrations/ai/configuration";
+import {
+  buildModelRequest,
+  createInboxModel,
+  type ModelInput,
+} from "@/integrations/ai/classify";
+import { intentGroup } from "@/domain/labels";
+
+async function ownerClient() {
+  const client = await authenticatedClient();
+  const result = await client.db.rpc("is_platform_owner");
+  databaseError(result.error);
+  if (!result.data) throw new Error("Platform owner access required.");
+  return client;
+}
+export async function readAIAdmin() {
+  const { db } = await ownerClient();
+  const [versions, release, publications] = await Promise.all([
+    db
+      .from("ai_config_versions")
+      .select("*")
+      .order("id", { ascending: false })
+      .limit(100),
+    db.from("ai_config_release").select("*").single(),
+    db
+      .from("ai_config_publications")
+      .select("*")
+      .order("id", { ascending: false })
+      .limit(100),
+  ]);
+  [versions, release, publications].forEach((r) => databaseError(r.error));
+  const items = versions.data ?? [];
+  if (!items.some((v) => v.id === release.data!.version_id)) {
+    const current = await db
+      .from("ai_config_versions")
+      .select("*")
+      .eq("id", release.data!.version_id)
+      .single();
+    databaseError(current.error);
+    items.push(current.data!);
+  }
+  return {
+    versions: items,
+    release: release.data!,
+    publications: publications.data ?? [],
+    environment: process.env.VERCEL_ENV ?? "local",
+  };
+}
+export async function saveAIAdmin(value: unknown) {
+  const { db } = await ownerClient();
+  const config = validateConfiguration(value);
+  const result = await db.rpc("save_ai_configuration", {
+    p_configuration: config,
+  });
+  databaseError(result.error);
+  return result.data!;
+}
+export async function publishAIAdmin(version: number, revision: number) {
+  const { db } = await ownerClient();
+  const candidate = await db
+    .from("ai_config_versions")
+    .select("configuration")
+    .eq("id", z.number().int().positive().parse(version))
+    .single();
+  databaseError(candidate.error);
+  validateConfiguration(candidate.data!.configuration);
+  databaseError(
+    (
+      await db.rpc("publish_ai_configuration", {
+        p_version: version,
+        p_revision: z.number().int().positive().parse(revision),
+      })
+    ).error,
+  );
+}
+const previewSchema = z.object({
+  workspaceId: z.uuid(),
+  agentId: z.uuid().nullable(),
+  conversationId: z.uuid().nullable(),
+  transcript: z.string().max(48000),
+  scenario: z.enum(["classify", "reply", "rewrite", "needs_input"]),
+  generateDraft: z.boolean(),
+  instructions: z.string().max(2000),
+  approvedAnswer: z.string().max(8000),
+  currentDraft: z.string().max(8000),
+});
+async function adminInput(value: unknown, configValue: unknown) {
+  const { db, user } = await ownerClient();
+  const valueParsed = previewSchema.parse(value);
+  const { workspaceId, agentId, conversationId } = valueParsed;
+  await authorizeWorkspace(db, user.id, workspaceId);
+  const ai = await loadAIContext(
+    adminClient(),
+    workspaceId,
+    conversationId ?? undefined,
+  );
+  const configuration = validateConfiguration(configValue);
+  let agent: ModelInput["agent"] = null;
+  let agentVersion: number | undefined;
+  if (agentId) {
+    const a = await db
+      .from("agents")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("id", agentId)
+      .single();
+    databaseError(a.error);
+    agentVersion = a.data!.version;
+    agent = {
+      name: a.data!.name,
+      goal: a.data!.goal,
+      language: a.data!.language,
+      knowledge: a.data!.knowledge,
+      replyGroups: z.array(intentGroup).parse(a.data!.reply_groups),
+    };
+  }
+  let messages: ModelInput["messages"];
+  let historyTruncated = false;
+  if (conversationId) {
+    const result = await db
+      .from("messages")
+      .select("id,direction,body")
+      .eq("workspace_id", workspaceId)
+      .eq("conversation_id", conversationId)
+      .order("occurred_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(51);
+    databaseError(result.error);
+    historyTruncated = (result.data?.length ?? 0) > 50;
+    messages = (result.data ?? [])
+      .slice(0, 50)
+      .reverse()
+      .map((m) => ({
+        ...m,
+        direction: z.enum(["inbound", "outbound"]).parse(m.direction),
+      }));
+  } else {
+    if (!valueParsed.transcript.trim())
+      throw new Error("Enter a sample conversation.");
+    messages = valueParsed.transcript
+      .split(/\n(?=(?:Lead|Team):)/)
+      .map((body, i) => ({
+        id: `sample-${i}`,
+        direction: body.startsWith("Team:") ? "outbound" : "inbound",
+        body: body.replace(/^(?:Lead|Team):\s*/, ""),
+      }));
+  }
+  return {
+    db,
+    agentVersion,
+    agentId,
+    conversationId,
+    catalogRevision: ai.catalogRevision,
+    input: {
+      ...ai,
+      configuration,
+      agent,
+      messages,
+      historyTruncated,
+      scenario: valueParsed.scenario,
+      generateDraft: valueParsed.generateDraft,
+      operator: {
+        instructions: valueParsed.instructions,
+        approvedAnswer: valueParsed.approvedAnswer,
+        currentDraft: valueParsed.currentDraft,
+      },
+    } satisfies ModelInput,
+    workspaceId,
+  };
+}
+export async function previewAIAdmin(value: unknown, config: unknown) {
+  const { input } = await adminInput(value, config);
+  return buildModelRequest(input, process.env.INBOX_MODEL);
+}
+export async function testAIAdmin(value: unknown, config: unknown) {
+  const {
+    input,
+    db,
+    workspaceId,
+    agentId,
+    agentVersion,
+    conversationId,
+    catalogRevision,
+  } = await adminInput(value, config);
+  databaseError(
+    (await db.rpc("reserve_agent_test", { p_workspace: workspaceId })).error,
+  );
+  const output = await runRecordedAI(
+    adminClient(),
+    createInboxModel(process.env.OPENAI_API_KEY, process.env.INBOX_MODEL),
+    input,
+    {
+      workspaceId,
+      agentId,
+      agentVersion,
+      conversationId: conversationId ?? undefined,
+      catalogRevision,
+      scenario: `product_test:${input.scenario}`,
+    },
+  );
+  return {
+    output,
+    label: input.labels.find((l) => l.id === output.labelId) ?? null,
+    versions: {
+      publishedBase: input.configurationVersion,
+      agent: agentVersion ?? null,
+      catalog: catalogRevision,
+    },
+  };
+}
