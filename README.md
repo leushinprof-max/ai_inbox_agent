@@ -2,7 +2,7 @@
 
 Standalone Aster Inbox, rebuilt around the [owner-approved design](https://aster-inbox-design.leushin-prof.chatgpt.site). It has no runtime dependency on LeadFleet, its database, client portal, profile assignments or workers.
 
-**Status: standalone application and runtime implemented and tested locally; hosted setup and controlled live-provider acceptance remain outstanding.** No new production deployment or migration has been made.
+**Status: the separate development application is live at [ai-inbox-dev.vercel.app](https://ai-inbox-dev.vercel.app).** Its own Supabase database and Railway worker are running; owner signup and workspace creation are verified. Real HeyReach connection/import/send acceptance remains outstanding. Existing LeadFleet production is unchanged.
 
 ## What works
 
@@ -26,7 +26,7 @@ npm run dev
 
 Open `http://127.0.0.1:43600/demo/drafts`. The demo needs no credentials or database and sends nothing externally. Its synthetic changes reset on reload. Authenticated routes never substitute demo data after a database failure.
 
-The approved hosted prototype is a design reference, not a deployment of this application. To run the persistent application, use the independent local stack in [development and operations](docs/operations.md).
+The deployed [design demo](https://ai-inbox-dev.vercel.app/demo/drafts) and [state catalogue](https://ai-inbox-dev.vercel.app/demo/states) use synthetic data. The approved prototype remains the design reference. See [hosted development](docs/dev-environment.md) for the live environment and [development and operations](docs/operations.md) for the independent local stack.
 
 ## Verify
 

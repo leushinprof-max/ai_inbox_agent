@@ -1,6 +1,6 @@
 # Implementation status
 
-As of 2026-09-06, the standalone application, database operations, provider adapters and worker are implemented. Separate Supabase, Vercel and Railway development projects have been created and configured; the [hosted environment record](dev-environment.md) tracks deployment and remaining acceptance. The existing LeadFleet production Inbox remains unchanged.
+As of 2026-09-06, the standalone application, database operations, provider adapters and worker are implemented. The separate development site, Supabase database and Railway worker are running. Owner signup and workspace creation are verified; the [hosted environment record](dev-environment.md) records exact deployment identities, evidence and remaining acceptance. The existing LeadFleet production Inbox remains unchanged.
 
 ## Implemented
 
@@ -26,12 +26,12 @@ The verification target is the feature branch identified in the PR; the PR recor
 - Worker image built and started against the isolated stack. `/health` returned 200; `/ready` returned 503 without an AI key, as intended. The container stopped cleanly.
 - Browser checks use only synthetic users/conversations. See the per-state [visual acceptance](visual-acceptance.md).
 
-This is not a pgTAP run, a hosted-system check or a real HeyReach/OpenAI acceptance test. No production data or credentials were used.
+The local suite above uses synthetic data and provider/model doubles; it is not a pgTAP run or real provider acceptance. Separately, the hosted environment now passes deployment/worker health checks and owner signup/workspace creation. A real OpenAI request through the shipped adapter classified a synthetic question and produced a draft. That request used the owner-authorized existing model key, not real conversations, and does not prove end-to-end queued classification.
 
 ## Remaining acceptance and deliberate limitations
 
-1. Provision separate hosted Supabase, web and worker environments; apply the new schema and configure Auth email delivery, secrets and a public HTTPS webhook. These are not configured by this branch.
-2. Perform an authorized live workspace-key check, inbound webhook/import/classification and one approved send. Validate real provider payload compatibility and model-answer quality before calling the product production-ready.
+1. Complete hosted invite/recovery delivery and configure custom SMTP before broader team onboarding. The database, nine migrations, web/worker secrets, HTTPS site and owner signup are already configured and verified.
+2. Connect Restaff, configure its new webhook and selected agent, then perform an authorized live inbound/import/classification run and one approved send. Validate real provider payload compatibility and model-answer quality before calling the product production-ready.
 3. Complete the remaining reference-state visual acceptance and owner review. Implemented boundaries without captured fixtures are identified in the visual ledger.
 
 Webhook creation currently uses guided setup in HeyReach with a generated private address. The app does not call CreateWebhook automatically. Invitations are shareable links, not invitation emails. Knowledge is editable approved text; website crawling, uploaded documents and vector retrieval are not included. Archive-workspace and cross-device preference syncing are not implemented. Pause drafting through the selected agent's Launch settings.

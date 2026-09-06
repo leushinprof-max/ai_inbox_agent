@@ -1,14 +1,14 @@
 # Hosted development environment
 
-This records provisioning of the independent development application on 2026-09-06. Existing LeadFleet projects and data remain separate. A created hosting project does not mean its database, Auth or worker is operational.
+This records the independent development application on 2026-09-06. The web application, database and worker are running. Existing LeadFleet projects and data remain separate; real HeyReach acceptance is still outstanding.
 
 ## Target resources
 
 | Resource | Target                                                                                             | Current state                                                                  |
 | -------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | Supabase | `ai-inbox-dev` (`brkprirbgjycgkvqegos`), organization `jrfrjatvakjjhhlnbdgl`, Frankfurt (`eu-central-1`) | Created after the owner freed a slot; all nine committed migrations applied and their original versions verified. |
-| Vercel   | `ai-inbox-dev` in `ivan-leushin-s-projects`, project `prj_VFiDS13hd9e86Gin8MjnfL0eLIj9` | Created and linked; Next.js / Node 24. Public canonical URL, protected preview/deployment URLs. Initial build pending. |
-| Railway  | Private `ai-inbox-dev`, project `0267feef-c4d1-4a24-a9c5-de4bab3ea05f`, workspace `ee8941aa-3369-472e-b331-a6f75aadfbff` | `worker` service `d5e6c0c3-b21d-473c-be99-53b9a69f491b` created; dedicated database/encryption configuration and the owner-authorized OpenAI key installed. First deployment pending. |
+| Vercel   | `ai-inbox-dev` in `ivan-leushin-s-projects`, project `prj_VFiDS13hd9e86Gin8MjnfL0eLIj9` | READY at [ai-inbox-dev.vercel.app](https://ai-inbox-dev.vercel.app); Next.js / Node 24. Public canonical URL, protected preview/deployment URLs. |
+| Railway  | Private `ai-inbox-dev`, project `0267feef-c4d1-4a24-a9c5-de4bab3ea05f`, workspace `ee8941aa-3369-472e-b331-a6f75aadfbff` | `worker` service `d5e6c0c3-b21d-473c-be99-53b9a69f491b` is Online with one running replica and no reported issues or recent failures at acceptance. |
 
 The owner acknowledged the USD 0/month estimate. Initial creation failed because both free slots were occupied. The owner then freed a slot; the scraper project was observed inactive, and the dedicated database was created after reconfirming the unchanged USD 0/month estimate. No paid plan was enabled. LeadFleet's project was not changed. See [Supabase billing](https://supabase.com/docs/guides/platform/billing-on-supabase) for the account-wide free-project limit.
 
@@ -20,7 +20,7 @@ Railway's default environment is named `production` (`c5bbc5f5-bf03-4f98-ba86-41
 
 - `vercel.json` selects Next.js with reproducible `npm ci` installation and the checked production build.
 - `.vercelignore` allows only application source, public assets, dependency manifests and required Next.js configuration into the deployment upload. Local environment files, artifacts, tests, seed tools and design references are excluded. The source is not publicly exposed by Vercel.
-- Railway service settings select `Dockerfile.worker`, `/ready` with a 180-second health-check timeout, ON_FAILURE with at most five restarts, and disabled sleeping. `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=180` provides the shutdown drain. Database, encryption and AI credentials are still required before deployment. `/health` remains a process diagnostic; neither endpoint grants or expires sending permissions.
+- Railway service settings select `Dockerfile.worker`, `/ready` with a 180-second health-check timeout, ON_FAILURE with at most five restarts, and disabled sleeping. `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=180` provides the shutdown drain. Database, encryption and AI credentials are configured. `/health` remains a process diagnostic; neither endpoint grants or expires sending permissions.
 - The prepared `railway.json` was removed after the provider rejected its use for a new service. [Railway's current documentation](https://docs.railway.com/infrastructure-as-code#iac-vs-config-as-code) states that Config as Code is deprecated and new services cannot opt into it. The old JSON Schema accepting a file did not establish that a new service could use it. Current service settings are the deployment configuration; review them before each worker deployment.
 - No pre-deploy SQL command runs automatically. Apply the reviewed migrations explicitly to the newly identified development project, then compare migration history and run database advisors.
 
@@ -30,15 +30,27 @@ The hosted security advisor reports informational deny-all RLS notices for five 
 
 The migration push completed, but CLI 2.109.1 could not cache its pg-delta catalog because a generated CA-file path was missing. All nine remote migration versions were independently verified. Certificate verification was not disabled.
 
-## Provisioning sequence
+## Deployment and verification
 
-1. Dedicated database creation and the nine committed migrations are complete. Never point local seed or integration scripts at the hosted database.
-2. Finish configuring the existing dedicated Vercel project with its public Supabase URL/key and private server key, a newly generated stable encryption key, and the canonical HTTPS `INBOX_APP_URL`. Keep the values out of logs, commits and client bundles. Do not copy LeadFleet keys or tenant data.
-3. Set Supabase's site URL and permitted Auth callbacks to the actual stable HTTPS development address. Keep hosted email confirmation enabled. Verify signup/sign-in, invitation acceptance and password recovery. Public team onboarding requires configured SMTP; do not disable confirmation to work around mail delivery.
-4. Configure the independent worker with the same development database and encryption key. Add an owner-provided model key to both the web application (Agent Test) and worker. A provider/model credential change needs scoped authorization. Deploy the exact reviewed commit and record both deployment identities.
-5. Open the application over HTTPS on desktop and phone. Verify authenticated workspace isolation and the four screens. The UI-only catalogue lives at `/demo/states` and makes no HeyReach/model calls.
-6. Connect an explicitly selected HeyReach workspace through the application. Create its new webhook only after the owner approves the provider configuration. Import a bounded seven-day window, inspect classification, receive one new inbound reply and review its generated draft. The historical import itself must not create drafts.
-7. Perform one real message send only with separately approved recipient and exact text. Record HTTP-200 completion and the immediately reusable composer. Do not reuse an earlier test-send approval from the old application.
+The deployed application source is `3ecd9aa59363d729b7cb900f32fdff34e0d55e53` on `codex/standalone-inbox`.
+
+- Vercel deployment `dpl_Fz39BN5vVHtCySUrFwj4duck1Y2Z` is READY from that clean source. The canonical `/login` returned 200 with configured Auth. The hosted build ran `npm ci` and `npm run build` successfully.
+- The first healthy Railway deployment from that source is `121128fd-f84d-4513-8a1c-81a49625d6e9`. Its configured `/ready` health check passed and the service reports one running replica. No public worker domain was created. Railway is connected to the feature branch and can deploy subsequent pushes; Vercel currently uses explicit CLI deployments.
+- The owner completed signup, email confirmation and sign-in using their own browser, then created `Restaff`. Read-only database verification confirmed owner membership. At acceptance its connection was disconnected, webhook not configured and no agent existed. No old tenant content or HeyReach credentials were copied.
+- The shipped model adapter passed a real OpenAI request using synthetic product facts and a synthetic incoming question: Interested and Information Request labels, a nonempty draft and no missing-knowledge result. This verifies the authorized key and adapter, not an authenticated Agent Test or a queued Railway classification job.
+- Hosted demo navigation through Drafts, Conversations, Agents and Settings passed; desktop Drafts, Agents and Settings screenshots were inspected. This does not replace the existing per-frame visual ledger or live provider checks.
+- At the source commit above, all 28 unit/adapter/SQL tests, lint, typecheck, an environmentless production build and diff checks passed. The focused isolated Supabase recovery integration test passed. Prior runtime verification includes 23 integration tests, nine-migration replay and worker container checks; these were not presented as a new full integration run.
+
+Initial Vercel attempts exposed two setup problems: nested source exclusions in the upload allowlist and static evaluation of the unconfigured password-reset page. Both were repaired before the successful deployment. The reset route remains authenticated and is evaluated dynamically; without Supabase configuration it redirects to password recovery instead of failing the build.
+
+## Remaining live acceptance
+
+1. Connect the new Restaff workspace through the application and create its new HeyReach webhook under scoped owner authorization. Import a bounded seven-day window, inspect classification, receive one new inbound reply and review the selected agent's generated draft. Historical import must not create drafts. Do not reuse old connection secrets or activation approvals implicitly.
+2. Perform one real message send only with separately approved recipient and exact text. Record HTTP-200 completion and the immediately reusable composer. Do not reuse an earlier test-send approval from the old application.
+3. Complete hosted invitation and password-recovery acceptance. Owner signup succeeded with the default mail service; team onboarding still needs custom SMTP and delivery verification. Keep email confirmation enabled.
+4. Complete the remaining visual ledger frames and owner review. Local multi-session isolation checks do not constitute a hosted multi-user acceptance run.
+
+Never point local seed or integration scripts at the hosted database. Configuration values remain outside tracked files and deployment source uploads. Preserve the stable encryption key when redeploying.
 
 ## Review and rollback
 

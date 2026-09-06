@@ -91,3 +91,9 @@ Repairs from this pass:
 - Scroll to the latest message when a mobile draft conversation opens; initially hidden transcripts previously opened at the top.
 
 Still separate: connected live setup, hosted Auth/SMTP, real model/provider acceptance and the remaining ledger deviations. This pass does not claim all prototype frames or hosted workflows are complete.
+
+## 2026-09-06 hosted smoke check
+
+At deployed source `3ecd9aa59363d729b7cb900f32fdff34e0d55e53`, navigation through the four demo sections succeeded over public HTTPS. Drafts, Agents and Settings desktop screenshots were inspected at 1280 × 720; Conversations showed the expected synthetic list. No new material layout difference from the previously inspected application was observed. Existing per-frame results and deviations above remain unchanged; this was a deployment smoke check, not a new full prototype comparison.
+
+The owner confirmed their email, signed in and created Restaff in their own browser. Database checks confirmed these operations; the owner's authenticated screens were not inspected in the agent's separate browser session. Hosted invitation/recovery mail, connected setup and the remaining visual fixtures still need acceptance. The synthetic real-model adapter test is recorded in [hosted development](dev-environment.md); it does not complete the Agents Test UI frame.
