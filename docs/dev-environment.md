@@ -1,6 +1,6 @@
 # Hosted development environment
 
-This records the independent development application on 2026-09-06. The web application, database and worker are running. The owner confirmed real HeyReach import and classification; replied-only admission is deployed and verified below. Webhook, draft and sending acceptance remain outstanding. Existing LeadFleet projects and data remain separate.
+This records the independent development application on 2026-09-06. The web application, database and worker are running. Real HeyReach import, replied-only admission, incoming webhook, automatic drafting, triage and one approved send have been verified below. Existing LeadFleet projects and data remain separate.
 
 ## Target resources
 
@@ -45,10 +45,9 @@ Initial Vercel attempts exposed two setup problems: nested source exclusions in 
 
 ## Remaining live acceptance
 
-1. The owner connected Restaff and confirmed import and classification with real provider data. The reply-eligibility correction is deployed; its observed results are recorded below. Finish webhook/new-inbound and selected-agent draft acceptance. Historical import must not create drafts. Do not reuse old connection secrets or activation approvals implicitly.
-2. Perform one real message send only with separately approved recipient and exact text. Record HTTP-200 completion and the immediately reusable composer. Do not reuse an earlier test-send approval from the old application.
-3. Complete hosted invitation and password-recovery acceptance. Owner signup succeeded with the default mail service; team onboarding still needs custom SMTP and delivery verification. Keep email confirmation enabled.
-4. Complete the remaining visual ledger frames and owner review. Local multi-session isolation checks do not constitute a hosted multi-user acceptance run.
+1. Broaden model-answer evaluation beyond the three saved-agent cases and one real incoming test below. Historical import remains classification-only and must not create drafts. Additional live sends need scoped authorization.
+2. Complete hosted invitation and password-recovery acceptance. Owner signup succeeded with the default mail service; team onboarding still needs custom SMTP and delivery verification. Keep email confirmation enabled.
+3. Complete the remaining visual ledger frames and owner review. Local multi-session isolation checks do not constitute a hosted multi-user acceptance run.
 
 Never point local seed or integration scripts at the hosted database. Configuration values remain outside tracked files and deployment source uploads. Preserve the stable encryption key when redeploying.
 
@@ -73,3 +72,23 @@ The owner explicitly authorized commit, push, dev database migration and dev web
 - Post-migration catalog checks found no authenticated/anonymous access to server RPCs, no authenticated read access to private tables and no unsafe SECURITY DEFINER search paths. Hosted advisors still report five private-table policy notices, 23 authenticated definer warnings and disabled [leaked-password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). Auth settings were not changed. Performance notices cover 11 uncovered foreign keys, one missing primary key and one unused index; this rollout does not claim an all-clear security/performance audit.
 
 Hosted acceptance used deployment metadata, HTTP and read-only SQL. The signed-in Conversations behavior was exercised locally with synthetic data; no owner session was impersonated to claim a hosted browser check.
+
+## Restaff live acceptance, 2026-09-06
+
+The owner signed in through the normal hosted browser and authorized agent configuration, the incoming test and a send in the designated test conversation. All configuration and triage actions used that real owner UI. No admin-generated session was used.
+
+- ReStaff agent version 2 is active and selected for the workspace. Approved Knowledge was prepared from [restaff.pro](https://restaff.pro/): product facts, official demo route, concise replies, no invented guarantees, and human input for missing essential facts. Three saved-agent tests returned an appropriate product/demo draft, Needs input for an unsupported payout guarantee, and no reply for an opt-out.
+- Read-only inspection with the workspace's stored encrypted connection confirmed its existing active reply webhook matches the new dev origin and secret. No webhook or credential was changed. The first actual event changed connection status to receiving.
+- The provider timestamp of the test incoming was 11:54:30 UTC. Its webhook arrived at 11:57:37 UTC; the Ready draft was persisted at 11:57:45 UTC, about eight seconds later. The delay before receipt was upstream of Inbox. The reply received Interested, Information Request and Meeting Request labels. Agent version and source revision matched the actual current conversation.
+- Ready → Later → Ready, editing and saving were exercised in Drafts. One short test message was sent through the UI. The operation became Sent at 12:00:29.804 UTC, less than 0.7 seconds after reservation. Exactly one accepted outgoing row was recorded and the draft completed. The queue cleared; entering text in Conversations made Send available again. The unsent editor-check text was discarded without sending.
+- The web source used for this live cycle was `0c692ee8bc18e99c0cfa3a73eb946a2beb02f4cd`. The healthy worker was deployment `d8bb9ef4-a46c-4b76-9120-c8ec7dd41a61`, source `9207be373d2ae568941baab34d545e44523974d8`; its changes since the prior acceptance were documentation only. HTTP 200 is the application send-completion contract; eventual readback is not a prerequisite for Sent or further composition.
+
+The walkthrough revealed stale queue totals on navigation/search and a first automatic draft not filling an already-open empty composer. The scoped repair on `codex/restaff-live-acceptance` updates totals with the first draft page and adopts a first draft only into an empty, unlocked composer. It preserves typed text. No hosted database migration, worker deployment, credential, webhook or send-policy change is required. The PR handoff records the exact checked source and subsequent web deployment after they complete.
+
+This verifies one authorized live cycle, not general model quality, hosted multi-user access or production readiness. Follow-ups remain disabled; replies require human approval. Operational IDs and message bodies are kept in ignored local evidence rather than this public repository.
+
+## Main consolidation, 2026-09-06
+
+The owner authorized final review and consolidation of PRs #1–#3 into `main`, followed by updating the existing dev site. The final release tree includes the previously accepted standalone app, reply-only admission and live draft refresh repair. The only new delivery configuration enables Vercel Git deployment from `main` and disables other branches. The [delivery procedure](operations.md#delivery-from-main) defines the subsequent workflow.
+
+Earlier branch/deployment entries above remain dated evidence. The root PR handoff records the actual merge SHAs, fresh verification results, host source changes and healthy deployments after completion; do not infer those results from this pre-merge record. Existing dev migrations, credentials, webhook, active agent and human-send policy are preserved. No new provider message or model test is part of the consolidation.
