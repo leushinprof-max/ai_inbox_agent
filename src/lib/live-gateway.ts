@@ -9,6 +9,7 @@ import type {
 import { InboxError } from "@/domain/inbox";
 import type { InboxGateway } from "@/domain/gateway";
 import { mutateInbox, type InboxMutation } from "@/server/inbox-actions";
+import { saveSenderAssignments } from "@/server/agent-actions";
 import { sendInbox } from "@/server/send-actions";
 import { disconnectHeyReach } from "@/server/connection-actions";
 import type { SendRequest } from "@/domain/send";
@@ -153,6 +154,24 @@ export class LiveGateway implements InboxGateway {
         this.state.conversations.find((c) => c.id === id)?.notesRevision ??
         0,
     });
+  saveSenderAssignments = async (
+    scope: Scope,
+    agentId: string,
+    senderIds: number[],
+    workspaceDefault: boolean,
+    revision: number,
+  ) => {
+    this.check(scope);
+    const result = await saveSenderAssignments({
+      workspaceId: scope.workspaceId,
+      agentId,
+      senderIds,
+      workspaceDefault,
+      revision,
+    });
+    if (!result.ok) throw new Error(result.error);
+    await this.refresh();
+  };
   saveAgent = (scope: Scope, agent: Agent) =>
     this.mutate(scope, {
       kind: "agent",

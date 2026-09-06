@@ -14,7 +14,11 @@ test("Populated upgrade maps single labels, queues replied history once and pres
     const files = readdirSync(dir)
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    for (const file of files.slice(0, -1))
+    const upgrade = files.findIndex((file) =>
+      file.endsWith("_labels_and_ai_configuration.sql"),
+    );
+    assert.ok(upgrade > 0);
+    for (const file of files.slice(0, upgrade))
       await db.exec(readFileSync(new URL(file, dir), "utf8"));
     await db.exec(`insert into auth.users(id,email) values('11111111-1111-4111-8111-111111111111','migration@example.test');
       select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);`);
@@ -48,7 +52,7 @@ test("Populated upgrade maps single labels, queues replied history once and pres
       select workspace_id,id,$2,1,1,'Keep human draft','ready' from public.conversations where workspace_id=$1 and provider_conversation_id='single'`,
       [workspace, agent],
     );
-    await db.exec(readFileSync(new URL(files.at(-1)!, dir), "utf8"));
+    await db.exec(readFileSync(new URL(files[upgrade], dir), "utf8"));
     const rows = (
       await db.query<{
         provider_conversation_id: string;

@@ -15,6 +15,56 @@ grant usage on schema public,auth to authenticated,anon;`);
     await db.exec(readFileSync(new URL(file, directory), "utf8"));
 });
 after(() => db.close());
+test("Photo refresh preserves message revisions and tolerates older workers", async () => {
+  const workspace = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  await db.query("insert into public.workspaces(id,name) values($1,'Photos')", [
+    workspace,
+  ]);
+  await db.query(
+    "insert into public.connections(workspace_id,status,revision) values($1,'connected',1)",
+    [workspace],
+  );
+  await db.query(
+    "insert into public.senders(workspace_id,provider_id,name,auth_valid) values($1,1,'Sender',true)",
+    [workspace],
+  );
+  const base = {
+    id: "photo-chat",
+    senderId: 1,
+    senderName: "Sender",
+    contactName: "Lead",
+    messages: [],
+  };
+  for (const photoUrl of [
+    "https://media.licdn.com/first",
+    undefined,
+    "https://media.licdn.com/updated",
+  ]) {
+    await db.query("select public.server_ingest_conversation($1,1,$2::jsonb)", [
+      workspace,
+      JSON.stringify({ ...base, photoUrl, senderPhotoUrl: photoUrl }),
+    ]);
+    const row = (
+      await db.query<{
+        contact_photo_url: string;
+        sender_photo_url: string;
+        inbound_revision: number;
+      }>(
+        "select contact_photo_url,sender_photo_url,inbound_revision from public.conversations where workspace_id=$1",
+        [workspace],
+      )
+    ).rows[0];
+    assert.equal(
+      row.contact_photo_url,
+      photoUrl ?? "https://media.licdn.com/first",
+    );
+    assert.equal(row.inbound_revision, 0);
+    assert.equal(
+      row.sender_photo_url,
+      photoUrl ?? "https://media.licdn.com/first",
+    );
+  }
+});
 test("Every standalone migration replays from an empty database; all exposed tables have RLS", async () => {
   const tables = (
     await db.query<{ tablename: string; rowsecurity: boolean }>(

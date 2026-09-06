@@ -308,6 +308,7 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_position: string;
+          contact_photo_url: string | null;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -331,6 +332,7 @@ export type Database = {
           reply_decision_revision: number | null;
           sender_id: number;
           sender_name: string;
+          sender_photo_url: string | null;
           workspace_id: string;
         };
         Insert: {
@@ -340,6 +342,7 @@ export type Database = {
           contact_company?: string;
           contact_name: string;
           contact_position?: string;
+          contact_photo_url?: string | null;
           contact_stopped?: boolean;
           created_at?: string;
           evidence_message_id?: string | null;
@@ -363,6 +366,7 @@ export type Database = {
           reply_decision_revision?: number | null;
           sender_id: number;
           sender_name: string;
+          sender_photo_url?: string | null;
           workspace_id: string;
         };
         Update: {
@@ -372,6 +376,7 @@ export type Database = {
           contact_company?: string;
           contact_name?: string;
           contact_position?: string;
+          contact_photo_url?: string | null;
           contact_stopped?: boolean;
           created_at?: string;
           evidence_message_id?: string | null;
@@ -395,6 +400,7 @@ export type Database = {
           reply_decision_revision?: number | null;
           sender_id?: number;
           sender_name?: string;
+          sender_photo_url?: string | null;
           workspace_id?: string;
         };
         Relationships: [
@@ -722,6 +728,7 @@ export type Database = {
       };
       senders: {
         Row: {
+          agent_id: string | null;
           auth_valid: boolean;
           name: string;
           provider_id: number;
@@ -729,6 +736,7 @@ export type Database = {
           workspace_id: string;
         };
         Insert: {
+          agent_id?: string | null;
           auth_valid: boolean;
           name: string;
           provider_id: number;
@@ -736,6 +744,7 @@ export type Database = {
           workspace_id: string;
         };
         Update: {
+          agent_id?: string | null;
           auth_valid?: boolean;
           name?: string;
           provider_id?: number;
@@ -832,6 +841,7 @@ export type Database = {
         Row: {
           created_at: string;
           default_agent_id: string | null;
+          agent_assignment_revision: number;
           id: string;
           label_revision: number;
           name: string;
@@ -840,6 +850,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           default_agent_id?: string | null;
+          agent_assignment_revision?: number;
           id?: string;
           label_revision?: number;
           name: string;
@@ -848,6 +859,7 @@ export type Database = {
         Update: {
           created_at?: string;
           default_agent_id?: string | null;
+          agent_assignment_revision?: number;
           id?: string;
           label_revision?: number;
           name?: string;
@@ -868,6 +880,20 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      save_sender_assignments: {
+        Args: {
+          p_workspace: string;
+          p_agent: string;
+          p_senders: number[];
+          p_default: boolean;
+          p_revision: number;
+        };
+        Returns: undefined;
+      };
+      server_resolve_agent: {
+        Args: { p_workspace: string; p_conversation: string };
+        Returns: string | null;
+      };
       accept_workspace_invite: { Args: { p_hash: string }; Returns: string };
       act_on_draft: {
         Args: {
@@ -926,6 +952,7 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_position: string;
+          contact_photo_url: string | null;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -949,6 +976,7 @@ export type Database = {
           reply_decision_revision: number | null;
           sender_id: number;
           sender_name: string;
+          sender_photo_url: string | null;
           workspace_id: string;
         }[];
         SetofOptions: {

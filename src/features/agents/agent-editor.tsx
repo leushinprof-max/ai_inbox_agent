@@ -1,11 +1,19 @@
 "use client";
 
+import "./agents.css";
+import { AgentMark } from "./agent-mark";
+import {
+  readAgentKnowledge,
+  writeAgentKnowledge,
+  hasAgentKnowledge,
+  type AgentKnowledge,
+} from "@/domain/agent-knowledge";
 import { intentGroup } from "@/domain/labels";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
 import type { Agent } from "@/domain/inbox";
-import { selectDefaultAgent } from "@/server/agent-actions";
+import { AgentLaunch } from "./agent-launch";
 import { LiveAgentTest } from "./live-agent-test";
 import {
   Badge,
@@ -13,7 +21,7 @@ import {
   Empty,
   IconButton,
   Notice,
-  Topbar,
+  Icon,
 } from "@/components/ui";
 
 const steps = ["Basics", "Knowledge", "Follow-ups", "Test", "Launch"];
@@ -46,6 +54,16 @@ export function AgentEditor({ id }: { id: string }) {
         version: 0,
       },
   );
+  const [initialAgent] = useState(agent);
+  const knowledge = readAgentKnowledge(agent.knowledge);
+  const dirty =
+    JSON.stringify(agent) !== JSON.stringify(existing ?? initialAgent);
+  const [customGoal, setCustomGoal] = useState(
+    agent.goal !== "Book a discovery call",
+  );
+  function updateKnowledge(value: AgentKnowledge) {
+    field("knowledge", writeAgentKnowledge(value));
+  }
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -61,27 +79,56 @@ export function AgentEditor({ id }: { id: string }) {
     setAgent((a) => ({ ...a, [key]: value }));
     setSaved(false);
   }
-  async function save(status: Agent["status"] = agent.status) {
+  async function save(
+    status: Agent["status"] = agent.status,
+    navigate = true,
+  ): Promise<Agent | undefined> {
     if (saving) return;
     setSaving(true);
     try {
       setError("");
+      if (agent.knowledge.length > 30000)
+        throw new Error(
+          "Knowledge is too long. Keep the combined content under 30,000 characters.",
+        );
+      if (status === "active" && !hasAgentKnowledge(agent.knowledge))
+        throw new Error(
+          "Add your Product & Offer before activating the agent.",
+        );
+      if (
+        status === "active" &&
+        knowledge.faq.some(
+          (item) =>
+            Boolean(item.question.trim()) !== Boolean(item.answer.trim()),
+        )
+      )
+        throw new Error(
+          "Add both a question and an approved answer to each FAQ, or clear both fields.",
+        );
+      if (
+        status === "active" &&
+        agent.knowledge.includes('"format": "agent-knowledge-v1"') &&
+        !knowledge.companyName.trim()
+      )
+        throw new Error("Add the Company Name before activating the agent.");
       const next = {
         ...agent,
-        id: id === "new" ? crypto.randomUUID() : id,
+        id:
+          id === "new"
+            ? agent.id === "new-agent"
+              ? crypto.randomUUID()
+              : agent.id
+            : id,
         status,
       };
       await repository.saveAgent(scope, next);
-      if (mode !== "demo" && status === "active" && !workspace.defaultAgentId) {
-        const result = await selectDefaultAgent(scope.workspaceId, next.id);
-        if (!result.ok) throw new Error(result.error);
-        await repository.refresh?.();
-      }
-      setAgent(
-        repository.getSnapshot().agents.find((a) => a.id === next.id) ?? next,
-      );
+      const savedAgent =
+        repository.getSnapshot().agents.find((a) => a.id === next.id) ?? next;
+      setAgent(savedAgent);
       setSaved(true);
-      if (id === "new") router.replace(`${basePath}/agents/${next.id}`);
+      if (id === "new" && navigate)
+        router.replace(`${basePath}/agents/${next.id}`);
+      return savedAgent;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Agent could not be saved.");
     } finally {
@@ -89,38 +136,50 @@ export function AgentEditor({ id }: { id: string }) {
     }
   }
   return (
-    <>
-      <Topbar title={existing?.name ?? "Create agent"}>
+    <div className="agent-editor">
+      <header className="agent-editor-header">
         <IconButton
           label="Back to agents"
           icon="back"
-          onClick={() => router.push(`${basePath}/agents`)}
+          onClick={() => router.push(basePath + "/agents")}
         />
-        <Badge color={agent.status === "active" ? "green" : ""}>
-          {agent.status}
-        </Badge>
+        <AgentMark name={agent.name} />
+        <div className="agent-editor-identity">
+          <strong>{agent.name || "Untitled Agent"}</strong>
+          <p>
+            {agent.status === "draft"
+              ? "Draft · setup not finished"
+              : agent.status === "active"
+                ? "Active"
+                : "Paused"}
+            {dirty ? (
+              <span className="agent-unsaved"> · Unsaved changes</span>
+            ) : saved ? (
+              <span> · Saved</span>
+            ) : null}
+          </p>
+        </div>
         <Button disabled={!canManage || saving} onClick={() => save()}>
-          {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
+          {saving ? "Saving…" : "Save changes"}
         </Button>
-      </Topbar>
+      </header>
       <div className="editor-tabs">
-        <div className="tabs" role="tablist" aria-label="Agent setup">
+        <div className="agents-segments agent-steps" aria-label="Agent setup">
           {steps.map((title, i) => (
             <button
               key={title}
-              role="tab"
-              aria-selected={step === i}
+              aria-pressed={step === i}
               className={`tab ${step === i ? "active" : ""}`}
               onClick={() => setStep(i)}
             >
-              {title}
+              <span>{String(i + 1).padStart(2, "0")}</span> {title}
             </button>
           ))}
         </div>
       </div>
       <div className="content-scroll">
         <div className="editor-content">
-          <h1>{steps[step]}</h1>
+          <h1 className="agents-sr-only">{steps[step]}</h1>
           <p className="page-description">
             {
               [
@@ -128,7 +187,7 @@ export function AgentEditor({ id }: { id: string }) {
                 "Give your agent approved information it can use in conversations.",
                 "Decide when your team should follow up.",
                 "Check how your agent uses its instructions.",
-                "Review your setup before activating the agent.",
+                "Choose which LinkedIn senders this agent should handle.",
               ][step]
             }
           </p>
@@ -140,17 +199,131 @@ export function AgentEditor({ id }: { id: string }) {
           {step === 0 ? (
             <div className="card">
               <div className="field">
-                <label htmlFor="agent-name">Agent name</label>
+                <label htmlFor="agent-name">
+                  Inbox Agent Name{" "}
+                  <small className="agent-required">Required</small>
+                </label>
                 <input
                   id="agent-name"
                   value={agent.name}
                   onChange={(e) => field("name", e.target.value)}
-                  placeholder="Reply Handler — Fintech Q3"
+                  placeholder="Untitled Agent"
                   maxLength={100}
                 />
               </div>
               <div className="field">
-                <label htmlFor="agent-description">Description</label>
+                <label>
+                  Main Objective{" "}
+                  <small className="agent-required">Required</small>
+                </label>
+                <div className="agent-objectives">
+                  <button
+                    aria-pressed={!customGoal}
+                    onClick={() => {
+                      setCustomGoal(false);
+                      field("goal", "Book a discovery call");
+                    }}
+                  >
+                    <Icon name="chat" />
+                    Book a call
+                  </button>
+                  <button
+                    aria-pressed={customGoal}
+                    onClick={() => {
+                      setCustomGoal(true);
+                      if (!customGoal) field("goal", "");
+                    }}
+                  >
+                    <Icon name="edit" />
+                    Custom
+                  </button>
+                </div>
+              </div>
+              {customGoal ? (
+                <div className="field">
+                  <label htmlFor="agent-goal">
+                    Custom Objective{" "}
+                    <small className="agent-required">Required</small>
+                  </label>
+                  <textarea
+                    id="agent-goal"
+                    value={agent.goal}
+                    onChange={(e) => field("goal", e.target.value)}
+                    placeholder="Qualify the lead and route enterprise inquiries to sales…"
+                    maxLength={2000}
+                  />
+                </div>
+              ) : null}
+              <div className="agent-response-options">
+                <div className="field">
+                  <label htmlFor="agent-language">
+                    Reply Language{" "}
+                    <small className="agent-required">Required</small>
+                  </label>
+                  <select
+                    id="agent-language"
+                    value={agent.language}
+                    onChange={(e) => field("language", e.target.value)}
+                  >
+                    {Array.from(
+                      new Set([
+                        "English",
+                        "Russian",
+                        "German",
+                        "Dutch",
+                        "Match the conversation",
+                        agent.language,
+                      ]),
+                    ).map((language) => (
+                      <option key={language}>{language}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <fieldset className="agent-reply-groups">
+                    <legend>Reply Logic</legend>
+                    <div className="agent-reply-checkboxes">
+                      {intentGroup.options.map((group) => (
+                        <label key={group}>
+                          <input
+                            type="checkbox"
+                            checked={agent.replyGroups.includes(group)}
+                            onChange={(event) =>
+                              field(
+                                "replyGroups",
+                                event.target.checked
+                                  ? intentGroup.options.filter(
+                                      (value) =>
+                                        value === group ||
+                                        agent.replyGroups.includes(value),
+                                    )
+                                  : agent.replyGroups.filter(
+                                      (value) => value !== group,
+                                    ),
+                              )
+                            }
+                          />
+                          {group[0].toUpperCase() + group.slice(1)}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  {!agent.replyGroups.length ? (
+                    <p className="help">
+                      No groups selected. This agent will not prepare replies.
+                    </p>
+                  ) : null}
+                  <p className="help">
+                    AI prepares a draft when the conversation needs a reply.
+                    Every draft is reviewed before sending.
+                  </p>
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="agent-description">
+                  Description{" "}
+                  <small className="muted">Optional · internal note</small>
+                </label>
                 <textarea
                   id="agent-description"
                   value={agent.description}
@@ -159,85 +332,117 @@ export function AgentEditor({ id }: { id: string }) {
                   maxLength={1000}
                 />
               </div>
-              <div className="two-col">
-                <div className="field">
-                  <label htmlFor="agent-goal">Primary goal</label>
-                  <select
-                    id="agent-goal"
-                    value={agent.goal}
-                    onChange={(e) => field("goal", e.target.value)}
-                  >
-                    <option>Book a discovery call</option>
-                    <option>Qualify the lead</option>
-                    <option>Answer product questions</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="agent-language">Reply language</label>
-                  <select
-                    id="agent-language"
-                    value={agent.language}
-                    onChange={(e) => field("language", e.target.value)}
-                  >
-                    <option>English</option>
-                    <option>Russian</option>
-                    <option>German</option>
-                    <option>Match the conversation</option>
-                  </select>
-                </div>
-              </div>
-              <div className="field">
-                <label>Prepare drafts for intent groups</label>
-                <div className="row wrap">
-                  {intentGroup.options.map((g) => (
-                    <label className="row" key={g}>
-                      <input
-                        type="checkbox"
-                        checked={agent.replyGroups.includes(g)}
-                        onChange={(e) =>
-                          field(
-                            "replyGroups",
-                            e.target.checked
-                              ? [...agent.replyGroups, g]
-                              : agent.replyGroups.filter((v) => v !== g),
-                          )
-                        }
-                      />
-                      {g}
-                    </label>
-                  ))}
-                </div>
-                <p className="help">
-                  AI prepares a draft when the conversation needs a reply. Every
-                  draft is reviewed before sending.
-                </p>
-              </div>
             </div>
           ) : null}
           {step === 1 ? (
             <>
-              <div className="card">
-                <div className="field">
-                  <label htmlFor="agent-knowledge">
-                    Approved product information and answers
-                  </label>
-                  <textarea
-                    id="agent-knowledge"
-                    style={{ minHeight: 300 }}
-                    value={agent.knowledge}
-                    onChange={(e) => field("knowledge", e.target.value)}
-                    placeholder="Describe the product, ideal customers, approved answers, pricing and how to book a demo…"
-                    maxLength={30000}
-                  />
-                  <p className="help">
-                    Use factual information. If an answer is missing, the agent
-                    will ask your team for input.
-                  </p>
-                </div>
+              <div className="field">
+                <label htmlFor="knowledge-company">
+                  Company Name{" "}
+                  <small className="agent-required">Required</small>
+                </label>
+                <input
+                  id="knowledge-company"
+                  value={knowledge.companyName}
+                  placeholder={workspace.name}
+                  maxLength={200}
+                  onChange={(e) =>
+                    updateKnowledge({
+                      ...knowledge,
+                      companyName: e.target.value,
+                    })
+                  }
+                />
               </div>
-              <Notice title="Knowledge belongs to this agent">
-                Changes are saved with the agent. Existing drafts keep the
-                context they were created with.
+              <div className="field">
+                <label htmlFor="knowledge-product">
+                  Product &amp; Offer{" "}
+                  <small className="agent-required">Required</small>
+                </label>
+                <textarea
+                  id="knowledge-product"
+                  className="agent-product"
+                  value={knowledge.productOffer}
+                  maxLength={28000}
+                  placeholder="What you sell, to whom, and on what terms — the basis of every reply."
+                  onChange={(e) =>
+                    updateKnowledge({
+                      ...knowledge,
+                      productOffer: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="field">
+                <label>
+                  FAQ{" "}
+                  <small className="muted">
+                    Optional · approved answers to common questions
+                  </small>
+                </label>
+                {knowledge.faq.map((item, index) => (
+                  <div className="agent-faq" key={index}>
+                    <div className="row between">
+                      <span className="small muted">Q&amp;A {index + 1}</span>
+                      <IconButton
+                        label={"Remove Q&A " + (index + 1)}
+                        icon="close"
+                        onClick={() =>
+                          updateKnowledge({
+                            ...knowledge,
+                            faq: knowledge.faq.filter((_, i) => i !== index),
+                          })
+                        }
+                      />
+                    </div>
+                    <input
+                      aria-label={"Question " + (index + 1)}
+                      placeholder="Question"
+                      value={item.question}
+                      maxLength={2000}
+                      onChange={(e) =>
+                        updateKnowledge({
+                          ...knowledge,
+                          faq: knowledge.faq.map((q, i) =>
+                            i === index
+                              ? { ...q, question: e.target.value }
+                              : q,
+                          ),
+                        })
+                      }
+                    />
+                    <textarea
+                      aria-label={"Approved answer " + (index + 1)}
+                      placeholder="Approved answer"
+                      value={item.answer}
+                      maxLength={8000}
+                      onChange={(e) =>
+                        updateKnowledge({
+                          ...knowledge,
+                          faq: knowledge.faq.map((q, i) =>
+                            i === index ? { ...q, answer: e.target.value } : q,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+                <Button
+                  className="agent-add-faq"
+                  icon="plus"
+                  onClick={() =>
+                    updateKnowledge({
+                      ...knowledge,
+                      faq: [...knowledge.faq, { question: "", answer: "" }],
+                    })
+                  }
+                >
+                  Add Q&amp;A
+                </Button>
+              </div>
+              <Notice>
+                If approved Knowledge is missing an answer, the agent asks your
+                team for input.
               </Notice>
             </>
           ) : null}
@@ -265,16 +470,58 @@ export function AgentEditor({ id }: { id: string }) {
                   This checks the form and Knowledge setup. It does not call an
                   AI model.
                 </Notice>
+                <div className="agent-test-presets">
+                  {[
+                    {
+                      label: "Interested",
+                      text: "Sounds interesting. Tell me more.",
+                    },
+                    {
+                      label: "Product question",
+                      text: "How does your product work?",
+                    },
+                    {
+                      label: "Meeting request",
+                      text: "Can we book a call next week?",
+                    },
+                    {
+                      label: "Not interested",
+                      text: "No thanks, please stop contacting me.",
+                    },
+                    {
+                      label: "Referral",
+                      text: "Please contact my colleague about this.",
+                    },
+                    {
+                      label: "Knowledge gap",
+                      text: "Do you support a custom on-premise deployment?",
+                    },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() => {
+                        setTest(preset.text);
+                        setTestResult(false);
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="test-chat">
                   {testResult ? (
                     <>
-                      <Badge color={agent.knowledge.trim() ? "green" : "amber"}>
-                        {agent.knowledge.trim()
+                      <Badge
+                        color={
+                          hasAgentKnowledge(agent.knowledge) ? "green" : "amber"
+                        }
+                      >
+                        {hasAgentKnowledge(agent.knowledge)
                           ? "Knowledge is available"
                           : "Needs input"}
                       </Badge>
                       <p className="page-description">
-                        {agent.knowledge.trim()
+                        {hasAgentKnowledge(agent.knowledge)
                           ? "The demo agent has approved information. Open your workspace to run an AI test."
                           : "Add approved product information before generating a reply."}
                       </p>
@@ -307,102 +554,26 @@ export function AgentEditor({ id }: { id: string }) {
               </>
             )
           ) : null}
-          {step === 4 ? (
-            <>
-              <div className="card">
-                <div className="details-row">
-                  <span>Name</span>
-                  <strong>{agent.name || "Not set"}</strong>
-                </div>
-                <div className="details-row">
-                  <span>Goal</span>
-                  <span>{agent.goal}</span>
-                </div>
-                <div className="details-row">
-                  <span>Knowledge</span>
-                  <span>{agent.knowledge.trim() ? "Provided" : "Missing"}</span>
-                </div>
-                <div className="details-row">
-                  <span>Sending</span>
-                  <span>Human approval required</span>
-                </div>
-                <div className="details-row">
-                  <span>Follow-ups</span>
-                  <span>Off</span>
-                </div>
-              </div>
-              <Notice title="You stay in control">
-                New replies enter the review workflow. Your agent never sends a
-                message automatically.
-              </Notice>
-              {mode !== "demo" ? (
-                <div className="card">
-                  <div className="card-header">
-                    <h2>Workspace replies</h2>
-                    <Badge
-                      color={
-                        workspace.defaultAgentId === agent.id ? "green" : ""
-                      }
-                    >
-                      {workspace.defaultAgentId === agent.id
-                        ? "Selected agent"
-                        : "Not selected"}
-                    </Badge>
-                  </div>
-                  <p className="page-description">
-                    One selected active agent prepares drafts for new incoming
-                    replies in this workspace.
-                  </p>
-                  {workspace.defaultAgentId !== agent.id ? (
-                    <Button
-                      disabled={
-                        agent.status !== "active" ||
-                        JSON.stringify(agent) !== JSON.stringify(existing)
-                      }
-                      onClick={async () => {
-                        const result = await selectDefaultAgent(
-                          scope.workspaceId,
-                          agent.id,
-                        );
-                        if (!result.ok) setError(result.error);
-                        else await repository.refresh?.();
-                      }}
-                    >
-                      Use for workspace replies
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="editor-next">
-                <Button
-                  variant="primary"
-                  disabled={
-                    !canManage ||
-                    saving ||
-                    !agent.name.trim() ||
-                    !agent.knowledge.trim()
-                  }
-                  onClick={() =>
-                    save(agent.status === "active" ? "paused" : "active")
-                  }
-                >
-                  {agent.status === "active" ? "Pause agent" : "Activate agent"}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="editor-next">
+          <div hidden={step !== 4}>
+            <AgentLaunch
+              agent={agent}
+              canManage={canManage}
+              onSave={(status) => save(status, false)}
+            />
+          </div>
+          {step !== 4 ? (
+            <div className="editor-next agent-next-step">
               <Button
                 variant="primary"
                 icon="arrow"
                 onClick={() => setStep(step + 1)}
               >
-                Continue
+                Next: {steps[step + 1]}
               </Button>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
-    </>
+    </div>
   );
 }

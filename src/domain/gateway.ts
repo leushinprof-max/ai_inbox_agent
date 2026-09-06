@@ -32,6 +32,13 @@ export interface InboxGateway {
     notes: string,
     revision?: number,
   ): Promise<void>;
+  saveSenderAssignments(
+    scope: Scope,
+    agentId: string,
+    senderIds: number[],
+    workspaceDefault: boolean,
+    revision: number,
+  ): Promise<void>;
   saveAgent(scope: Scope, agent: Agent): Promise<void>;
   addWorkspace(userId: string, id: string, name: string): Promise<void>;
   renameWorkspace(scope: Scope, name: string, timezone: string): Promise<void>;

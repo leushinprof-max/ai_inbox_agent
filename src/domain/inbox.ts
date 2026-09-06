@@ -8,6 +8,7 @@ export interface Workspace {
   name: string;
   timezone: string;
   defaultAgentId?: string | null;
+  agentAssignmentRevision?: number;
 }
 export interface Membership {
   workspaceId: string;
@@ -36,6 +37,7 @@ export interface Agent {
 }
 export interface Contact {
   name: string;
+  photoUrl?: string | null;
   initials: string;
   company: string;
   position: string;
@@ -55,6 +57,7 @@ export interface Conversation {
   providerConversationId: string;
   senderId: number;
   senderName: string;
+  senderPhotoUrl?: string | null;
   contact: Contact;
   campaign: string;
   labelId: string | null;
@@ -105,7 +108,13 @@ export interface InboxState {
   agents: Agent[];
   conversations: Conversation[];
   drafts: Draft[];
-  senders?: { id: number; name: string; authValid: boolean }[];
+  senders?: {
+    id: number;
+    name: string;
+    authValid: boolean;
+    workspaceId?: string;
+    agentId?: string | null;
+  }[];
   imports?: {
     id: string;
     days: number;

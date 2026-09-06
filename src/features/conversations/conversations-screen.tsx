@@ -164,7 +164,11 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
                 key={c.id}
                 onClick={() => setSelected(c.id)}
               >
-                <Avatar initials={c.contact.initials} color={c.contact.color} />
+                <Avatar
+                  photoUrl={c.contact.photoUrl}
+                  initials={c.contact.initials}
+                  color={c.contact.color}
+                />
                 <span>
                   <strong>{c.contact.name}</strong>
                   <small>{c.contact.company}</small>

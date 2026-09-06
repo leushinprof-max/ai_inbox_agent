@@ -20,6 +20,8 @@ function createDemoGateway(
     snooze: async (...args) => repository.snooze(...args),
     restore: async (...args) => repository.restore(...args),
     note: async (scope, id, notes) => repository.note(scope, id, notes),
+    saveSenderAssignments: async (...args) =>
+      repository.saveSenderAssignments(...args),
     saveAgent: async (...args) => repository.saveAgent(...args),
     addWorkspace: async (...args) => repository.addWorkspace(...args),
     renameWorkspace: async (...args) => repository.renameWorkspace(...args),
