@@ -11,6 +11,7 @@ import {
   decryptConnection,
 } from "../../src/server/credentials";
 import { runNextJob } from "../../src/server/runtime";
+import { readConversation, readWorkspace } from "../../src/server/inbox-read";
 import { durableSendRepository } from "../../src/server/delivery";
 import { sendReply } from "../../src/domain/send";
 import {
@@ -987,4 +988,256 @@ test("A hint arriving during a claimed sync schedules another read and stale lea
     "queued:false",
   );
   sql(`update app_private.jobs set status='done' where id='${id}';`);
+});
+
+test("Reply-only import skips model calls, hides outreach in application reads and admits the first live reply", async () => {
+  const target = must(
+    await owner.rpc("create_workspace", { p_name: "Reply eligibility" }),
+  );
+  const agent = randomUUID();
+  must(
+    await owner.rpc("save_agent", {
+      p_workspace: target,
+      p_id: agent,
+      p_revision: 0,
+      p_config: {
+        name: "Reply agent",
+        status: "active",
+        goal: "Answer questions",
+        knowledge: "Approved fixture facts.",
+        language: "English",
+        replyPolicy: "all",
+      },
+    }),
+  );
+  must(
+    await owner.rpc("set_default_agent", {
+      p_workspace: target,
+      p_agent: agent,
+    }),
+  );
+  const secret = encryptConnection(target, "synthetic-reply-eligibility-key");
+  must(
+    await admin.rpc("server_connect", {
+      p_workspace: target,
+      p_actor: userId,
+      p_ciphertext: secret.ciphertext,
+      p_fingerprint: secret.fingerprint,
+      p_webhook_hash: secret.webhookHash,
+      p_senders: [{ id: 42, name: "Team sender", authValid: true }],
+    }),
+  );
+  const recent = new Date(Date.now() - 3600_000).toISOString();
+  const rawOutgoing = {
+    sender: "ME",
+    body: "Our outreach question?",
+    createdAt: recent,
+  };
+  const raw = (id: string, messages: object[]) => ({
+    id,
+    linkedInAccountId: 42,
+    lastMessageAt: recent,
+    correspondentProfile: { firstName: "Reply", lastName: id },
+    messages,
+  });
+  const outreach = normalizeConversation(raw("outreach", [rawOutgoing]));
+  // Eligibility must not depend on the latest message page or the import window.
+  const oldReply = {
+    sender: "THEM",
+    body: "Interested, tell me more.",
+    createdAt: new Date(Date.now() - 90 * 86400_000).toISOString(),
+  };
+  const answered = normalizeConversation(
+    raw("answered", [
+      oldReply,
+      ...Array.from({ length: 55 }, (_, i) => ({
+        ...rawOutgoing,
+        body: `Our update ${i}`,
+      })),
+    ]),
+  );
+  const empty = normalizeConversation(raw("empty", []));
+  const fixtures = new Map([outreach, answered, empty].map((c) => [c.id, c]));
+  let importedIds = ["outreach", "answered", "empty"];
+  let calls = 0;
+  const selectedModel: InboxModel = {
+    async classify(input) {
+      assert.ok(input.messages.some((m) => m.direction === "inbound"));
+      calls++;
+      return {
+        labels: ["Interested"],
+        shouldReply: input.generateDraft,
+        draft: input.generateDraft ? "Reviewed fixture reply." : "",
+        missingKnowledge: "",
+      };
+    },
+  };
+  const selectedProvider = {
+    ...provider,
+    async conversations() {
+      return {
+        total: importedIds.length,
+        received: importedIds.length,
+        items: importedIds.map((id) => fixtures.get(id)!),
+      };
+    },
+    async chat(sender: number, id: string) {
+      assert.equal(sender, 42);
+      assert.ok(fixtures.has(id));
+      return fixtures.get(id)!;
+    },
+  };
+  async function processJobs() {
+    for (let i = 0; i < 60; i++) {
+      const pending = Number(
+        sql(
+          `select count(*) from app_private.jobs where workspace_id='${target}' and status in ('queued','running');`,
+        ).trim(),
+      );
+      if (!pending) return;
+      await runNextJob({
+        db: admin,
+        model: selectedModel,
+        provider: (id) => (id === target ? selectedProvider : provider),
+      });
+    }
+    assert.fail("Reply eligibility queue did not finish");
+  }
+  const firstRun = must(
+    await owner.rpc("start_history_import", { p_workspace: target, p_days: 7 }),
+  );
+  await processJobs();
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    must(
+      await owner
+        .from("import_runs")
+        .select("status,inspected,imported,classified")
+        .eq("id", firstRun)
+        .single(),
+    ),
+    { status: "completed", inspected: 3, imported: 1, classified: 1 },
+  );
+  const hidden = must(
+    await admin
+      .from("conversations")
+      .select("id")
+      .eq("workspace_id", target)
+      .eq("provider_conversation_id", "outreach")
+      .single(),
+  ).id;
+  const snapshot = await readWorkspace(owner, userId, target);
+  assert.equal(snapshot.paging?.conversationTotal, 1);
+  assert.deepEqual(
+    snapshot.conversations.map((c) => c.providerConversationId),
+    ["answered"],
+  );
+  assert.equal(snapshot.drafts.length, 0);
+  await assert.rejects(
+    readConversation(owner, target, hidden),
+    /Conversation not found/,
+  );
+  const currentPage = await readConversation(
+    owner,
+    target,
+    snapshot.conversations[0].id,
+  );
+  assert.ok(
+    currentPage.conversation.messages.every((m) => m.direction === "outbound"),
+  );
+  assert.ok(
+    currentPage.next,
+    "The qualifying old reply is outside the loaded message page",
+  );
+  assert.equal(
+    must(await outsider.rpc("conversation_page", { p_workspace: target }))
+      .length,
+    0,
+  );
+
+  // An old queued revision-zero job must finish without spending a model call.
+  must(
+    await admin.rpc("server_enqueue", {
+      p_workspace: target,
+      p_kind: "classify",
+      p_key: randomUUID(),
+      p_payload: {
+        conversationId: hidden,
+        revision: 0,
+        generateDraft: false,
+        connectionRevision: 1,
+      },
+    }),
+  );
+  await processJobs();
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    must(
+      await owner
+        .from("conversations")
+        .select("labels")
+        .eq("id", hidden)
+        .single(),
+    ).labels,
+    [],
+  );
+  importedIds = ["outreach", "empty"];
+  const skippedRun = must(
+    await owner.rpc("start_history_import", { p_workspace: target, p_days: 7 }),
+  );
+  await processJobs();
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    must(
+      await owner
+        .from("import_runs")
+        .select("status,inspected,imported,classified")
+        .eq("id", skippedRun)
+        .single(),
+    ),
+    { status: "completed", inspected: 2, imported: 0, classified: 0 },
+  );
+
+  fixtures.set(
+    "outreach",
+    normalizeConversation(
+      raw("outreach", [
+        rawOutgoing,
+        {
+          sender: "THEM",
+          body: "Tell me more.",
+          createdAt: new Date().toISOString(),
+        },
+      ]),
+    ),
+  );
+  const hint = {
+    p_workspace: target,
+    p_kind: "sync",
+    p_key: "first-reply",
+    p_payload: {
+      conversationId: "outreach",
+      senderId: 42,
+      connectionRevision: 1,
+    },
+  };
+  must(await admin.rpc("server_enqueue", hint));
+  await processJobs();
+  const after = await readWorkspace(owner, userId, target);
+  assert.equal(after.paging?.conversationTotal, 2);
+  const thread = await readConversation(owner, target, hidden);
+  assert.deepEqual(
+    thread.conversation.messages.map((m) => m.direction),
+    ["outbound", "inbound"],
+  );
+  assert.equal(thread.draft?.status, "ready");
+  assert.equal(calls, 2);
+  must(await admin.rpc("server_enqueue", hint));
+  await processJobs();
+  assert.equal(calls, 2, "Duplicate delivery must not repeat classification");
+  assert.equal(
+    (await readConversation(owner, target, hidden)).conversation.messages
+      .length,
+    2,
+  );
 });

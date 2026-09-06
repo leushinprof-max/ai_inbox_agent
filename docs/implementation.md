@@ -7,7 +7,7 @@ As of 2026-09-06, the standalone application, database operations, provider adap
 | Area          | Behavior                                                                                                                                                                       |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Access        | Signup, password sign-in/recovery, independent workspaces, current-membership RLS, owner/admin/member/viewer roles, verified-email invitation links, revoke and remove access. |
-| Conversations | Paginated search/filtering, full transcript with older-message paging, workspace-local timestamps, notes with conflict recovery, manual composition.                           |
+| Conversations | Only histories with a canonical lead reply; paginated search/filtering, full transcript with older-message paging, workspace-local timestamps, notes with conflict recovery, manual composition. |
 | Drafts        | Ready / Needs input / Later, persisted edit/dismiss/snooze/restore, approved-answer generation, redraft instructions, cancellation, stale-context recovery and send-and-next.  |
 | Agents        | Immutable published versions, Knowledge, goal/language/reply policy, activation/pause, one selected workspace agent, model-backed Test, actual sent-draft totals.              |
 | Connection    | Workspace-key verification, encrypted secret storage, provider-owned senders, private webhook URL and durable event ingestion.                                                 |
@@ -31,9 +31,17 @@ The local suite above uses synthetic data and provider/model doubles; it is not 
 ## Remaining acceptance and deliberate limitations
 
 1. Complete hosted invite/recovery delivery and configure custom SMTP before broader team onboarding. The database, nine migrations, web/worker secrets, HTTPS site and owner signup are already configured and verified.
-2. Connect Restaff, configure its new webhook and selected agent, then perform an authorized live inbound/import/classification run and one approved send. Validate real provider payload compatibility and model-answer quality before calling the product production-ready.
+2. The owner has connected Restaff and confirmed a real import/classification run. The resulting data exposed outbound-only histories being shown and classified; the prepared reply-eligibility fix is recorded below. Complete webhook/new-inbound, selected-agent draft and approved-send acceptance. Validate model-answer quality before calling the product production-ready.
 3. Complete the remaining reference-state visual acceptance and owner review. Implemented boundaries without captured fixtures are identified in the visual ledger.
 
 Webhook creation currently uses guided setup in HeyReach with a generated private address. The app does not call CreateWebhook automatically. Invitations are shareable links, not invitation emails. Knowledge is editable approved text; website crawling, uploaded documents and vector retrieval are not included. Archive-workspace and cross-device preference syncing are not implemented. Pause drafting through the selected agent's Launch settings.
 
 The first release intentionally excludes automatic outbound messages, scheduled follow-ups, attachments, billing, analytics and portal/admin features. The hosted design prototype stays separate from the runnable application.
+
+## Reply eligibility correction, 2026-09-06
+
+Prepared on `codex/replied-conversations`, based on `927a55fa365a2867d780d7e2dad2e4c852bd597f`; not yet deployed to hosted development. Read-only Restaff diagnosis found 101 stored conversations, 78 with no inbound message; the reported example had four outbound messages and zero inbound messages. Direction normalization was correct. Missing admission and classification conditions caused the bug.
+
+Migration `20260906105736_replied_conversations.sql` filters the database list before search/pagination, records skipped import items, clears derived labels on outreach, corrects import counts and rejects late revision-zero classification results. Application totals/direct reads use the same rule. The worker avoids model calls for queued revision-zero jobs and retains the latest lead reply when it predates the latest message page. Message history is preserved; a first live reply admits the conversation and uses the existing drafting flow.
+
+Verification: 32 unit/SQL tests and 24 isolated Supabase integration tests passed, including populated upgrade, pagination/search/RLS, all-skipped completion, zero model calls for outreach, replies outside the import/message window, first-reply drafting and duplicate delivery. Lint, typecheck, production build and diff checks passed. Local database advisors reported no issues; generated public types matched after canonical formatting. No hosted migration, real model call or external send was used to verify this correction.

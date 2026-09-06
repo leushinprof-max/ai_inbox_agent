@@ -277,11 +277,33 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           config = agentConfig.parse(version.data?.configuration);
         }
       }
-      const transcript = (messages.data ?? []).reverse().map((m) => ({
+      // A queued job from before the reply-only rule must not classify outreach.
+      const matches =
+        payload.revision > 0 &&
+        conversation.data?.inbound_revision === payload.revision;
+      const context = [...(messages.data ?? [])];
+      if (matches && !context.some((m) => m.direction === "inbound")) {
+        // The latest lead reply can predate the last page of team messages.
+        const inbound = await db
+          .from("messages")
+          .select("direction,body,occurred_at,id")
+          .eq("workspace_id", job.workspace_id)
+          .eq("conversation_id", payload.conversationId)
+          .eq("direction", "inbound")
+          .order("occurred_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        databaseError(inbound.error);
+        if (inbound.data) {
+          context.splice(49);
+          context.push(inbound.data);
+        }
+      }
+      const transcript = context.reverse().map((m) => ({
         body: m.body,
         direction: z.enum(["inbound", "outbound"]).parse(m.direction),
       }));
-      const matches = conversation.data?.inbound_revision === payload.revision;
       const result = matches
         ? await deps.model.classify({
             agent: config,

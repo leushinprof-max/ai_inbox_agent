@@ -244,6 +244,7 @@ export async function readWorkspace(
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspaceId)
+      .gt("inbound_revision", 0)
       .eq("archived", false),
     db
       .from("senders")
@@ -413,6 +414,7 @@ export async function readConversation(
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", id)
+    .gt("inbound_revision", 0)
     .maybeSingle();
   databaseError(conversation.error);
   if (!conversation.data)

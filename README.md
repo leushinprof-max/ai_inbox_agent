@@ -7,7 +7,7 @@ Standalone Aster Inbox, rebuilt around the [owner-approved design](https://aster
 ## What works
 
 - Authenticated workspaces, password authentication/recovery, roles and email-bound invitation links.
-- Conversations with search, labels, paginated history, notes and manual replies.
+- Conversations with at least one lead reply, search, labels, paginated history, notes and manual replies. Outbound-only outreach stays outside the inbox and classification.
 - Draft triage: Ready, Needs input and Later; edit, dismiss, snooze, redraft, cancel generation and send-and-next.
 - Versioned agents with Knowledge, workspace agent selection, pause/activation and model-backed Test.
 - HeyReach workspace-key verification, encrypted credentials, provider sender discovery and durable webhook ingestion.

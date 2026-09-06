@@ -20,7 +20,9 @@ The documented chat message shape has no stable message ID. Ingestion fingerprin
 
 PostgreSQL jobs use `SKIP LOCKED`, a three-minute lease and a token that prevents stale workers from finishing another claim. Transient failures retry up to five attempts; final errors appear on imports or generation requests. Side effects remain revision-fenced even after lease expiry. The worker never retries a message POST.
 
-History imports freeze the window, scan in bounded pages and persist each item's ingestion/classification progress. They classify latest conversation state without historical drafts. Interrupted imports can replay idempotently. Cancellation stops further admission; already imported history stays. The current scan cap is 10,000 inspected conversations and 5,000 messages per chat. Full chat context is retained for conversations active in the selected window; the window is not a per-message deletion filter.
+History imports freeze the window, scan in bounded pages and persist each item's ingestion/classification/skipped progress. Canonical `inbound_revision > 0` admits a conversation to the operator inbox, including search, pagination, counts and direct reads. This revision is updated transactionally during message ingestion and covers the complete stored history. Outbound-only and empty histories remain stored but do not enqueue classification; skipped items complete a run without inflating imported/classified counts. Existing queued classification jobs for revision zero do not call the model, and SQL rejects their late results. The first lead reply admits the retained history and follows the ordinary live classification/draft path.
+
+Imports classify latest conversation state without historical drafts. Interrupted imports can replay idempotently. Cancellation stops further admission; already imported history stays. The current scan cap is 10,000 inspected conversations and 5,000 messages per chat. Full chat context is retained for conversations active in the selected window; the window is not a per-message deletion filter.
 
 ## Drafts and model calls
 
