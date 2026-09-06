@@ -1016,7 +1016,7 @@ test("Reply-only import skips model calls, hides outreach in application reads a
       p_agent: agent,
     }),
   );
-  const secret = encryptConnection(target, "synthetic-reply-eligibility-key");
+  const secret = encryptConnection(target, `synthetic-reply-eligibility-${run}`);
   must(
     await admin.rpc("server_connect", {
       p_workspace: target,
