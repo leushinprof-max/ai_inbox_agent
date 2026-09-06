@@ -1,0 +1,11 @@
+/*
+!src
+!src/**
+!public
+!public/**
+!package.json
+!package-lock.json
+!next.config.ts
+!next-env.d.ts
+!tsconfig.json
+!vercel.json
