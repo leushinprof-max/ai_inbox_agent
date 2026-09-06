@@ -59,6 +59,16 @@ Imports keep their original window and progress; retry replays failed work idemp
 
 Dedicated Supabase, Vercel and Railway projects have been created and configured; their identities and actual deployment status are recorded in [hosted development](dev-environment.md). Hosted email confirmation remains enabled. Before team onboarding, configure SMTP and validate delivery: Supabase's default mail service is restricted to organization members. Local signup confirmation is disabled for synthetic development; hosted invitations rely on verified email and must not use that development setting.
 
-Review the exact migration/branch diff and run all applicable local checks before publishing. Applying hosted migrations, setting credentials/domains/webhooks, activating a real workspace and performing a test send require the owner's scoped authorization. The current draft PR is not merged and changes no LeadFleet production service.
+Review the exact migration/branch diff and run all applicable local checks before publishing. Applying hosted migrations, setting credentials/domains/webhooks, activating a real workspace and performing a test send require the owner's scoped authorization. The independent Inbox delivery process changes no LeadFleet production service.
 
 After authorized setup, validate sign-in/invite/reset in the hosted environment, one real incoming event, bounded import and classification, and one explicitly approved message. Record the exact deployed commit and outcomes. Keep the previous application available during this separate rollout; do not silently migrate its tenant data or send history.
+
+## Delivery from main
+
+The owner authorized consolidating the initial PR stack into `main` and using it as the dedicated dev release source. New work starts on a short-lived `codex/` branch and is reviewed in a PR to `main`. Run the applicable local matrix before merge; no GitHub workflow or required check is introduced by this consolidation.
+
+Connect the existing Vercel project to this repository with production branch `main`. Its production target is the canonical **development** URL `ai-inbox-dev.vercel.app`. `vercel.json` disables automatic deployment for other branches, including slash-containing names, and explicitly enables `main`. Keep PR verification local unless a separate preview is requested. The existing Railway dev worker should likewise follow `main`, preserving its build, healthcheck, replica and secret configuration. Verify the actual host source settings after changing them; a Git merge alone does not update those settings.
+
+Before moving the initial stack, review its final combined tree, mark the PRs ready, merge the child PR into its parent, then merge that parent into the root PR and the root into `main`. Preserve commits with merge commits so each accepted change stays traceable. Confirm that every merge has the checked tree; do not silently squash away dependent ancestry or delete branches during consolidation.
+
+Record the final main SHA and web/worker deployment identities in the root PR handoff. A compatible tree-only merge does not apply migrations again. Rollback selects the previously healthy dev deployment; database changes always use separately reviewed forward migrations. Subsequent changes follow one feature PR at a time.

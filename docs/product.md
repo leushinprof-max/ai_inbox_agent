@@ -10,7 +10,9 @@ Workspace is the tenant boundary. A workspace owns its members, HeyReach connect
 
 ## Conversations
 
-The full searchable history remains available independently of the draft queue. Operators can read context, see labels and notes, and write a manual message. Manual composition must not inherit a stale AI draft's revision fence.
+Only conversations with at least one canonical inbound message from the lead appear in Conversations, search and counts. Outbound-only outreach is retained for synchronization but stays outside the operator inbox and classification. The first inbound reply admits the conversation with its complete prior history. A later team reply does not hide it again, and the qualifying inbound reply need not fall within the import window or latest transcript page.
+
+The full searchable history of admitted conversations remains available independently of the draft queue. Operators can read context, see labels and notes, and write a manual message. Manual composition must not inherit a stale AI draft's revision fence.
 
 ## Drafts
 
@@ -40,7 +42,7 @@ Name → connect the exact HeyReach workspace → configure its webhook → opti
 
 Invitations are email-bound shareable links; team roles are independent of provider sender accounts. Personal queue/layout/shortcut preferences are saved per user in the current browser.
 
-Historical import reads a bounded period and classifies the latest conversation state. It does not create a backlog of historical drafts. The worker must resume interrupted imports, expose useful progress and avoid duplicate messages.
+Historical import reads a bounded period and classifies the latest conversation state of conversations with a lead reply. Outbound-only and empty histories are marked skipped, finish without a model call, and do not count as imported/classified inbox conversations. Inspected includes all scanned provider records. It does not create a backlog of historical drafts. The worker must resume interrupted imports, expose useful progress and avoid duplicate messages.
 
 ## Initial exclusions
 

@@ -158,6 +158,23 @@ export async function conversationPage(
         : null,
   };
 }
+export async function draftCounts(db: DB, workspaceId: string) {
+  const statuses = ["ready", "needs_input", "snoozed"];
+  const counts = await Promise.all(
+    statuses.map((status) =>
+      db
+        .from("drafts")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .eq("status", status),
+    ),
+  );
+  counts.forEach((result) => databaseError(result.error));
+  return Object.fromEntries(
+    statuses.map((status, i) => [status, counts[i].count ?? 0]),
+  );
+}
+
 export async function draftPage(
   db: DB,
   workspaceId: string,
@@ -218,7 +235,7 @@ export async function readWorkspace(
     unresolved,
     generations,
     activity,
-    ...counts
+    counts,
   ] = await Promise.all([
     db
       .from("workspaces")
@@ -244,6 +261,7 @@ export async function readWorkspace(
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspaceId)
+      .gt("inbound_revision", 0)
       .eq("archived", false),
     db
       .from("senders")
@@ -274,13 +292,7 @@ export async function readWorkspace(
       .order("created_at", { ascending: false })
       .limit(100),
     db.rpc("agent_activity", { p_workspace: workspaceId }),
-    ...["ready", "needs_input", "snoozed"].map((s) =>
-      db
-        .from("drafts")
-        .select("id", { count: "exact", head: true })
-        .eq("workspace_id", workspaceId)
-        .eq("status", s),
-    ),
+    draftCounts(db, workspaceId),
   ]);
   [
     workspaces,
@@ -294,7 +306,6 @@ export async function readWorkspace(
     unresolved,
     generations,
     activity,
-    ...counts,
   ].forEach((r) => databaseError(r.error));
   const missingIds = [
     ...new Set(drafts.rows.map((d) => d.conversation_id)),
@@ -390,12 +401,7 @@ export async function readWorkspace(
       draftIds: drafts.rows.map((d) => d.id),
       draftNext: drafts.next,
       conversationTotal: total.count ?? 0,
-      draftCounts: Object.fromEntries(
-        ["ready", "needs_input", "snoozed"].map((s, i) => [
-          s,
-          counts[i].count ?? 0,
-        ]),
-      ),
+      draftCounts: counts,
       messageNext: {},
     },
   };
@@ -413,6 +419,7 @@ export async function readConversation(
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", id)
+    .gt("inbound_revision", 0)
     .maybeSingle();
   databaseError(conversation.error);
   if (!conversation.data)
