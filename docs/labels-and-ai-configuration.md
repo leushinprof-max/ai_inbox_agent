@@ -1,6 +1,6 @@
 # Single intent labels and product AI configuration
 
-Implemented on `codex/labels-ai-configuration`. Hosted rollout is a separate coordinated step; the migration and new web/worker must ship together.
+Implemented in PR #4 and deployed to the independent `ai-inbox-dev` on 2026-09-06. The migration and compatible web/worker shipped together.
 
 ## Operator behavior
 
@@ -51,6 +51,8 @@ All calls use `buildModelRequest` and `createInboxModel`. Server calls record co
 
 `workspace_labels` provides stable IDs and a composite tenant key. `conversations.label_id` is scalar, with a same-workspace foreign key. AI evidence must cite an existing inbound message in that conversation and contain a verbatim substring. The model cannot invent a label ID or group.
 
+The model response schema restricts evidence IDs to supplied inbound messages and earlier verified inbound evidence. Citation whitespace differences are restored from the original message before SQL validation; changed words, punctuation, translations and outbound evidence are rejected. The schema asks for a short contiguous excerpt rather than combined quotations.
+
 Catalog rules and their revision are loaded from one database snapshot. Applying a result locks the workspace and checks inbound revision, manual-assignment revision, catalog revision, active/default agent version and published AI version. Outdated configuration raises a retryable application conflict; old inbound/manual results are ignored. Explicit generation additionally checks the expected draft revision. Business instructions cannot bypass these database gates.
 
 ## Coordinated dev rollout
@@ -63,6 +65,14 @@ Catalog rules and their revision are loaded from one database snapshot. Applying
 6. Monitor `select * from public.server_intent_backfill_status();` using the service/operations role. The migration queues each stored replied conversation once with `generateDraft=false`; no HeyReach reads or sends are scheduled by this backfill. Normal bounded job retries apply. Investigate failures before an operational retry; there is no tenant-wide reclassify button.
 
 A rollback of prompt behavior republishes an earlier AI version. A rollback of application code across this schema boundary requires a compatible forward fix; do not simply restart the legacy worker.
+
+### Initial hosted rollout record
+
+PR #4 merged as `6478f1d469360ead7ede3c0fb10da97774996033`. Migration `20260906175829` was applied and independently verified on Supabase `brkprirbgjycgkvqegos`. Vercel deployment `dpl_6pkvkdc55Yoiiho8S7ifyaLtTFPo` and Railway deployment `f595bb3a-5299-48e2-b6f4-e02908cf08ae` both reached READY/SUCCESS from that main commit. The owner's existing browser session loaded Product admin with published version 1, ReStaff v3, and the Conversations list with 24 replied histories.
+
+The classification-only backfill exposed citation whitespace changes and an outbound-evidence selection. The follow-up adapter correction above preserves strict database validation. The final rollout/backfill receipt is recorded on the feature PR after completion. Baseline messages (447) and drafts (2), including complete row fingerprints, were unchanged during the initial backfill.
+
+Hosted advisors reported no ERROR-level notices, but retain warnings: 29 authenticated SECURITY DEFINER functions, five intentionally inaccessible private tables without policies, disabled leaked-password protection, 17 unindexed foreign keys, one missing primary key and one unused index. Public server RPCs had no authenticated/anonymous execute grants; platform ownership remained private with neither role able to read its table. This is not an all-clear security/performance audit. See [RPC warning guidance](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) and [password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). The CLI migration-cache CA-file warning recurred after successful application; TLS checks were not disabled and the migration was not reapplied.
 
 ## Verification
 

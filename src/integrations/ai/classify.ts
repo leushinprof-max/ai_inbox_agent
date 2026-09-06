@@ -100,6 +100,14 @@ export function buildModelRequest(
       )
     : null;
   const scenario = input.scenario ?? "classify";
+  const evidenceIds = [
+    ...new Set([
+      ...messages
+        .filter((message) => message.direction === "inbound")
+        .map((message) => message.id),
+      ...(input.previous?.evidence ? [input.previous.evidence.id] : []),
+    ]),
+  ];
   const blocks = [
     invariant,
     config.classification,
@@ -156,8 +164,15 @@ export function buildModelRequest(
                   { type: "null" },
                 ],
               },
-              evidenceMessageId: { type: ["string", "null"] },
-              evidenceQuote: { type: "string" },
+              evidenceMessageId: {
+                type: ["string", "null"],
+                enum: [...evidenceIds, null],
+              },
+              evidenceQuote: {
+                type: "string",
+                description:
+                  "Copy one short, contiguous excerpt from the inbound message selected by evidenceMessageId. Preserve its original language and punctuation. Never combine separate excerpts or copy from an outbound message. Empty when labelId is null.",
+              },
               shouldReply: { type: "boolean" },
               noReplyReason: { type: "string" },
               contactStopped: { type: "boolean" },
@@ -218,6 +233,22 @@ export function validateModelResult(
     ].find(
       (m) => m.id === result.evidenceMessageId && m.direction === "inbound",
     );
+    // Restore only whitespace differences to the original verbatim substring.
+    // The database still verifies the exact original inbound quote.
+    if (
+      !explicit &&
+      evidence &&
+      result.evidenceQuote.trim() &&
+      !evidence.body.includes(result.evidenceQuote)
+    ) {
+      const pattern = result.evidenceQuote
+        .trim()
+        .split(/\s+/)
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("\\s+");
+      const original = evidence.body.match(new RegExp(pattern))?.[0];
+      if (original && original.length <= 8000) result.evidenceQuote = original;
+    }
     if (
       !explicit &&
       (!evidence ||

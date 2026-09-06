@@ -33,6 +33,54 @@ const meeting = {
   draft: "",
   missingKnowledge: "",
 };
+test("Evidence schema excludes outbound IDs and preserves earlier verified inbound evidence", () => {
+  const built = buildModelRequest({
+    ...base,
+    messages: [
+      ...base.messages,
+      { id: "team", direction: "outbound", body: "Let's meet Tuesday" },
+    ],
+    previous: {
+      labelId: "meeting_request",
+      source: "ai",
+      evidence: { id: "earlier", direction: "inbound", body: "Yes" },
+    },
+  });
+  assert.deepEqual(
+    built.request.text.format.schema.properties.evidenceMessageId.enum,
+    ["lead", "earlier", null],
+  );
+  assert.deepEqual(
+    buildModelRequest({ ...base, messages: [] }).request.text.format.schema
+      .properties.evidenceMessageId.enum,
+    [null],
+  );
+});
+test("Whitespace-only citation differences recover the exact original without accepting paraphrases", () => {
+  const body = "Yes.\n\nLet's\u00a0meet\tTuesday (15:00)?";
+  const input = {
+    ...base,
+    messages: [{ id: "lead", direction: "inbound" as const, body }],
+  };
+  const result = validateModelResult(input, {
+    ...meeting,
+    evidenceQuote: "Let's meet Tuesday (15:00)?",
+  });
+  assert.equal(result.evidenceQuote, "Let's\u00a0meet\tTuesday (15:00)?");
+  assert.ok(body.includes(result.evidenceQuote));
+  assert.throws(() =>
+    validateModelResult(input, {
+      ...meeting,
+      evidenceQuote: "Let's meet Wednesday (15:00)?",
+    }),
+  );
+  assert.throws(() =>
+    validateModelResult(
+      { ...input, messages: [{ id: "lead", direction: "outbound", body }] },
+      { ...meeting, evidenceQuote: "Let's meet Tuesday (15:00)?" },
+    ),
+  );
+});
 test("One window retains recent messages and keeps old intent evidence separately", () => {
   assert.equal(
     buildModelRequest({ ...base, historyTruncated: true }).context.truncated,
