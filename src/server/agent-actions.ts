@@ -2,6 +2,9 @@
 import { z } from "zod";
 import { authenticatedClient, databaseError } from "./session";
 import { authorizeWorkspace } from "./inbox-read";
+import { adminClient } from "./admin";
+import { runRecordedAI } from "./ai-run";
+import { loadAIContext } from "./ai-context";
 import { createInboxModel, ModelError } from "@/integrations/ai/classify";
 
 export async function selectDefaultAgent(workspaceId: string, agentId: string) {
@@ -68,17 +71,32 @@ export async function testAgent(input: unknown) {
       process.env.OPENAI_API_KEY,
       process.env.INBOX_MODEL,
     );
-    const output = await model.classify({
-      agent: {
-        name: a.name,
-        goal: a.goal,
-        language: a.language,
-        replyPolicy: z.enum(["positive", "all"]).parse(a.reply_policy),
-        knowledge: a.knowledge,
+    const ai = await loadAIContext(adminClient(), workspaceId);
+    const output = await runRecordedAI(
+      adminClient(),
+      model,
+      {
+        ...ai,
+        agent: {
+          name: a.name,
+          goal: a.goal,
+          language: a.language,
+          replyGroups: z
+            .array(z.enum(["positive", "neutral", "negative"]))
+            .parse(a.reply_groups),
+          knowledge: a.knowledge,
+        },
+        messages: [{ id: "sample", direction: "inbound", body: message }],
+        generateDraft: true,
       },
-      messages: [{ direction: "inbound", body: message }],
-      generateDraft: true,
-    });
+      {
+        workspaceId,
+        agentId,
+        agentVersion: version,
+        catalogRevision: ai.catalogRevision,
+        scenario: "agent_test",
+      },
+    );
     return { ok: true as const, output };
   } catch (error) {
     return {

@@ -1978,3 +1978,106 @@ input[type="checkbox"] {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Label identity is consistent across the inbox and configuration screens. */
+.pill.teal {
+  color: #68ddd1;
+  background: #123333;
+  border-color: #285454;
+}
+.pill.pink {
+  color: #f3a6dc;
+  background: #381c33;
+  border-color: #603451;
+}
+.pill.gray {
+  color: #c4c6cd;
+  background: #26272c;
+  border-color: #40424c;
+}
+.pill.red {
+  color: #ff9b91;
+  background: #3b2020;
+  border-color: #633431;
+}
+.label-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.label-settings-row:last-child {
+  border-bottom: 0;
+}
+.label-description {
+  color: var(--muted);
+  max-width: 75ch;
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+.ai-admin-page {
+  padding: 32px;
+  max-width: 1600px;
+  margin: auto;
+  display: grid;
+  gap: 24px;
+}
+.ai-admin-grid {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.ai-admin-grid .card {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.prompt-editor {
+  min-height: 320px;
+  line-height: 1.6;
+}
+.prompt-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 550px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.test-result {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.ai-admin-page summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+.ai-admin-page input[type="checkbox"],
+.label-settings-row input[type="checkbox"] {
+  width: auto;
+}
+@media (max-width: 1000px) {
+  .ai-admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .ai-admin-page {
+    padding: 16px;
+  }
+  .label-settings-row {
+    flex-wrap: wrap;
+  }
+  .label-settings-row > .grow {
+    flex-basis: 100%;
+  }
+}

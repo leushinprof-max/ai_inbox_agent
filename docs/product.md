@@ -6,6 +6,8 @@ Owner-approved on 2026-09-05, after reviewing the hosted prototype.
 
 Only four top-level sections: Conversations, Drafts, Agents and Settings. No Overview, Pulse, standalone Knowledge, LeadFleet admin navigation, client assignments or billing coupling.
 
+The platform owner additionally has Product admin → AI configuration. This permission is independent of a client's workspace role. The [single-label contract](labels-and-ai-configuration.md) defines the September 6 classification update: one current intent, three groups, custom workspace labels and versioned product instructions.
+
 Workspace is the tenant boundary. A workspace owns its members, HeyReach connection, sender identities, conversations and agents. One workspace API key represents the corresponding HeyReach workspace. LinkedIn senders come from provider conversation identity, not from an admin inventory or hard-coded allowlist.
 
 ## Conversations

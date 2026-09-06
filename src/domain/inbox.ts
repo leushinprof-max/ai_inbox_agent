@@ -1,12 +1,7 @@
+import type { IntentGroup, LabelDefinition } from "./labels";
 export type Role = "owner" | "admin" | "member" | "viewer";
 export type DraftStatus =
   "ready" | "needs_input" | "snoozed" | "sent" | "dismissed";
-export type Label =
-  | "Interested"
-  | "Information Request"
-  | "Meeting Request"
-  | "Referral"
-  | "Not interested";
 
 export interface Workspace {
   id: string;
@@ -35,7 +30,7 @@ export interface Agent {
   status: "draft" | "active" | "paused";
   goal: string;
   language: string;
-  replyPolicy: "positive" | "all";
+  replyGroups: IntentGroup[];
   knowledge: string;
   version: number;
 }
@@ -62,7 +57,20 @@ export interface Conversation {
   senderName: string;
   contact: Contact;
   campaign: string;
-  labels: Label[];
+  labelId: string | null;
+  labelState?:
+    "pending" | "classified" | "uncategorized" | "failed" | "manual_clear";
+  labelAssignmentRevision?: number;
+  labelSource?: string | null;
+  noReplyReason?: string;
+  replyDecision?: {
+    revision: number | null;
+    agentId: string | null;
+    agentVersion: number | null;
+    catalogRevision: number | null;
+    configVersion: number | null;
+  };
+  contactStopped?: boolean;
   revision: number;
   messages: Message[];
   notes: string;
@@ -82,6 +90,15 @@ export interface Draft {
   snoozedUntil: string | null;
 }
 export interface InboxState {
+  labelCatalog?: LabelDefinition[];
+  platformOwner?: boolean;
+  aiConfigVersion?: number;
+  labelCatalogRevision?: number;
+  agentDefaults?: {
+    goal: string;
+    language: string;
+    replyGroups: IntentGroup[];
+  };
   workspaces: Workspace[];
   memberships: Membership[];
   connections: Connection[];

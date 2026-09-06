@@ -5,6 +5,7 @@ import { useInbox } from "@/lib/inbox-context";
 import type { Conversation, Draft } from "@/domain/inbox";
 import { Button, IconButton, Notice, Spark } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
+import { replyAllowed } from "@/domain/labels";
 import { inspectSend } from "@/server/send-actions";
 import {
   requestGeneration,
@@ -46,6 +47,31 @@ export function Composer({
     state.generations?.find(
       (g) => g.conversationId === conversation.id && g.status === "queued",
     );
+  const workspaceAgent = state.agents.find(
+    (a) =>
+      a.id ===
+        state.workspaces.find((w) => w.id === scope.workspaceId)
+          ?.defaultAgentId && a.status === "active",
+  );
+  const eligible =
+    !!workspaceAgent &&
+    !conversation.contactStopped &&
+    conversation.messages.at(-1)?.direction === "inbound" &&
+    replyAllowed(
+      state.labelCatalog ?? [],
+      conversation.labelId,
+      workspaceAgent.replyGroups,
+    );
+  const decision = conversation.replyDecision;
+  const noReplyReason =
+    decision?.revision === conversation.revision &&
+    decision?.agentId === workspaceAgent?.id &&
+    decision?.agentVersion === workspaceAgent?.version &&
+    decision?.catalogRevision === state.labelCatalogRevision &&
+    decision?.configVersion === state.aiConfigVersion &&
+    conversation.messages.at(-1)?.direction === "inbound"
+      ? conversation.noReplyReason
+      : "";
   const generating = requesting || generation?.status === "queued";
   const writable = state.memberships.some(
     (m) =>
@@ -117,7 +143,9 @@ export function Composer({
     generationId &&
     generation &&
     generation.status !== "queued" &&
-    (generation.status !== "completed" || generatedDraft)
+    (generation.status !== "completed" ||
+      generatedDraft ||
+      generation.error === "no_reply_needed")
   ) {
     if (generation.status === "completed" && generatedDraft) {
       setReviewedDraft(generatedDraft);
@@ -579,14 +607,18 @@ export function Composer({
                     Sending as {conversation.senderName}
                   </span>
                 )}
-                {mode === "manual" && environment !== "demo" ? (
+                {mode === "manual" &&
+                environment !== "demo" &&
+                !draft &&
+                !generating &&
+                eligible ? (
                   <Button
                     variant="ghost small"
                     icon="spark"
                     disabled={!writable || status !== "idle"}
                     onClick={() => void generate()}
                   >
-                    Draft
+                    Prepare reply
                   </Button>
                 ) : null}
               </div>
@@ -628,6 +660,14 @@ export function Composer({
               </div>
             </div>
             <div className="composer-foot">
+              {!draft && noReplyReason ? (
+                <p className="muted">{noReplyReason}</p>
+              ) : null}
+              {!draft && conversation.labelState === "uncategorized" ? (
+                <p className="muted">
+                  No automatic draft: intent could not be determined.
+                </p>
+              ) : null}
               <span>
                 {conversation.senderName} → {conversation.contact.name}
               </span>

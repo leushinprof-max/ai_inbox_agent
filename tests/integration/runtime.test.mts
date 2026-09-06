@@ -10,6 +10,7 @@ import {
   encryptConnection,
   decryptConnection,
 } from "../../src/server/credentials";
+import { loadAIContext } from "../../src/server/ai-context";
 import { runNextJob } from "../../src/server/runtime";
 import { readConversation, readWorkspace } from "../../src/server/inbox-read";
 import { durableSendRepository } from "../../src/server/delivery";
@@ -25,6 +26,8 @@ import {
 
 const local = localConfig();
 process.loadEnvFile(".env.local");
+process.env.NEXT_PUBLIC_SUPABASE_URL = local.API_URL;
+process.env.SUPABASE_SECRET_KEY = local.SERVICE_ROLE_KEY;
 const options = { auth: { persistSession: false }, db: { retry: false } };
 const admin = createClient<Database>(
   local.API_URL,
@@ -43,7 +46,15 @@ const model: InboxModel = {
   async classify(input) {
     modelCalls++;
     return {
-      labels: ["Interested"],
+      labelId: input.labels.find((l) => l.systemKey === "interested")!.id,
+      evidenceMessageId:
+        input.messages.findLast((m) => m.direction === "inbound")?.id ?? null,
+      evidenceQuote:
+        input.messages
+          .findLast((m) => m.direction === "inbound")
+          ?.body.slice(0, 200) ?? "",
+      noReplyReason: "",
+      contactStopped: false,
       shouldReply: input.generateDraft,
       draft: input.generateDraft ? "Approved local reply." : "",
       missingKnowledge: "",
@@ -164,7 +175,7 @@ before(async () => {
         name: "Runtime agent",
         goal: "Answer questions",
         language: "English",
-        replyPolicy: "positive",
+        replyGroups: ["positive"],
         knowledge: "Approved local facts.",
         status: "active",
       },
@@ -245,7 +256,8 @@ test("Historical import persists messages and classifications but never creates 
       .single(),
   );
   conversationId = c.id;
-  assert.deepEqual(c.labels, ["Interested"]);
+  assert.ok(c.label_id);
+  assert.equal(c.label_state, "classified");
   assert.equal(c.inbound_revision, 1);
   assert.equal(
     must(await owner.from("drafts").select("id").eq("workspace_id", workspace))
@@ -670,7 +682,7 @@ test("Provider readback merges an acknowledgement and delayed completion preserv
   );
 });
 
-test("Late classification results cannot overwrite an edited draft or generate after disconnect", async () => {
+test("Late classification results cannot overwrite an edited draft or assignment", async () => {
   const c = must(
     await owner
       .from("conversations")
@@ -696,19 +708,38 @@ test("Late classification results cannot overwrite an edited draft or generate a
       p_body: "Human-reviewed draft",
     }),
   );
+  const ai = await loadAIContext(admin, workspace, c.id);
+  const evidence = must(
+    await admin
+      .from("messages")
+      .select("id,body")
+      .eq("conversation_id", c.id)
+      .eq("direction", "inbound")
+      .limit(1)
+      .single(),
+  );
   const args = {
     p_workspace: workspace,
     p_conversation: c.id,
     p_revision: c.inbound_revision,
-    p_labels: ["Interested"],
+    p_assignment: ai.assignmentRevision,
+    p_catalog: ai.catalogRevision,
+    p_config: ai.configurationVersion,
+    p_result: {
+      labelId: ai.labels.find((l) => l.systemKey === "interested")!.id,
+      evidenceMessageId: evidence.id,
+      evidenceQuote: evidence.body,
+      shouldReply: true,
+      noReplyReason: "",
+      contactStopped: false,
+      draft: "Late generated replacement",
+      missingKnowledge: "",
+    },
     p_agent: agentId,
     p_agent_version: 1,
-    p_draft: "Late generated replacement",
-    p_missing: "",
     p_generate: true,
-    p_connection_revision: 1,
   };
-  must(await admin.rpc("server_apply_classification", args));
+  must(await admin.rpc("server_apply_intent", args));
   assert.equal(
     must(await owner.from("drafts").select("body").eq("id", d.id).single())
       .body,
@@ -716,8 +747,9 @@ test("Late classification results cannot overwrite an edited draft or generate a
   );
   must(await owner.rpc("disconnect_workspace", { p_workspace: workspace }));
   assert.equal(
-    (await admin.rpc("server_apply_classification", args)).error?.code,
-    "PT409",
+    must(await admin.rpc("server_apply_intent", args)),
+    false,
+    "A stale assignment is ignored even when provider is disconnected",
   );
   assert.ok(modelCalls >= 3);
 });
@@ -1006,7 +1038,7 @@ test("Reply-only import skips model calls, hides outreach in application reads a
         goal: "Answer questions",
         knowledge: "Approved fixture facts.",
         language: "English",
-        replyPolicy: "all",
+        replyGroups: ["positive", "neutral", "negative"],
       },
     }),
   );
@@ -1016,7 +1048,10 @@ test("Reply-only import skips model calls, hides outreach in application reads a
       p_agent: agent,
     }),
   );
-  const secret = encryptConnection(target, `synthetic-reply-eligibility-${run}`);
+  const secret = encryptConnection(
+    target,
+    `synthetic-reply-eligibility-${run}`,
+  );
   must(
     await admin.rpc("server_connect", {
       p_workspace: target,
@@ -1062,10 +1097,26 @@ test("Reply-only import skips model calls, hides outreach in application reads a
   let calls = 0;
   const selectedModel: InboxModel = {
     async classify(input) {
-      assert.ok(input.messages.some((m) => m.direction === "inbound"));
+      const inbound = input.messages.findLast((m) => m.direction === "inbound");
+      if (!inbound)
+        assert.equal(
+          input.messages.length,
+          50,
+          "The fixed window does not search older history",
+        );
       calls++;
       return {
-        labels: ["Interested"],
+        labelId: inbound
+          ? input.labels.find((l) => l.systemKey === "interested")!.id
+          : null,
+        evidenceMessageId:
+          input.messages.findLast((m) => m.direction === "inbound")?.id ?? null,
+        evidenceQuote:
+          input.messages
+            .findLast((m) => m.direction === "inbound")
+            ?.body.slice(0, 200) ?? "",
+        noReplyReason: "",
+        contactStopped: false,
         shouldReply: input.generateDraft,
         draft: input.generateDraft ? "Reviewed fixture reply." : "",
         missingKnowledge: "",

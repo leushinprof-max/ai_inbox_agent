@@ -1,5 +1,6 @@
 "use client";
 
+import { intentGroup } from "@/domain/labels";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
@@ -38,9 +39,9 @@ export function AgentEditor({ id }: { id: string }) {
         name: "",
         description: "",
         status: "draft",
-        goal: "Book a discovery call",
-        language: "English",
-        replyPolicy: "positive",
+        goal: state.agentDefaults?.goal ?? "Book a discovery call",
+        language: state.agentDefaults?.language ?? "English",
+        replyGroups: state.agentDefaults?.replyGroups ?? ["positive"],
         knowledge: "",
         version: 0,
       },
@@ -186,21 +187,29 @@ export function AgentEditor({ id }: { id: string }) {
                 </div>
               </div>
               <div className="field">
-                <label htmlFor="reply-policy">Prepare replies for</label>
-                <select
-                  id="reply-policy"
-                  value={agent.replyPolicy}
-                  onChange={(e) =>
-                    field("replyPolicy", e.target.value as Agent["replyPolicy"])
-                  }
-                >
-                  <option value="positive">
-                    Positive and actionable replies
-                  </option>
-                  <option value="all">All replies except opt-outs</option>
-                </select>
+                <label>Prepare drafts for intent groups</label>
+                <div className="row wrap">
+                  {intentGroup.options.map((g) => (
+                    <label className="row" key={g}>
+                      <input
+                        type="checkbox"
+                        checked={agent.replyGroups.includes(g)}
+                        onChange={(e) =>
+                          field(
+                            "replyGroups",
+                            e.target.checked
+                              ? [...agent.replyGroups, g]
+                              : agent.replyGroups.filter((v) => v !== g),
+                          )
+                        }
+                      />
+                      {g}
+                    </label>
+                  ))}
+                </div>
                 <p className="help">
-                  A person reviews every draft before sending.
+                  AI prepares a draft when the conversation needs a reply. Every
+                  draft is reviewed before sending.
                 </p>
               </div>
             </div>

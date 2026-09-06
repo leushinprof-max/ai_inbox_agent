@@ -69,6 +69,12 @@ export function InboxShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
+        {state.platformOwner && (
+          <Link className="nav-item" href={`${basePath}/product-admin`}>
+            <Icon name="settings" />
+            <span>Product admin</span>
+          </Link>
+        )}
         <div className="sidebar-spacer" />
         <Link href="/workspaces" className="preview-trigger">
           <Icon name="info" />

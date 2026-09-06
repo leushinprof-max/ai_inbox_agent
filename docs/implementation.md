@@ -18,6 +18,8 @@ As of 2026-09-06, the standalone application, database operations, provider adap
 
 ## Local evidence
 
+For the subsequent single-intent classification and Product admin implementation, see [feature verification and rollout](labels-and-ai-configuration.md). Its feature branch requires a coordinated schema/web/worker release; earlier deployment evidence below applies to the previous behavior. The latest fixed context rule replaces the earlier worker fallback that searched beyond the last message page.
+
 The verification target is the feature branch identified in the PR; the PR records the exact base and checked HEAD. The final command outcomes belong in that handoff rather than an unversioned readiness claim.
 
 - 28 unit/adapter/PostgreSQL tests: actual migration replay in PGlite, tenant grants, draft transitions, model/provider payload validation, 200 handling and ambiguous sends.

@@ -1,3 +1,5 @@
+import { AIConfigurationScreen } from "@/features/settings/ai-configuration-screen";
+import { authenticatedClient, databaseError } from "@/server/session";
 import { notFound, redirect } from "next/navigation";
 import { ConversationsScreen } from "@/features/conversations/conversations-screen";
 import { DraftsScreen } from "@/features/drafts/drafts-screen";
@@ -25,6 +27,13 @@ export default async function WorkspacePage({
       <AgentsScreen />
     );
   if (section.length > 1) notFound();
+  if (section[0] === "product-admin") {
+    const { db } = await authenticatedClient();
+    const result = await db.rpc("is_platform_owner");
+    databaseError(result.error);
+    if (!result.data) notFound();
+    return <AIConfigurationScreen />;
+  }
   if (section[0] === "drafts") return <DraftsScreen />;
   if (section[0] === "settings") return <SettingsScreen />;
   if (section[0] === "setup") return <LiveSetupScreen />;

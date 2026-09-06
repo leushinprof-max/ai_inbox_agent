@@ -35,7 +35,7 @@ const mutation = z.discriminatedUnion("kind", [
       goal: z.string().max(8000),
       language: z.string().min(1).max(80),
       knowledge: z.string().max(30000),
-      replyPolicy: z.enum(["all", "positive"]),
+      replyGroups: z.array(z.enum(["positive", "neutral", "negative"])).max(3),
       status: z.enum(["draft", "active", "paused"]),
     }),
   }),

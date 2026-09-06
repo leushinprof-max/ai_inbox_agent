@@ -26,6 +26,8 @@ Imports classify latest conversation state without historical drafts. Interrupte
 
 ## Drafts and model calls
 
+The [single-label and AI configuration design](labels-and-ai-configuration.md) extends this pipeline with workspace label IDs, a global published instruction version, manual-assignment protection, verified intent evidence and a separate no-reply decision. The worker, tests and full-request preview share one builder. The same fixed 50-message / 48,000-character body window applies to every conversation; earlier evidence is retained separately.
+
 Conversation inbound revision, draft revision, immutable agent version and connection revision are separate counters. Our own outgoing message does not increment the inbound revision. Human edits, saved notes and agent updates use optimistic concurrency. Application conflicts use `PT409`, avoiding PostgREST serialization retries for ordinary review conflicts.
 
 The worker classifies new inbound state, using the selected active agent when one exists. Approved Knowledge and untrusted transcript are separate model inputs. The OpenAI Responses request uses a strict output schema, `store: false`, a bounded transcript and timeout. Classification cannot invent missing approved information. Missing facts become Needs input. Without an active agent, historical classification can still label conversations, but no automatic draft is created.

@@ -11,6 +11,8 @@ import { readWorkspace, readConversation } from "../../src/server/inbox-read";
 import { LiveGateway } from "../../src/lib/live-gateway";
 
 const local = localConfig();
+process.env.NEXT_PUBLIC_SUPABASE_URL = local.API_URL;
+process.env.SUPABASE_SECRET_KEY = local.SERVICE_ROLE_KEY;
 const admin = createClient<Database>(local.API_URL, local.SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });

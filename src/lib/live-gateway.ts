@@ -22,7 +22,7 @@ export class LiveGateway implements InboxGateway {
   private loadedDetails = new Set<string>();
   private conversationPages = 1;
   private draftPages = 1;
-  private draftSearch = { query: "", status: "ready" };
+  private draftSearch = { query: "", status: "ready", label: "all" };
   private draftSearchVersion = 0;
   private refreshPromise: Promise<void> | null = null;
   constructor(
@@ -269,6 +269,7 @@ export class LiveGateway implements InboxGateway {
         view: "drafts",
         q: this.draftSearch.query,
         status: this.draftSearch.status,
+        label: this.draftSearch.label,
         ...(before ? { before: JSON.stringify(before) } : {}),
       });
       drafts.push(...result.items);
@@ -318,9 +319,9 @@ export class LiveGateway implements InboxGateway {
     });
     this.conversationPages++;
   };
-  searchDrafts = async (query: string, status: string) => {
+  searchDrafts = async (query: string, status: string, label = "all") => {
     this.draftSearchVersion++;
-    this.draftSearch = { query, status };
+    this.draftSearch = { query, status, label };
     this.draftPages = 1;
     await this.reloadDraftPages(1);
   };
@@ -336,6 +337,7 @@ export class LiveGateway implements InboxGateway {
       view: "drafts",
       q: this.draftSearch.query,
       status: this.draftSearch.status,
+      label: this.draftSearch.label,
       before: JSON.stringify(before),
     });
     if (version !== this.draftSearchVersion) return;
