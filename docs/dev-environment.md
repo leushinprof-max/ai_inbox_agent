@@ -86,3 +86,9 @@ The owner signed in through the normal hosted browser and authorized agent confi
 The walkthrough revealed stale queue totals on navigation/search and a first automatic draft not filling an already-open empty composer. The scoped repair on `codex/restaff-live-acceptance` updates totals with the first draft page and adopts a first draft only into an empty, unlocked composer. It preserves typed text. No hosted database migration, worker deployment, credential, webhook or send-policy change is required. The PR handoff records the exact checked source and subsequent web deployment after they complete.
 
 This verifies one authorized live cycle, not general model quality, hosted multi-user access or production readiness. Follow-ups remain disabled; replies require human approval. Operational IDs and message bodies are kept in ignored local evidence rather than this public repository.
+
+## Main consolidation, 2026-09-06
+
+The owner authorized final review and consolidation of PRs #1–#3 into `main`, followed by updating the existing dev site. The final release tree includes the previously accepted standalone app, reply-only admission and live draft refresh repair. The only new delivery configuration enables Vercel Git deployment from `main` and disables other branches. The [delivery procedure](operations.md#delivery-from-main) defines the subsequent workflow.
+
+Earlier branch/deployment entries above remain dated evidence. The root PR handoff records the actual merge SHAs, fresh verification results, host source changes and healthy deployments after completion; do not infer those results from this pre-merge record. Existing dev migrations, credentials, webhook, active agent and human-send policy are preserved. No new provider message or model test is part of the consolidation.
