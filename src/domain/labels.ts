@@ -32,7 +32,7 @@ export const systemLabels = [
     group: "positive",
     color: "green",
     instruction:
-      "The lead expresses genuine interest without a more specific current request. Do not add this alongside a request category. A question or meeting agreement takes the more specific category.",
+      "The lead expresses genuine interest without a more specific current request, OR accepts an actual CALL/MEETING proposed by our team. Agreement to that live meeting invitation (including yes, thumbs-up or choosing a time) is Interested, not Meeting Request. This exception applies ONLY to live meetings, NEVER to accepting an offer to send a link, materials or information: those are Information Request even when the lead only says yes or uses an emoji. A lead-initiated meeting request is Meeting Request. Do not infer interest merely because the lead answered a factual qualification question.",
   },
   {
     key: "information_request",
@@ -40,7 +40,7 @@ export const systemLabels = [
     group: "positive",
     color: "blue",
     instruction:
-      "The lead asks for relevant details, pricing, materials or a demo link without agreeing to a meeting. A mere question inside an explicit refusal is not positive intent. Distinguish our outreach questions from the lead's own requests.",
+      "The lead requests OR ACCEPTS OUR OFFER TO SEND product details, pricing, materials, a demo link, legal/payment mechanics or partnership-program information. Team: 'Прислать ссылку на демо?' Lead: '👍' means Information Request, not Interested; the lead has asked us to fulfill the offered action. A demo link is not a live meeting. Product questions remain Information Request even if our subsequent messages propose a call. Asking whether a referral program exists is a product/partnership question, not a Referral. A mere question inside an explicit refusal is not positive intent. Distinguish our outreach questions from the lead's own requests.",
   },
   {
     key: "meeting_request",
@@ -48,7 +48,7 @@ export const systemLabels = [
     group: "positive",
     color: "purple",
     instruction:
-      "The lead proposes or accepts a call, meeting or live demo, or coordinates it. Preserve this intent through scheduling questions and acknowledgements. General interest without agreement to meet is insufficient.",
+      "Only use when the lead initiates a call, meeting or live demo request. The lead must originate the meeting proposal, not merely accept ours. Team: 'Shall we have a call?' Lead: 'Yes, let's talk' => Interested, NEVER Meeting Request. Offering a time or rescheduling in response to our invitation is still Interested. Lead spontaneously: 'Can we schedule a call?' => Meeting Request. Preserve a verified lead-initiated Meeting Request through later scheduling details and acknowledgements. Never infer initiative from our outbound suggestions or an old label alone; if origin is unavailable, do not assume lead initiative.",
   },
   {
     key: "referral",
