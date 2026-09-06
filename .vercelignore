@@ -1,6 +1,8 @@
 /*
-!src/
-!public/
+!src
+!src/**
+!public
+!public/**
 !package.json
 !package-lock.json
 !next.config.ts
