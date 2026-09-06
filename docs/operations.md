@@ -57,7 +57,7 @@ Imports keep their original window and progress; retry replays failed work idemp
 
 ## Hosted release boundary
 
-This repository is not linked to a new hosted deployment. The concrete resource plan and checked configuration files are documented in [hosted development](dev-environment.md). Before live use, configure dedicated web/worker/Supabase projects, confirm HTTPS application and Auth callback URLs, enable email confirmation and configure SMTP. Local signup confirmation is disabled for synthetic development; hosted invitations rely on verified email and must not use that development setting.
+Dedicated Vercel and Railway projects have been created and linked; their identities and actual setup status are recorded in [hosted development](dev-environment.md). Supabase creation was rejected by the account's free-project limit. Before live use, complete the dedicated database/worker configuration, confirm HTTPS application and Auth callback URLs, enable email confirmation and configure SMTP. Local signup confirmation is disabled for synthetic development; hosted invitations rely on verified email and must not use that development setting.
 
 Review the exact migration/branch diff and run all applicable local checks before publishing. Applying hosted migrations, setting credentials/domains/webhooks, activating a real workspace and performing a test send require the owner's scoped authorization. The current draft PR is not merged and changes no LeadFleet production service.
 
