@@ -1,6 +1,6 @@
 # Implementation status
 
-As of 2026-09-06, the standalone application, database operations, provider adapters and worker are implemented. Separate Vercel and Railway development projects have been created; the [hosted environment record](dev-environment.md) tracks deployment and the unresolved Supabase free-project limit. The existing LeadFleet production Inbox remains unchanged.
+As of 2026-09-06, the standalone application, database operations, provider adapters and worker are implemented. Separate Supabase, Vercel and Railway development projects have been created and configured; the [hosted environment record](dev-environment.md) tracks deployment and remaining acceptance. The existing LeadFleet production Inbox remains unchanged.
 
 ## Implemented
 
