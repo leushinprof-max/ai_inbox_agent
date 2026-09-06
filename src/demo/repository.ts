@@ -112,6 +112,72 @@ export class DemoRepository implements SendRepository {
       ),
     });
   }
+  saveSenderAssignments(
+    scope: Scope,
+    agentId: string,
+    senderIds: number[],
+    workspaceDefault: boolean,
+    revision: number,
+  ) {
+    const member = assertMember(this.state, scope, true);
+    const workspace = this.state.workspaces.find(
+      (w) => w.id === scope.workspaceId,
+    )!;
+    if (
+      !["owner", "admin"].includes(member.role) ||
+      !this.state.agents.some(
+        (a) => a.workspaceId === scope.workspaceId && a.id === agentId,
+      )
+    )
+      throw new InboxError(
+        "forbidden",
+        "Only workspace admins can assign agents.",
+      );
+    if ((workspace.agentAssignmentRevision ?? 0) !== revision)
+      throw new Error(
+        "Assignments changed. Reload and review the current assignments.",
+      );
+    const senders = this.state.senders ?? [];
+    if (
+      senderIds.some(
+        (id) =>
+          !senders.some(
+            (s) =>
+              s.id === id &&
+              (!s.workspaceId || s.workspaceId === scope.workspaceId),
+          ),
+      )
+    )
+      throw new Error("Invalid sender selection.");
+    this.publish({
+      ...this.state,
+      workspaces: this.state.workspaces.map((w) =>
+        w.id === scope.workspaceId
+          ? {
+              ...w,
+              agentAssignmentRevision: revision + 1,
+              defaultAgentId: workspaceDefault
+                ? agentId
+                : w.defaultAgentId === agentId
+                  ? null
+                  : w.defaultAgentId,
+            }
+          : w,
+      ),
+      senders: senders.map((s) =>
+        s.workspaceId && s.workspaceId !== scope.workspaceId
+          ? s
+          : {
+              ...s,
+              agentId: senderIds.includes(s.id)
+                ? agentId
+                : s.agentId === agentId
+                  ? null
+                  : s.agentId,
+            },
+      ),
+    });
+  }
   saveAgent(scope: Scope, agent: Agent) {
     const member = assertMember(this.state, scope, true);
     if (

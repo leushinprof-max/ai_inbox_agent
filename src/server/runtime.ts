@@ -27,7 +27,10 @@ const agentConfig = z.object({
   replyGroups: z.array(z.enum(["positive", "neutral", "negative"])),
   knowledge: z.string(),
 });
-type Provider = ReturnType<typeof createHeyReachClient>;
+type Provider = Pick<
+  ReturnType<typeof createHeyReachClient>,
+  "verify" | "senders" | "conversations" | "chat"
+>;
 export interface RuntimeDependencies {
   db: SupabaseClient<Database>;
   model: InboxModel;
@@ -260,18 +263,17 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           generateDraft: z.boolean(),
         })
         .parse(job.payload);
-      const [conversation, workspace, messages] = await Promise.all([
+      const [conversation, routing, messages] = await Promise.all([
         db
           .from("conversations")
           .select("inbound_revision")
           .eq("workspace_id", job.workspace_id)
           .eq("id", payload.conversationId)
           .single(),
-        db
-          .from("workspaces")
-          .select("default_agent_id")
-          .eq("id", job.workspace_id)
-          .single(),
+        db.rpc("server_resolve_agent", {
+          p_workspace: job.workspace_id,
+          p_conversation: payload.conversationId,
+        }),
         db
           .from("messages")
           .select("direction,body,occurred_at,id")
@@ -281,18 +283,16 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           .order("id", { ascending: false })
           .limit(51),
       ]);
-      [conversation, workspace, messages].forEach((r) =>
-        databaseError(r.error),
-      );
+      [conversation, routing, messages].forEach((r) => databaseError(r.error));
       let agentId: string | null = null;
       let agentVersion = 0;
       let config: z.infer<typeof agentConfig> | null = null;
-      if (workspace.data?.default_agent_id) {
+      if (routing.data) {
         const agent = await db
           .from("agents")
           .select("id,version,status")
           .eq("workspace_id", job.workspace_id)
-          .eq("id", workspace.data.default_agent_id)
+          .eq("id", routing.data)
           .single();
         databaseError(agent.error);
         if (agent.data?.status === "active") {

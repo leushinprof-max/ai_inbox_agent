@@ -103,6 +103,17 @@ export function createDemoState(): InboxState {
       },
     ],
     labelCatalog: demoLabels("aster"),
+    senders: [
+      {
+        id: 1,
+        name: "John Richardson",
+        authValid: true,
+        workspaceId: "aster",
+        agentId: "reply-handler",
+      },
+      { id: 2, name: "Sarah Mitchell", authValid: true, workspaceId: "aster" },
+      { id: 3, name: "Alex Morgan", authValid: false, workspaceId: "aster" },
+    ],
     agents: [
       {
         id: "reply-handler",

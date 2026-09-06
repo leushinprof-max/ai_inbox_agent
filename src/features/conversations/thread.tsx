@@ -56,6 +56,7 @@ export function ConversationThread({
           onClick={onBack}
         />
         <Avatar
+          photoUrl={conversation.contact.photoUrl}
           initials={conversation.contact.initials}
           color={conversation.contact.color}
         />
@@ -126,6 +127,11 @@ export function ConversationThread({
               >
                 <div className="message-meta">
                   <Avatar
+                    photoUrl={
+                      message.direction === "inbound"
+                        ? conversation.contact.photoUrl
+                        : conversation.senderPhotoUrl
+                    }
                     initials={
                       message.direction === "outbound"
                         ? conversation.senderName
@@ -189,6 +195,7 @@ export function ContactContext({
       <div className="context-profile">
         <div className="row between">
           <Avatar
+            photoUrl={conversation.contact.photoUrl}
             initials={conversation.contact.initials}
             color={conversation.contact.color}
             large

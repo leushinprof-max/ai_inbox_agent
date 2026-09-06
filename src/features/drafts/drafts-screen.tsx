@@ -187,6 +187,7 @@ export function DraftsScreen() {
                   >
                     <span className="row">
                       <Avatar
+                        photoUrl={c.contact.photoUrl}
                         initials={c.contact.initials}
                         color={c.contact.color}
                       />

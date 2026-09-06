@@ -73,21 +73,7 @@ export function IconButton({
     />
   );
 }
-export function Avatar({
-  initials,
-  color = "",
-  large = false,
-}: {
-  initials: string;
-  color?: string;
-  large?: boolean;
-}) {
-  return (
-    <span className={`avatar ${color} ${large ? "large" : ""}`}>
-      {initials}
-    </span>
-  );
-}
+export { Avatar } from "./avatar";
 export function Badge({
   children,
   color = "",

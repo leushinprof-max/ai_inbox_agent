@@ -45,8 +45,10 @@ export function conversationDto(
     providerConversationId: c.provider_conversation_id,
     senderId: c.sender_id,
     senderName: c.sender_name,
+    senderPhotoUrl: c.sender_photo_url,
     contact: {
       name: c.contact_name,
+      photoUrl: c.contact_photo_url,
       initials: c.contact_name
         .split(/\s+/)
         .filter(Boolean)
@@ -249,7 +251,7 @@ export async function readWorkspace(
   ] = await Promise.all([
     db
       .from("workspaces")
-      .select("id,name,timezone,default_agent_id")
+      .select("id,name,timezone,default_agent_id,agent_assignment_revision")
       .order("created_at")
       .limit(200),
     db
@@ -275,7 +277,7 @@ export async function readWorkspace(
       .eq("archived", false),
     db
       .from("senders")
-      .select("provider_id,name,auth_valid")
+      .select("provider_id,name,auth_valid,agent_id")
       .eq("workspace_id", workspaceId)
       .order("name")
       .limit(1000),
@@ -356,6 +358,7 @@ export async function readWorkspace(
       name: w.name,
       timezone: w.timezone,
       defaultAgentId: w.default_agent_id,
+      agentAssignmentRevision: w.agent_assignment_revision,
     })),
     memberships: [
       ...current,
@@ -391,6 +394,7 @@ export async function readWorkspace(
       id: s.provider_id,
       name: s.name,
       authValid: s.auth_valid,
+      agentId: s.agent_id,
     })),
     imports: (imports.data ?? []).map((r) => ({
       id: r.id,

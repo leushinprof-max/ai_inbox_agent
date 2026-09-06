@@ -5,6 +5,7 @@ import { useInbox } from "@/lib/inbox-context";
 import type { Conversation, Draft } from "@/domain/inbox";
 import { Button, IconButton, Notice, Spark } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
+import { resolveSenderAgent } from "@/domain/sender-agent";
 import { replyAllowed } from "@/domain/labels";
 import { inspectSend } from "@/server/send-actions";
 import {
@@ -47,11 +48,10 @@ export function Composer({
     state.generations?.find(
       (g) => g.conversationId === conversation.id && g.status === "queued",
     );
-  const workspaceAgent = state.agents.find(
-    (a) =>
-      a.id ===
-        state.workspaces.find((w) => w.id === scope.workspaceId)
-          ?.defaultAgentId && a.status === "active",
+  const workspaceAgent = resolveSenderAgent(
+    state,
+    scope.workspaceId,
+    conversation.senderId,
   );
   const eligible =
     !!workspaceAgent &&

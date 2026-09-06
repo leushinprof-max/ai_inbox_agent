@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { contactPhotoUrl } from "../../lib/contact-photo";
 
 const base = "https://api.heyreach.io/api/public";
 const id = z.string().min(1).max(4096);
@@ -8,6 +9,7 @@ const date = z
   .string()
   .refine((v) => Number.isFinite(Date.parse(v)), "Invalid provider timestamp");
 const profile = z.object({
+  imageUrl: z.unknown().optional(),
   firstName: z.string().nullish(),
   lastName: z.string().nullish(),
   companyName: z.string().nullish(),
@@ -15,6 +17,7 @@ const profile = z.object({
 });
 const account = z.object({
   id: accountId,
+  profileUrl: z.string().nullish(),
   firstName: z.string().nullish(),
   lastName: z.string().nullish(),
   authIsValid: z.boolean(),
@@ -46,7 +49,9 @@ export interface ProviderConversation {
   id: string;
   senderId: number;
   senderName: string;
+  senderPhotoUrl?: string | null;
   contactName: string;
+  photoUrl?: string | null;
   company: string;
   position: string;
   lastMessageAt: string | null;
@@ -56,6 +61,7 @@ export interface ProviderSender {
   id: number;
   name: string;
   authValid: boolean;
+  profileUrl?: string | null;
 }
 export class ProviderError extends Error {
   constructor(
@@ -128,6 +134,7 @@ export function normalizeConversation(
     senderName:
       name(c.linkedInAccount) || `LinkedIn sender ${c.linkedInAccountId}`,
     contactName: name(c.correspondentProfile) || "LinkedIn contact",
+    photoUrl: contactPhotoUrl(c.correspondentProfile?.imageUrl),
     company: c.correspondentProfile?.companyName ?? "",
     position: c.correspondentProfile?.position ?? "",
     lastMessageAt: c.lastMessageAt
@@ -190,7 +197,21 @@ export function createHeyReachClient(
       );
     return json ? boundedJson(response) : null;
   }
+  async function senderPhoto(profileUrl: string | null | undefined) {
+    if (!profileUrl) return null;
+    try {
+      const result = await request("/lead/GetLead", { profileUrl });
+      const parsed = z
+        .object({ imageUrl: z.unknown().optional() })
+        .safeParse(result);
+      return parsed.success ? contactPhotoUrl(parsed.data.imageUrl) : null;
+    } catch {
+      // Optional enrichment must not prevent canonical message synchronization.
+      return null;
+    }
+  }
   return {
+    senderPhoto,
     async verify() {
       await request("/auth/CheckApiKey", undefined, false);
     },
@@ -213,6 +234,7 @@ export function createHeyReachClient(
               [a.firstName, a.lastName].filter(Boolean).join(" ") ||
               `LinkedIn sender ${a.id}`,
             authValid: a.authIsValid,
+            ...(a.profileUrl ? { profileUrl: a.profileUrl } : {}),
           });
         if (offset + parsed.data.items.length >= parsed.data.totalCount)
           return result;
@@ -243,15 +265,24 @@ export function createHeyReachClient(
         received: parsed.data.items.length,
       };
     },
-    async chat(senderId: number, conversationId: string) {
+    async chat(
+      senderId: number,
+      conversationId: string,
+    ): Promise<ProviderConversation> {
       accountId.parse(senderId);
       id.parse(conversationId);
-      return normalizeConversation(
-        await request(
-          `/inbox/GetChatroom/${senderId}/${encodeURIComponent(conversationId)}`,
-        ),
-        { senderId, id: conversationId },
+      const raw = await request(
+        `/inbox/GetChatroom/${senderId}/${encodeURIComponent(conversationId)}`,
       );
+      const normalized = normalizeConversation(raw, {
+        senderId,
+        id: conversationId,
+      });
+      const parsed = conversation.parse(raw);
+      return {
+        ...normalized,
+        senderPhotoUrl: await senderPhoto(parsed.linkedInAccount?.profileUrl),
+      };
     },
   };
 }
