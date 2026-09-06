@@ -93,6 +93,7 @@ test("One window retains recent messages and keeps old intent evidence separatel
   }));
   const built = buildModelRequest({
     ...base,
+    scenario: "reply",
     messages,
     previous: {
       labelId: "meeting_request",
@@ -111,6 +112,45 @@ test("One window retains recent messages and keeps old intent evidence separatel
   assert.equal(
     JSON.parse(built.request.input[1].content).previous.evidence.body,
     "Let's meet Tuesday",
+  );
+});
+test("Classification stops at the last lead reply; generation retains the full context", () => {
+  const input: ModelInput = {
+    ...base,
+    messages: [
+      { id: "invite", direction: "outbound", body: "Shall we have a call?" },
+      { id: "lead", direction: "inbound", body: "Send information first." },
+      { id: "later", direction: "outbound", body: "Let's meet Tuesday." },
+    ],
+  };
+  const classify = buildModelRequest(input);
+  assert.deepEqual(
+    classify.messages.map((m) => m.id),
+    ["invite", "lead"],
+  );
+  assert.equal(classify.context.excludedTrailingOutbound, 1);
+  assert.equal(classify.context.truncated, false);
+  assert.equal(
+    JSON.parse(classify.request.input[1].content).generateDraft,
+    false,
+  );
+  for (const scenario of ["reply", "rewrite", "needs_input"] as const)
+    assert.deepEqual(
+      buildModelRequest({ ...input, scenario }).messages.map((m) => m.id),
+      ["invite", "lead", "later"],
+    );
+  assert.deepEqual(
+    buildModelRequest({ ...input, messages: [input.messages[0]] }).messages,
+    [],
+  );
+  assert.equal(
+    validateModelResult(input, {
+      ...meeting,
+      evidenceQuote: "Send information first.",
+      shouldReply: true,
+      draft: "Do not send",
+    }).draft,
+    "",
   );
 });
 test("No-reply decision preserves intent, while the same eligible intent can produce a draft", () => {

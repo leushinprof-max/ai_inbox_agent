@@ -71,9 +71,19 @@ export function buildModelRequest(
   const config = validateConfiguration(
     input.configuration ?? initialAIConfiguration,
   );
+  const scenario = input.scenario ?? "classify";
+  const lastInbound = input.messages.findLastIndex(
+    (m) => m.direction === "inbound",
+  );
+  const transcript =
+    scenario === "classify"
+      ? input.messages.slice(0, lastInbound + 1)
+      : input.messages;
+  const generateDraft =
+    input.generateDraft && input.messages.at(-1)?.direction === "inbound";
   let budget = 48000;
   const messages: ModelInput["messages"] = [];
-  for (const m of input.messages.slice(-50).reverse()) {
+  for (const m of transcript.slice(-50).reverse()) {
     if (budget <= 0) break;
     const body = m.body.slice(0, Math.min(8000, budget));
     messages.unshift({ ...m, body });
@@ -99,7 +109,6 @@ export function buildModelRequest(
         },
       )
     : null;
-  const scenario = input.scenario ?? "classify";
   const evidenceIds = [
     ...new Set([
       ...messages
@@ -112,12 +121,12 @@ export function buildModelRequest(
     invariant,
     config.classification,
     config.replyDecision,
-    ...(input.generateDraft ? [config.draft, config.needsInput] : []),
+    ...(generateDraft ? [config.draft, config.needsInput] : []),
     ...(scenario === "rewrite" ? [config.rewrite] : []),
   ];
   const data = {
     scenario,
-    generateDraft: input.generateDraft,
+    generateDraft,
     agent: renderedAgent,
     eligibleGroups: agent?.replyGroups ?? [],
     labels,
@@ -195,11 +204,12 @@ export function buildModelRequest(
     },
     context: {
       suppliedMessages: input.messages.length,
+      excludedTrailingOutbound: input.messages.length - transcript.length,
       includedMessages: messages.length,
       bodyCharacters: 48000 - budget,
       truncated:
         !!input.historyTruncated ||
-        input.messages.length !== messages.length ||
+        transcript.length !== messages.length ||
         messages.some(
           (m) =>
             m.body.length !==
