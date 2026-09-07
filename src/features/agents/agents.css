@@ -400,22 +400,6 @@
   min-height: 300px;
   height: clamp(300px, 45vh, 560px);
 }
-.agent-test-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 20px 0;
-}
-.agent-test-presets button {
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 6px 12px;
-  color: var(--muted);
-}
-.agent-test-presets button:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
 @media (max-width: 1500px) {
   .agents-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
