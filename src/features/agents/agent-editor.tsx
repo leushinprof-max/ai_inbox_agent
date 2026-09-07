@@ -470,44 +470,6 @@ export function AgentEditor({ id }: { id: string }) {
                   This checks the form and Knowledge setup. It does not call an
                   AI model.
                 </Notice>
-                <div className="agent-test-presets">
-                  {[
-                    {
-                      label: "Interested",
-                      text: "Sounds interesting. Tell me more.",
-                    },
-                    {
-                      label: "Product question",
-                      text: "How does your product work?",
-                    },
-                    {
-                      label: "Meeting request",
-                      text: "Can we book a call next week?",
-                    },
-                    {
-                      label: "Not interested",
-                      text: "No thanks, please stop contacting me.",
-                    },
-                    {
-                      label: "Referral",
-                      text: "Please contact my colleague about this.",
-                    },
-                    {
-                      label: "Knowledge gap",
-                      text: "Do you support a custom on-premise deployment?",
-                    },
-                  ].map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={() => {
-                        setTest(preset.text);
-                        setTestResult(false);
-                      }}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
                 <div className="test-chat">
                   {testResult ? (
                     <>
