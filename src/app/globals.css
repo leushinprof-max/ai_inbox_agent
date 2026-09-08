@@ -523,6 +523,32 @@ h3 {
 .draft-layout.details-closed {
   grid-template-columns: 278px minmax(340px, 1fr);
 }
+/* Drafts workspace frame experiment: keep isolated for a one-commit rollback. */
+@media (min-width: 681px) {
+  .workspace-main:has(> .draft-layout) {
+    padding: 24px 12px 12px;
+    background: var(--side);
+  }
+  .workspace-main > .draft-layout {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    background: var(--bg);
+  }
+}
+@media (min-width: 681px) and (max-width: 1180px),
+  (min-width: 681px) and (max-height: 800px) {
+  .workspace-main:has(> .draft-layout) {
+    padding: 16px 8px 8px;
+  }
+}
+@media (min-width: 681px) and (max-width: 1180px) {
+  .workspace-main > .draft-layout > .context {
+    top: 0;
+    max-width: 100%;
+  }
+}
 .queue {
   border-right: 1px solid var(--line);
   display: flex;
