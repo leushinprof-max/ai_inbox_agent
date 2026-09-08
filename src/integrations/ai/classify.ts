@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { boundedJson } from "@/integrations/heyreach/client";
+import { assertReasoningSupported } from "./model-catalog";
 import {
   replyAllowed,
   type IntentGroup,
@@ -95,6 +96,9 @@ export function buildModelRequest(
   const scenario = input.scenario ?? "classify";
   const classifying = scenario === "classify";
   const models = resolveModels(config, model);
+  const selectedModel = classifying ? models.classification : models.draft;
+  const effort = config.reasoning[classifying ? "classification" : "draft"];
+  assertReasoningSupported(selectedModel, effort);
   const lastInbound = input.messages.findLastIndex(
     (m) => m.direction === "inbound",
   );
@@ -214,7 +218,8 @@ export function buildModelRequest(
       };
   return {
     request: {
-      model: scenario === "classify" ? models.classification : models.draft,
+      model: selectedModel,
+      ...(effort !== null ? { reasoning: { effort } } : {}),
       store: false,
       max_output_tokens: 4000,
       input: [

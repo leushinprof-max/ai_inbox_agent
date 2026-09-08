@@ -225,6 +225,7 @@ test("Platform prompt ownership is separate from workspace ownership; versions p
       JSON.stringify({
         ...config,
         models: { classification: "classifier", draft: "writer" },
+        reasoning: { classification: "none", draft: "medium" },
       }),
     ])
   ).id;
@@ -248,6 +249,15 @@ test("Platform prompt ownership is separate from workspace ownership; versions p
   await db.query("select public.publish_ai_configuration($1,1)", [version]);
   assert.deepEqual(
     (
+      await row<{ reasoning: object }>(
+        "select configuration->'reasoning' reasoning from public.ai_config_versions v join public.ai_config_release r on r.version_id=v.id",
+      )
+    ).reasoning,
+    { classification: "none", draft: "medium" },
+    "Published versions preserve independent reasoning settings",
+  );
+  assert.deepEqual(
+    (
       await row<{ models: object }>(
         "select configuration->'models' models from public.ai_config_versions v join public.ai_config_release r on r.version_id=v.id",
       )
@@ -256,6 +266,15 @@ test("Platform prompt ownership is separate from workspace ownership; versions p
   );
   await assert.rejects(db.query("select public.publish_ai_configuration(1,1)"));
   await db.query("select public.publish_ai_configuration(1,2)");
+  assert.equal(
+    (
+      await row<{ reasoning: object | null }>(
+        "select configuration->'reasoning' reasoning from public.ai_config_versions v join public.ai_config_release r on r.version_id=v.id",
+      )
+    ).reasoning,
+    null,
+    "Rollback to a legacy version restores provider-default reasoning",
+  );
   assert.equal(
     (
       await row<{ models: object | null }>(
