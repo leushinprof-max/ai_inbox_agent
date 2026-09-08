@@ -380,36 +380,8 @@
 }
 .kimi-thread .thread-content,
 .kimi-thread .composer {
-  width: 94%;
-  max-width: 1280px;
-}
-/* Temporary comparison control; the default remains the current layout. */
-.kimi-thread.thread-width-wide .thread-content,
-.kimi-thread.thread-width-wide .composer {
   width: 100%;
   max-width: none;
-}
-.thread-width-preview {
-  display: flex;
-  flex-shrink: 0;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-}
-.thread-width-preview button {
-  padding: 5px 8px;
-  border-radius: 5px;
-  color: var(--muted);
-  font-size: 11px;
-}
-.thread-width-preview button[aria-pressed="true"] {
-  background: var(--hover);
-  color: var(--text);
-}
-.thread-width-preview button:hover {
-  color: var(--text);
 }
 .kimi-thread .message {
   position: relative;
@@ -575,9 +547,6 @@
   }
 }
 @media (max-width: 680px) {
-  .thread-width-preview {
-    display: none;
-  }
   .conversations-toolbar {
     padding: 12px 16px;
   }
@@ -593,10 +562,6 @@
   }
   .kimi-thread .thread-scroll {
     padding: 20px 16px;
-  }
-  .kimi-thread .thread-content,
-  .kimi-thread .composer {
-    width: 100%;
   }
   .kimi-thread .composer-wrap {
     padding: 0 12px 12px;
