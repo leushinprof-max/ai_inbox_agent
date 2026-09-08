@@ -46,6 +46,7 @@ export interface Contact {
 }
 export interface Message {
   id: string;
+  operationId?: string;
   body: string;
   direction: "inbound" | "outbound";
   createdAt: string;

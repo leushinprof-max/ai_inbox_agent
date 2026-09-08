@@ -29,6 +29,9 @@ const PAGE_SIZE = 50;
 export function messageDto(m: Tables<"messages">): Message {
   return {
     id: m.id,
+    operationId: m.ingestion_key.startsWith("send:")
+      ? m.ingestion_key.slice(5)
+      : undefined,
     body: m.body,
     direction: z.enum(["inbound", "outbound"]).parse(m.direction),
     createdAt: m.occurred_at,

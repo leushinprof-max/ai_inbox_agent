@@ -12,6 +12,7 @@ import {
   requestGeneration,
   cancelGeneration,
 } from "@/server/generation-actions";
+import { outgoingStore, useOutgoing } from "@/lib/outgoing-messages";
 import { usePreferences } from "@/lib/preferences";
 
 export function Composer({
@@ -91,10 +92,19 @@ export function Composer({
   const [modal, setModal] = useState<
     "snooze" | "dismiss" | "send-absent" | null
   >(null);
-  const unresolved = state.unresolvedSends?.find(
+  const outgoing = useOutgoing(repository);
+  const durableUnresolved = state.unresolvedSends?.find(
     (o) => o.conversationId === conversation.id,
   );
-  const locked = status !== "idle" || !!unresolved;
+  const unresolved =
+    durableUnresolved ??
+    outgoing.find(
+      (o) => o.conversationId === conversation.id && o.status === "unknown",
+    );
+  const pendingSend = outgoing.some(
+    (m) => m.conversationId === conversation.id && m.status === "sending",
+  );
+  const locked = status !== "idle" || !!unresolved || pendingSend;
   // A first incoming draft can arrive while this conversation is already open.
   // Adopt it only into an untouched empty composer; never replace typed text.
   if (
@@ -224,6 +234,7 @@ export function Composer({
   async function send() {
     if (
       lock.current ||
+      pendingSend ||
       status === "unknown" ||
       unresolved ||
       !canSend ||
@@ -238,13 +249,26 @@ export function Composer({
     setStatus("sending");
     setError("");
     setSendRejected(false);
+    const operationId = crypto.randomUUID();
+    const submittedText = text;
+    const pending = {
+      id: operationId,
+      conversationId: conversation.id,
+      body: submittedText,
+      createdAt: new Date().toISOString(),
+      status: "sending" as const,
+      previousIds: conversation.messages.map((m) => m.id),
+    };
+    const outbox = outgoingStore(repository);
+    outbox.put(pending);
+    setText("");
+    setMode("manual");
     try {
-      const operationId = crypto.randomUUID();
       lastOperation.current = operationId;
       const outcome = await repository.send(scope, {
         operationId,
         conversationId: conversation.id,
-        body: text,
+        body: submittedText,
         ...(draft && mode !== "manual"
           ? {
               draft: {
@@ -257,17 +281,24 @@ export function Composer({
           : {}),
       });
       if (outcome.status === "sent") {
-        setText("");
+        outbox.put({ ...pending, status: "sent" });
         setStatus("idle");
         onDone?.();
-      } else if (outcome.status === "unknown" || outcome.status === "sending")
+      } else if (outcome.status === "unknown" || outcome.status === "sending") {
+        outbox.put({ ...pending, status: "unknown" });
         setStatus("unknown");
-      else {
+      } else {
+        outbox.remove(operationId);
+        setText(submittedText);
+        setMode(mode);
         setSendRejected(true);
         setError(outcome.reason);
         setStatus("idle");
       }
     } catch (e) {
+      outbox.remove(operationId);
+      setText(submittedText);
+      setMode(mode);
       setError(e instanceof Error ? e.message : "Message could not be sent.");
       setStatus("idle");
     } finally {
@@ -530,7 +561,7 @@ export function Composer({
                     >
                       Check status
                     </Button>
-                    {unresolved ? (
+                    {durableUnresolved ? (
                       <Button
                         variant="ghost small"
                         onClick={() => setModal("send-absent")}
@@ -549,8 +580,13 @@ export function Composer({
                                 .unresolvedSends?.some(
                                   (o) => o.conversationId === conversation.id,
                                 )
-                            )
+                            ) {
+                              if (unresolved) {
+                                outgoingStore(repository).remove(unresolved.id);
+                                setText(unresolved.body);
+                              }
                               setStatus("idle");
+                            }
                           })
                         }
                       >
@@ -656,11 +692,7 @@ export function Composer({
                     (stale && mode !== "manual")
                   }
                 >
-                  {status === "sending"
-                    ? "Sending…"
-                    : sendRejected
-                      ? "Try again"
-                      : "Send"}
+                  {sendRejected ? "Try again" : "Send"}
                 </Button>
               </div>
             </div>
@@ -702,6 +734,8 @@ export function Composer({
                   );
                   if (!result.ok) throw new Error(result.error);
                   await repository.refresh?.();
+                  outgoingStore(repository).remove(unresolved.id);
+                  setText(unresolved.body);
                   setStatus("idle");
                   setModal(null);
                 })

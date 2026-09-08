@@ -6,7 +6,12 @@ import { LabelPicker } from "./label-picker";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useInbox } from "@/lib/inbox-context";
-import type { Conversation } from "@/domain/inbox";
+import {
+  isConfirmed,
+  outgoingStore,
+  useOutgoing,
+} from "@/lib/outgoing-messages";
+import type { Conversation, Message } from "@/domain/inbox";
 import { Avatar, Button, IconButton, Spark, Notice } from "@/components/ui";
 
 export function ConversationThread({
@@ -47,8 +52,38 @@ export function ConversationThread({
       active = false;
     };
   }, [conversation.id, repository]);
+  const outgoing = useOutgoing(repository);
+  useEffect(() => {
+    for (const item of outgoing) {
+      if (
+        item.conversationId === conversation.id &&
+        isConfirmed(item, conversation.messages)
+      ) {
+        outgoingStore(repository).remove(item.id);
+      }
+    }
+  }, [outgoing, conversation.id, conversation.messages, repository]);
+  const messages: (Message & {
+    deliveryStatus?: "sending" | "unknown" | "sent";
+  })[] = [
+    ...conversation.messages,
+    ...outgoing
+      .filter(
+        (m) =>
+          m.conversationId === conversation.id &&
+          !isConfirmed(m, conversation.messages),
+      )
+      .map((m) => ({
+        id: m.id,
+        body: m.body,
+        createdAt: m.createdAt,
+        direction: "outbound" as const,
+        source: "accepted_send" as const,
+        deliveryStatus: m.status,
+      })),
+  ];
   const scroll = useRef<HTMLDivElement>(null);
-  const latestMessageId = conversation.messages.at(-1)?.id;
+  const latestMessageId = messages.at(-1)?.id;
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [conversation.id, latestMessageId, mobileOpen]);
@@ -126,11 +161,11 @@ export function ConversationThread({
               Load earlier messages
             </Button>
           ) : null}
-          {conversation.messages.map((message, index) => (
+          {messages.map((message, index) => (
             <div key={message.id}>
               {index === 0 ||
               message.createdAt.slice(0, 10) !==
-                conversation.messages[index - 1].createdAt.slice(0, 10) ? (
+                messages[index - 1].createdAt.slice(0, 10) ? (
                 <div className="date-divider">
                   {new Date(message.createdAt).toLocaleDateString("en-GB", {
                     day: "numeric",
@@ -140,7 +175,7 @@ export function ConversationThread({
                 </div>
               ) : null}
               <div
-                className={`message ${message.direction === "outbound" ? "outbound" : ""} ${message.source === "accepted_send" ? "success" : ""}`}
+                className={`message ${message.direction === "outbound" ? "outbound" : ""}`}
               >
                 <div className="message-meta">
                   <Avatar
@@ -177,12 +212,17 @@ export function ConversationThread({
                     })}
                   </time>
                 </div>
-                <div className="bubble">
-                  {message.body}
-                  {message.source === "accepted_send" ? (
-                    <span className="sent">✓ Sent</span>
-                  ) : null}
-                </div>
+                <div className="bubble">{message.body}</div>
+                {message.deliveryStatus === "sending" ? (
+                  <div className="message-delivery" role="status">
+                    <span className="message-spinner" aria-hidden="true" />{" "}
+                    Sending…
+                  </div>
+                ) : message.deliveryStatus === "unknown" ? (
+                  <div className="message-delivery" role="status">
+                    Send status unavailable
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}
