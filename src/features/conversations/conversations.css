@@ -403,10 +403,7 @@
 .kimi-thread .message.outbound .bubble {
   background: var(--hover);
 }
-.kimi-thread .message.success .bubble {
-  background: var(--soft);
-  border-color: #7c6cf830;
-}
+
 .kimi-thread .date-divider {
   font-size: 11px;
 }
@@ -733,4 +730,32 @@
   font-size: 11px;
   line-height: 1.5;
   margin-top: 8px;
+}
+
+.message-delivery {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.message-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: message-send-spin 800ms linear infinite;
+}
+@keyframes message-send-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-spinner {
+    animation: none;
+  }
 }
