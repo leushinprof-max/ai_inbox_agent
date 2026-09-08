@@ -200,6 +200,6 @@
   gap: 12px;
 }
 .skeleton-avatar {
-  background: #202027;
+  background: var(--hover);
   border: 0;
 }

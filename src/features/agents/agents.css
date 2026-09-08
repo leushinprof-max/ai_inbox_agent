@@ -53,9 +53,9 @@
   white-space: nowrap;
 }
 .agents-segments button[aria-pressed="true"] {
-  background: #232427;
+  background: var(--hover);
   color: var(--text);
-  border-color: #3b3c42;
+  border-color: var(--line-strong);
   box-shadow: 0 1px 3px #0003;
 }
 .agents-segments button span {
@@ -97,7 +97,7 @@
   gap: 30px;
 }
 .agents-card:hover {
-  border-color: #45424f;
+  border-color: var(--line-strong);
 }
 .agent-card-heading {
   display: flex;
@@ -185,7 +185,7 @@
   width: 30px;
   height: 17px;
   border-radius: 20px;
-  background: #303137;
+  background: var(--hover);
   padding: 2px;
   margin-bottom: 7px;
 }
@@ -193,7 +193,7 @@
   display: block;
   width: 13px;
   height: 13px;
-  background: #0a0a0b;
+  background: var(--bg);
   border-radius: 50%;
 }
 .agent-toggle.is-on {
@@ -483,7 +483,7 @@
 }
 .agent-editor .editor-next:not(.agent-next-step) .btn.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--text);
 }
 @media (max-width: 650px) {
   .agent-response-options {
@@ -630,7 +630,7 @@
   z-index: -1;
 }
 .agents-card:hover {
-  background: #191a1d;
+  background: var(--raised);
   border-color: #ffffff24;
   transform: translateY(-2px);
 }
@@ -676,6 +676,7 @@
   font-size: 11.5px;
 }
 .agents-toolbar .search {
+  background: var(--raised);
   height: 34px;
 }
 .agents-toolbar .btn {
@@ -690,7 +691,7 @@
 }
 .agents-segments {
   border-radius: 10px;
-  background: #191a1d;
+  background: var(--raised);
 }
 .agents-table th {
   text-transform: uppercase;
@@ -733,7 +734,7 @@
   border-radius: 9px;
 }
 .agent-editor .agent-steps {
-  background: #111113;
+  background: var(--panel);
 }
 @media (hover: none) {
   .agents-card:hover {
