@@ -1051,3 +1051,21 @@
     animation: none;
   }
 }
+
+.message-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #302743;
+  color: var(--accent-text);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.message-ai-badge .icon {
+  width: 12px;
+  height: 12px;
+}

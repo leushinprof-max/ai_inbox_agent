@@ -52,6 +52,7 @@ export interface Message {
   direction: "inbound" | "outbound";
   createdAt: string;
   source: "provider" | "accepted_send";
+  aiGenerated?: boolean;
 }
 export interface Conversation {
   id: string;

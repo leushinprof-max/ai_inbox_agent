@@ -433,6 +433,7 @@ export class DemoRepository implements SendRepository {
                   body: operation.request.body,
                   direction: "outbound",
                   source: "accepted_send",
+                  aiGenerated: !!operation.request.draft,
                   createdAt: new Date().toISOString(),
                 },
               ],
