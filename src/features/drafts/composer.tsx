@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation, Draft } from "@/domain/inbox";
 import { Button, IconButton, Notice, Spark } from "@/components/ui";
@@ -188,6 +188,18 @@ export function Composer({
         (c) => c.workspaceId === scope.workspaceId && c.status === "connected",
       ));
   const editable = mode !== "draft";
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = messageInput.current;
+    if (!input) return;
+    const resize = () => {
+      input.style.height = "0px";
+      input.style.height = `${Math.min(180, Math.max(56, input.scrollHeight))}px`;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [text, editable, generating, redrafting, draft?.status]);
 
   async function run(action: () => void | Promise<void>) {
     try {
@@ -310,7 +322,9 @@ export function Composer({
         }
       }}
     >
-      <div className="composer">
+      <div
+        className={`composer ${!generating && !redrafting && !needsInput ? "composer-reply" : ""}`}
+      >
         {generating ? (
           <>
             <div className="composer-title">
@@ -438,21 +452,16 @@ export function Composer({
           </>
         ) : (
           <>
-            <div className="composer-title">
-              <Spark />
-              {status === "sending"
-                ? "Sending…"
-                : status === "unknown" || unresolved
-                  ? "Send status unavailable"
-                  : mode === "manual"
-                    ? "Your reply"
-                    : "AI draft"}
-              {draft ? (
-                <span className="version">Draft {draft.revision}</span>
-              ) : null}
-            </div>
+            {mode !== "manual" ? (
+              <div className="composer-title">
+                <Spark /> AI draft
+              </div>
+            ) : null}
             {editable ? (
               <textarea
+                ref={messageInput}
+                className="reply-input"
+                rows={2}
                 aria-label="Message"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -602,11 +611,7 @@ export function Composer({
                   >
                     Save draft
                   </Button>
-                ) : (
-                  <span className="small muted">
-                    Sending as {conversation.senderName}
-                  </span>
-                )}
+                ) : null}
                 {mode === "manual" &&
                 environment !== "demo" &&
                 !draft &&
@@ -623,7 +628,7 @@ export function Composer({
                 ) : null}
               </div>
               <div className="row">
-                {draft ? (
+                {draft && mode !== "manual" ? (
                   <>
                     <IconButton
                       label="Dismiss draft"
@@ -659,24 +664,14 @@ export function Composer({
                 </Button>
               </div>
             </div>
-            <div className="composer-foot">
-              {!draft && noReplyReason ? (
-                <p className="muted">{noReplyReason}</p>
-              ) : null}
-              {!draft && conversation.labelState === "uncategorized" ? (
-                <p className="muted">
-                  No automatic draft: intent could not be determined.
-                </p>
-              ) : null}
-              <span>
-                {conversation.senderName} → {conversation.contact.name}
-              </span>
-              <span>
-                {environment === "demo"
-                  ? "Demo · no real message is sent"
-                  : "Send from this conversation’s LinkedIn account"}
-              </span>
-            </div>
+            {!draft && noReplyReason ? (
+              <p className="composer-context-note">{noReplyReason}</p>
+            ) : null}
+            {!draft && conversation.labelState === "uncategorized" ? (
+              <p className="composer-context-note">
+                No automatic draft: intent could not be determined.
+              </p>
+            ) : null}
           </>
         )}
         {error && (generating || redrafting || needsInput) ? (
