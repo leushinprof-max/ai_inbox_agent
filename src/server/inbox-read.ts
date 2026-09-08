@@ -434,7 +434,6 @@ export async function readWorkspace(
     aiConfigVersion: published.version,
     labelCatalogRevision: catalogVersion.data!.label_revision,
     platformOwner: owner.data ?? false,
-    agentDefaults: published.configuration.defaults,
     drafts: drafts.rows.map(draftDto),
     senders: (senders.data ?? []).map((s) => ({
       id: s.provider_id,
