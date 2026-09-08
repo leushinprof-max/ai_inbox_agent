@@ -11,6 +11,7 @@ import type { InboxGateway } from "@/domain/gateway";
 import { mutateInbox, type InboxMutation } from "@/server/inbox-actions";
 import { saveSenderAssignments } from "@/server/agent-actions";
 import { sendInbox } from "@/server/send-actions";
+import { refreshInboxConversation } from "@/server/refresh-actions";
 import { disconnectHeyReach } from "@/server/connection-actions";
 import type { SendRequest } from "@/domain/send";
 
@@ -27,6 +28,7 @@ export class LiveGateway implements InboxGateway {
   private loadedDetails = new Set<string>();
   private detailRequests = new Map<string, Promise<void>>();
   private detailFetchedAt = new Map<string, number>();
+  private providerRefreshes = new Map<string, Promise<void>>();
   private conversationPages = 1;
   private draftPages = 1;
   private draftSearch = { query: "", status: "ready", label: "all" };
@@ -43,6 +45,7 @@ export class LiveGateway implements InboxGateway {
     private readonly workspaceId: string,
     private readonly userId: string,
     private readonly mutationAction = mutateInbox,
+    private readonly refreshAction = refreshInboxConversation,
   ) {
     this.snapshot = state;
   }
@@ -536,6 +539,20 @@ export class LiveGateway implements InboxGateway {
     this.detailId = id;
     if (this.freshConversation(id)) return Promise.resolve();
     return this.loadConversation(id);
+  };
+  refreshConversation = (id: string): Promise<void> => {
+    const pending = this.providerRefreshes.get(id);
+    if (pending) return pending;
+    const request = (async () => {
+      const result = await this.refreshAction(this.workspaceId, id);
+      if (!result.ok) throw new Error(result.error);
+      // A prefetch started before provider sync must not count as its result.
+      await this.detailRequests.get(id)?.catch(() => {});
+      this.detailFetchedAt.delete(id);
+      await this.loadConversation(id);
+    })().finally(() => this.providerRefreshes.delete(id));
+    this.providerRefreshes.set(id, request);
+    return request;
   };
   private loadConversation(id: string): Promise<void> {
     const pending = this.detailRequests.get(id);

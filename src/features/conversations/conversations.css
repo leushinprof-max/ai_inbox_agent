@@ -384,6 +384,37 @@
   height: 100%;
   min-height: 80px;
 }
+.thread-refresh-control {
+  position: relative;
+  flex: 0 0 auto;
+}
+.thread-refresh.spinning .icon {
+  animation: message-send-spin 900ms linear infinite;
+}
+.thread-refresh-feedback {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px #0003;
+  z-index: 30;
+}
+.thread-refresh-feedback.error {
+  color: var(--red);
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-refresh.spinning .icon {
+    animation: none;
+  }
+}
 .thread-loading-spinner {
   width: 24px;
   height: 24px;

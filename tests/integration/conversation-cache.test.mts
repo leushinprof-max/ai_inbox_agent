@@ -207,3 +207,68 @@ test("Transient refresh failures preserve cached history; access denial invalida
     Date.now = clock;
   }
 });
+
+test("Manual refresh shares clicks, bypasses fresh cache, and waits out an older prefetch", async () => {
+  const { state, scope, conversation } = fixture();
+  const original = globalThis.fetch;
+  const oldRead = deferred();
+  let finish!: () => void;
+  const actionGate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let actions = 0,
+    reads = 0,
+    fail = false;
+  const gateway = new LiveGateway(
+    state,
+    scope.workspaceId,
+    scope.userId,
+    undefined,
+    async () => {
+      actions++;
+      if (fail) return { ok: false as const, error: "Provider unavailable" };
+      await actionGate;
+      return { ok: true as const };
+    },
+  );
+  const updated = structuredClone(conversation);
+  updated.revision++;
+  updated.messages.push({
+    ...updated.messages.at(-1)!,
+    id: "manual-refresh-message",
+    createdAt: "2030-01-01T12:00:00Z",
+    body: "Fresh provider snapshot",
+  });
+  globalThis.fetch = async () =>
+    ++reads === 1 ? oldRead.promise : response(updated);
+  try {
+    const prefetch = gateway.prefetchConversation(conversation.id);
+    const first = gateway.refreshConversation(conversation.id);
+    assert.equal(first, gateway.refreshConversation(conversation.id));
+    assert.equal(actions, 1);
+    finish();
+    await Promise.resolve();
+    assert.equal(reads, 1);
+    oldRead.resolve(response(conversation));
+    await Promise.all([prefetch, first]);
+    assert.equal(reads, 2);
+    assert.equal(
+      gateway
+        .getSnapshot()
+        .conversations.find((c) => c.id === conversation.id)!
+        .messages.at(-1)!.id,
+      "manual-refresh-message",
+    );
+    await gateway.refreshConversation(conversation.id);
+    assert.equal(reads, 3);
+    fail = true;
+    await assert.rejects(
+      gateway.refreshConversation(conversation.id),
+      /Provider unavailable/,
+    );
+    assert.equal(reads, 3);
+    assert.equal(gateway.hasConversationHistory(conversation.id), true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
