@@ -523,26 +523,62 @@ h3 {
 .draft-layout.details-closed {
   grid-template-columns: 278px minmax(340px, 1fr);
 }
-/* Drafts workspace frame experiment: keep isolated for a one-commit rollback. */
+/* Shared inset frame for inbox and agent workspaces. */
 @media (min-width: 681px) {
-  .shell:has(> .workspace-main > .draft-layout) > .sidebar {
+  .shell:has(
+      > .workspace-main
+        > :is(
+          .draft-layout,
+          .conversations-page,
+          .conversation-detail-layout,
+          .agents-page,
+          .agent-editor
+        )
+    )
+    > .sidebar {
     border-right-color: transparent;
   }
-  .workspace-main:has(> .draft-layout) {
+  .workspace-main:has(
+    > :is(
+      .draft-layout,
+      .conversations-page,
+      .conversation-detail-layout,
+      .agents-page,
+      .agent-editor
+    )
+  ) {
     padding: 24px 12px 12px;
     background: var(--side);
   }
-  .workspace-main > .draft-layout {
+  .workspace-main
+    > :is(
+      .draft-layout,
+      .conversations-page,
+      .conversation-detail-layout,
+      .agents-page,
+      .agent-editor
+    ) {
     position: relative;
     overflow: hidden;
     border: 1px solid var(--line-strong);
     border-radius: 14px;
     background: var(--bg);
   }
+  .workspace-main > .conversation-detail-layout > .context {
+    background: var(--bg);
+  }
 }
 @media (min-width: 681px) and (max-width: 1180px),
   (min-width: 681px) and (max-height: 800px) {
-  .workspace-main:has(> .draft-layout) {
+  .workspace-main:has(
+    > :is(
+      .draft-layout,
+      .conversations-page,
+      .conversation-detail-layout,
+      .agents-page,
+      .agent-editor
+    )
+  ) {
     padding: 16px 8px 8px;
   }
 }
