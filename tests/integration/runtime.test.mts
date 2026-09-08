@@ -201,6 +201,106 @@ before(async () => {
   );
 });
 
+test("Explicit reclassification evaluates afresh, updates the label and never generates a draft", async () => {
+  const target = must(
+    await owner.rpc("create_workspace", { p_name: `Reclassify ${run}` }),
+  );
+  const id = randomUUID(),
+    message = randomUUID();
+  sql(`insert into public.conversations(id,workspace_id,provider_conversation_id,sender_id,sender_name,contact_name,inbound_revision,classified_revision,label_state,label_source)
+    values('${id}','${target}','reclassify',42,'Team','Lead',1,1,'uncategorized','ai');
+    insert into public.messages(id,workspace_id,conversation_id,ingestion_key,body,direction,source,occurred_at)
+    values('${message}','${target}','${id}','reclassify','Yes, please send details.','inbound','provider',now());`);
+  const request = { p_workspace: target, p_conversation: id };
+  must(await owner.rpc("retry_classification", request));
+  must(await owner.rpc("retry_classification", request));
+  let calls = 0;
+  const classifier: InboxModel = {
+    async classify(input) {
+      calls++;
+      assert.equal(input.previous, undefined);
+      assert.equal(input.generateDraft, false);
+      return {
+        labelId: input.labels.find((l) => l.systemKey === "interested")!.id,
+        evidenceMessageId: message,
+        evidenceQuote: "Yes, please send details.",
+        draft: "",
+        missingKnowledge: "",
+        shouldReply: false,
+        noReplyReason: "",
+        contactStopped: false,
+      };
+    },
+  };
+  for (let i = 0; i < 20; i++) {
+    const pending = sql(
+      `select count(*) from app_private.jobs where workspace_id='${target}' and status in ('queued','running')`,
+    ).trim();
+    if (pending === "0") break;
+    await runNextJob({
+      db: admin,
+      model: classifier,
+      provider: () => provider,
+    });
+  }
+  assert.equal(calls, 1);
+  const result = must(
+    await admin
+      .from("conversations")
+      .select("label_state,label_id")
+      .eq("id", id)
+      .single(),
+  );
+  assert.equal(result.label_state, "classified");
+  assert.ok(result.label_id);
+  assert.equal(
+    must(await admin.from("drafts").select("id").eq("conversation_id", id))
+      .length,
+    0,
+  );
+  assert.equal(
+    sql(
+      `select count(*) from app_private.jobs where workspace_id='${target}' and status='done'`,
+    ).trim(),
+    "1",
+  );
+  must(await owner.rpc("retry_classification", request));
+  const queued = must(
+    await admin
+      .from("conversations")
+      .select("inbound_revision,label_assignment_revision")
+      .eq("id", id)
+      .single(),
+  );
+  must(
+    await owner.rpc("assign_conversation_label", {
+      ...request,
+      p_label: null!,
+      p_revision: queued.inbound_revision,
+      p_assignment: queued.label_assignment_revision,
+    }),
+  );
+  await runNextJob({ db: admin, model: classifier, provider: () => provider });
+  assert.equal(calls, 1, "A newer manual edit supersedes a queued rerun");
+  assert.equal(
+    must(
+      await admin
+        .from("conversations")
+        .select("label_state")
+        .eq("id", id)
+        .single(),
+    ).label_state,
+    "manual_clear",
+  );
+  assert.equal(
+    sql(
+      `select count(*) from app_private.jobs where workspace_id='${target}' and status='done'`,
+    ).trim(),
+    "2",
+    "Skipped jobs still finish",
+  );
+});
+
 test("Provider credentials are encrypted, tenant-bound, and inaccessible through browser RPCs", async () => {
   const stored = must(
     await admin.rpc("server_credentials", { p_workspace: workspace }),

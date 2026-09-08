@@ -942,6 +942,12 @@
   position: relative;
   justify-items: end;
 }
+.reference-context .label-reclassify {
+  min-height: 28px;
+  padding: 3px 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .label-menu {
   position: absolute;
   z-index: 40;
