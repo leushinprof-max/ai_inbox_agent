@@ -1,0 +1,171 @@
+.section-loading .skeleton {
+  margin: 8px 0;
+}
+.section-loading .skeleton-avatar {
+  flex-shrink: 0;
+}
+.section-loading .thread-header > .avatar {
+  width: 42px;
+  height: 42px;
+}
+.section-loading .thread-header > .grow {
+  max-width: 260px;
+}
+.loading-control {
+  height: 40px;
+  border-radius: 8px;
+  background: var(--raised);
+  flex-shrink: 0;
+}
+.loading-filter {
+  width: 88px;
+}
+.conversations-toolbar > .loading-control {
+  height: 36px;
+}
+.conversation-tabs > .loading-tabs {
+  min-height: 28px;
+}
+.loading-conversation-row .skeleton {
+  margin: 0;
+}
+.section-loading .agent-editor-header > .avatar {
+  width: 36px;
+  height: 36px;
+}
+.section-loading .agent-editor-header .skeleton {
+  height: 10px;
+  margin: 4px 0;
+}
+.section-loading .agent-editor-header > .loading-control {
+  height: 34px;
+}
+.loading-search {
+  width: 260px;
+}
+.loading-tabs,
+.loading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.loading-tabs {
+  min-height: 32px;
+  flex-wrap: wrap;
+}
+.loading-tabs > span {
+  width: 76px;
+  height: 24px;
+  border-radius: 5px;
+  background: var(--raised);
+}
+.loading-actions {
+  margin-left: auto;
+}
+.loading-actions > span {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--raised);
+}
+.loading-lead {
+  display: flex;
+  gap: 12px;
+  padding: 14px 11px;
+}
+.loading-lead > .avatar {
+  width: 40px;
+  height: 40px;
+}
+.loading-conversation-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line-soft);
+  min-height: 48px;
+}
+.loading-conversation-row > .avatar {
+  width: 24px;
+  height: 24px;
+}
+.loading-name {
+  width: 160px;
+}
+.loading-date {
+  width: 48px;
+}
+.loading-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.loading-message {
+  width: 72%;
+}
+.loading-message.outgoing {
+  align-self: flex-end;
+}
+.loading-bubble {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.loading-composer {
+  margin: 0 24px 16px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+}
+.loading-composer .skeleton {
+  background: var(--hover);
+}
+.loading-composer .loading-actions {
+  justify-content: flex-end;
+}
+.loading-context-body {
+  padding: 8px 16px;
+}
+.loading-note {
+  height: 110px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.loading-form {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 36px;
+}
+.section-loading .agent-editor-header > .grow {
+  max-width: 320px;
+}
+.section-loading .agent-editor-header > .loading-control {
+  margin-left: auto;
+}
+@media (max-width: 680px) {
+  .loading-search {
+    width: 100%;
+  }
+  .loading-name {
+    width: 90px;
+  }
+  .loading-date {
+    display: none;
+  }
+  .loading-conversation-row {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .loading-actions > span {
+    width: 24px;
+    height: 28px;
+  }
+  .loading-composer {
+    margin: 0 12px 12px;
+  }
+  .section-loading.conversation-detail-layout > .thread {
+    display: flex;
+  }
+}
