@@ -308,6 +308,7 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_photo_url: string | null;
+          contact_profile_url: string | null;
           contact_position: string;
           contact_stopped: boolean;
           created_at: string;
@@ -344,6 +345,7 @@ export type Database = {
           contact_company?: string;
           contact_name: string;
           contact_photo_url?: string | null;
+          contact_profile_url?: string | null;
           contact_position?: string;
           contact_stopped?: boolean;
           created_at?: string;
@@ -380,6 +382,7 @@ export type Database = {
           contact_company?: string;
           contact_name?: string;
           contact_photo_url?: string | null;
+          contact_profile_url?: string | null;
           contact_position?: string;
           contact_stopped?: boolean;
           created_at?: string;
@@ -952,6 +955,7 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_photo_url: string | null;
+          contact_profile_url: string | null;
           contact_position: string;
           contact_stopped: boolean;
           created_at: string;
@@ -1005,6 +1009,7 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_photo_url: string | null;
+          contact_profile_url: string | null;
           contact_position: string;
           contact_stopped: boolean;
           created_at: string;

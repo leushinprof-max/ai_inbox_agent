@@ -385,7 +385,20 @@ export function ContactContext({
         />
         <div className="grow">
           <h2>{conversation.contact.name}</h2>
-          <p>LinkedIn contact</p>
+          <p>
+            {conversation.contact.profileUrl ? (
+              <a
+                className="contact-profile-link"
+                href={conversation.contact.profileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                LinkedIn profile
+              </a>
+            ) : (
+              "LinkedIn profile unavailable"
+            )}
+          </p>
         </div>
         {overlay && (
           <IconButton label="Close details" icon="close" onClick={onClose} />

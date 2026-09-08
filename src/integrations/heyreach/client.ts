@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { contactPhotoUrl } from "../../lib/contact-photo";
+import { linkedinProfileUrl } from "../../lib/linkedin-profile";
 
 const base = "https://api.heyreach.io/api/public";
 const id = z.string().min(1).max(4096);
@@ -9,6 +10,7 @@ const date = z
   .string()
   .refine((v) => Number.isFinite(Date.parse(v)), "Invalid provider timestamp");
 const profile = z.object({
+  profileUrl: z.unknown().optional(),
   imageUrl: z.unknown().optional(),
   firstName: z.string().nullish(),
   lastName: z.string().nullish(),
@@ -51,6 +53,7 @@ export interface ProviderConversation {
   senderName: string;
   senderPhotoUrl?: string | null;
   contactName: string;
+  profileUrl?: string | null;
   photoUrl?: string | null;
   company: string;
   position: string;
@@ -134,6 +137,7 @@ export function normalizeConversation(
     senderName:
       name(c.linkedInAccount) || `LinkedIn sender ${c.linkedInAccountId}`,
     contactName: name(c.correspondentProfile) || "LinkedIn contact",
+    profileUrl: linkedinProfileUrl(c.correspondentProfile?.profileUrl),
     photoUrl: contactPhotoUrl(c.correspondentProfile?.imageUrl),
     company: c.correspondentProfile?.companyName ?? "",
     position: c.correspondentProfile?.position ?? "",

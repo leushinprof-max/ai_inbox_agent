@@ -36,6 +36,7 @@ export interface Agent {
   version: number;
 }
 export interface Contact {
+  profileUrl?: string | null;
   name: string;
   photoUrl?: string | null;
   initials: string;

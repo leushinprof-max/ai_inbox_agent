@@ -1,4 +1,5 @@
 import "server-only";
+import { linkedinProfileUrl } from "@/lib/linkedin-profile";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database, Tables } from "@/lib/supabase/database.types";
@@ -52,6 +53,7 @@ export function conversationDto(
     contact: {
       name: c.contact_name,
       photoUrl: c.contact_photo_url,
+      profileUrl: linkedinProfileUrl(c.contact_profile_url),
       initials: c.contact_name
         .split(/\s+/)
         .filter(Boolean)
