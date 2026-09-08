@@ -42,6 +42,7 @@ export async function GET(
           q.get("q") ?? "",
           q.get("label") ?? "all",
           before,
+          z.enum(["all", "unread", "read"]).parse(q.get("read") ?? "all"),
         );
         return NextResponse.json(
           {

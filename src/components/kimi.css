@@ -1,0 +1,19 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+.conversations-page,
+.kimi-thread,
+.kimi-context,
+.agents-page,
+.agent-editor {
+  --accent: #7c6cf8;
+  --accent-text: #b4a9ff;
+  --line: rgba(255, 255, 255, 0.08);
+  --muted: #96969d;
+  --faint: #808087;
+  --soft: rgba(124, 108, 248, 0.14);
+  --raised: #191a1d;
+  font-family: Inter, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+}

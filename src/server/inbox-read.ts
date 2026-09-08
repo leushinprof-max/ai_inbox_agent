@@ -82,6 +82,8 @@ export function conversationDto(
     notes: c.notes,
     notesRevision: c.notes_revision,
     archived: c.archived,
+    unread: c.unread,
+    readStateRevision: c.read_state_revision,
     messages: messages
       .filter((m) => m.conversation_id === c.id)
       .sort(
@@ -148,8 +150,10 @@ export async function conversationPage(
   query = "",
   label = "all",
   before?: PageCursor,
+  read: "all" | "unread" | "read" = "all",
 ) {
-  const { data, error } = await db.rpc("conversation_page", {
+  const { data, error } = await db.rpc("conversation_page_v2", {
+    p_read: read,
     p_workspace: workspaceId,
     p_query: query.slice(0, 200),
     ...(label !== "all" ? { p_label: label } : {}),
@@ -248,6 +252,7 @@ export async function readWorkspace(
     generations,
     activity,
     counts,
+    conversationCounts,
   ] = await Promise.all([
     db
       .from("workspaces")
@@ -305,6 +310,7 @@ export async function readWorkspace(
       .limit(100),
     db.rpc("agent_activity", { p_workspace: workspaceId }),
     draftCounts(db, workspaceId),
+    db.rpc("conversation_counts", { p_workspace: workspaceId }),
   ]);
   [
     workspaces,
@@ -318,6 +324,7 @@ export async function readWorkspace(
     unresolved,
     generations,
     activity,
+    conversationCounts,
   ].forEach((r) => databaseError(r.error));
   const published = await publishedAI();
   const catalogVersion = await db
@@ -406,6 +413,7 @@ export async function readWorkspace(
       error: r.error_code,
       startedAt: r.created_at,
     })),
+    conversationCounts: conversationCounts.data as Record<string, number>,
     agentActivity: Object.fromEntries(
       (activity.data ?? []).map((a) => [a.agent_id, a.sent]),
     ),

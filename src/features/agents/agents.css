@@ -1,3 +1,5 @@
+@import "../../components/kimi.css";
+
 .agents-sr-only {
   position: absolute;
   width: 1px;
@@ -22,7 +24,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 24px 40px;
+  padding: 20px 32px;
   flex-wrap: wrap;
 }
 .agents-toolbar .search {
@@ -76,7 +78,7 @@
 .agents-list-scroll {
   flex: 1;
   overflow: auto;
-  padding: 16px 40px 40px;
+  padding: 12px 32px 32px;
 }
 .agents-grid {
   display: grid;
@@ -86,9 +88,9 @@
 .agents-card {
   border: 1px solid var(--line);
   background: var(--panel);
-  padding: 18px;
-  border-radius: 14px;
-  min-height: 170px;
+  padding: 16px;
+  border-radius: 12px;
+  min-height: 152px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -168,7 +170,7 @@
 }
 .agent-metric {
   display: block;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.6px;
   line-height: 1.2;
@@ -258,8 +260,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 68px;
-  padding: 12px 28px;
+  min-height: 56px;
+  padding: 10px 24px;
   border-bottom: 1px solid var(--line);
 }
 .agent-editor-header .agent-mark {
@@ -301,7 +303,7 @@
   padding: 36px 28px 48px;
 }
 .agent-editor .editor-content {
-  max-width: 720px;
+  max-width: 680px;
   width: 100%;
 }
 .agent-editor .editor-content > .page-description {
@@ -601,4 +603,160 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* Kimi surfaces: one native link covers the card, controls sit above it. */
+.agents-card {
+  position: relative;
+  isolation: isolate;
+  transition:
+    transform 200ms ease,
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+.agents-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    320px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(124, 108, 248, 0.07),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+  z-index: -1;
+}
+.agents-card:hover {
+  background: #191a1d;
+  border-color: #ffffff24;
+  transform: translateY(-2px);
+}
+.agents-card:hover::before {
+  opacity: 1;
+}
+.agents-card .agent-card-heading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.agents-card .agent-toggle,
+.agents-card .agent-finish {
+  position: relative;
+  z-index: 2;
+}
+.agents-card:has(.agent-card-heading:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.agents-card .agent-card-heading:focus-visible {
+  outline: none;
+}
+.agents-card .agent-card-heading {
+  gap: 12px;
+}
+.agents-card .agent-card-heading strong {
+  font-size: 14px;
+}
+.agents-card .agent-card-heading p {
+  font-size: 12px;
+  margin-top: 3px;
+}
+.agents-card .agent-mark {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.agent-metric-caption {
+  font-size: 11.5px;
+}
+.agents-toolbar .search {
+  height: 34px;
+}
+.agents-toolbar .btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 9px;
+}
+.agents-toolbar .search input,
+.agents-segments button {
+  font-size: 12px;
+}
+.agents-segments {
+  border-radius: 10px;
+  background: #191a1d;
+}
+.agents-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  padding: 10px 16px;
+}
+.agents-table td {
+  padding: 12px 16px;
+  font-size: 13px;
+}
+.agent-editor-identity strong {
+  font-size: 14px;
+}
+.agent-editor .editor-tabs {
+  padding: 12px 20px;
+}
+.agent-steps button {
+  padding: 8px 14px;
+}
+.agent-editor .field {
+  margin-bottom: 26px;
+}
+.agent-editor .field input:not([type="checkbox"]),
+.agent-editor .field textarea {
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 9px;
+}
+.agent-editor .field label {
+  font-size: 12px;
+}
+.agent-editor .page-description {
+  font-size: 13px;
+  color: var(--muted);
+}
+.agent-editor .agent-objectives button {
+  font-size: 13px;
+  padding: 13px;
+  border-radius: 9px;
+}
+.agent-editor .agent-steps {
+  background: #111113;
+}
+@media (hover: none) {
+  .agents-card:hover {
+    transform: none;
+  }
+  .agent-toggle {
+    position: relative;
+  }
+  .agent-toggle::before {
+    content: "";
+    position: absolute;
+    inset: -12px -8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agents-card,
+  .agents-card::before {
+    transition: none;
+  }
+  .agents-card:hover {
+    transform: none;
+  }
+  .agents-card::before {
+    display: none;
+  }
 }

@@ -42,7 +42,9 @@ export function DraftsScreen() {
       clearTimeout(timer);
     };
   }, [repository, query, queue, label]);
-  const [details, setDetails] = useContactDetails(preferences.details);
+  const [details, setDetails, wideDetails] = useContactDetails(
+    preferences.details,
+  );
   const [mobileThread, setMobileThread] = useState(false);
   const drafts = state.drafts.filter(
     (d) =>
@@ -253,6 +255,9 @@ export function DraftsScreen() {
           </aside>
           {conversation && selected ? (
             <ConversationThread
+              active={!details || wideDetails}
+              key={`thread-${conversation.id}`}
+              backLabel="Back to queue"
               mobileOpen={mobileThread}
               conversation={conversation}
               onBack={() => setMobileThread(false)}
@@ -327,6 +332,7 @@ export function DraftsScreen() {
           )}
           {details && conversation ? (
             <ContactContext
+              overlay={!wideDetails}
               key={conversation.id}
               conversation={conversation}
               onClose={() => setDetails(false)}

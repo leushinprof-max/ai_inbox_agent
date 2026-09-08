@@ -4,7 +4,17 @@ import type { SendOutcome, SendRequest } from "./send";
 /** UI-facing application boundary. Implementations own persistence and transport. */
 export interface InboxGateway {
   refresh?(): Promise<void>;
-  searchConversations?(query: string, label: string): Promise<void>;
+  searchConversations?(
+    query: string,
+    label: string,
+    read?: "all" | "unread" | "read",
+  ): Promise<void>;
+  setConversationRead(
+    scope: Scope,
+    id: string,
+    revision: number,
+    unread: boolean,
+  ): Promise<void>;
   moreConversations?(): Promise<void>;
   searchDrafts?(query: string, status: string, label?: string): Promise<void>;
   moreDrafts?(): Promise<void>;

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { trackCursorGlow } from "@/components/cursor-glow";
 import { useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import { Empty, Icon, Notice } from "@/components/ui";
@@ -152,7 +153,11 @@ export function AgentsScreen() {
           view === "grid" ? (
             <div className="agents-grid">
               {agents.map((agent) => (
-                <article className="agents-card" key={agent.id}>
+                <article
+                  className="agents-card"
+                  key={agent.id}
+                  onPointerMove={trackCursorGlow}
+                >
                   <Link
                     className="agent-card-heading"
                     href={`${basePath}/agents/${agent.id}`}

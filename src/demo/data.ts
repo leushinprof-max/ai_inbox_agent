@@ -134,6 +134,8 @@ export function createDemoState(): InboxState {
       ([id, name, company, position, color, label, incoming]) => ({
         id,
         workspaceId: "aster",
+        unread: ["elena", "marcus"].includes(id),
+        readStateRevision: 0,
         providerConversationId: `demo-${id}`,
         senderId: 1,
         senderName: "John Richardson",
