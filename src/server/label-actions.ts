@@ -41,35 +41,6 @@ export async function saveLabel(workspaceId: string, value: unknown) {
     };
   }
 }
-export async function assignLabel(
-  workspaceId: string,
-  conversationId: string,
-  labelId: string | null,
-  revision: number,
-  assignment: number,
-) {
-  try {
-    const { db, user } = await authenticatedClient();
-    await authorizeWorkspace(db, user.id, workspaceId);
-    databaseError(
-      (
-        await db.rpc("assign_conversation_label", {
-          p_workspace: workspaceId,
-          p_conversation: z.uuid().parse(conversationId),
-          p_label: labelId === null ? null! : z.uuid().parse(labelId),
-          p_revision: z.number().int().parse(revision),
-          p_assignment: z.number().int().parse(assignment),
-        })
-      ).error,
-    );
-    return { ok: true as const };
-  } catch (e) {
-    return {
-      ok: false as const,
-      error: e instanceof Error ? e.message : "Could not change label.",
-    };
-  }
-}
 export async function retryClassification(
   workspaceId: string,
   conversationId: string,
@@ -129,13 +100,11 @@ export async function testLabel(
         ...ai,
         agent: null,
         generateDraft: false,
-        messages: text
-          .split(/\n(?=(?:Lead|Team):)/)
-          .map((body, i) => ({
-            id: `sample-${i}`,
-            direction: body.startsWith("Team:") ? "outbound" : "inbound",
-            body: body.replace(/^(?:Lead|Team):\s*/, ""),
-          })),
+        messages: text.split(/\n(?=(?:Lead|Team):)/).map((body, i) => ({
+          id: `sample-${i}`,
+          direction: body.startsWith("Team:") ? "outbound" : "inbound",
+          body: body.replace(/^(?:Lead|Team):\s*/, ""),
+        })),
       },
       {
         workspaceId,

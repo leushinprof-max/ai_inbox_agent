@@ -3,7 +3,7 @@
 import "./conversations.css";
 import { ReadStateControl } from "./read-state-control";
 import { RefreshConversationControl } from "./refresh-control";
-import { LabelPicker } from "./label-picker";
+import { ConversationClassification } from "./conversation-classification";
 import {
   useEffect,
   useLayoutEffect,
@@ -434,7 +434,7 @@ export function ContactContext({
         <p className="eyebrow">Automation</p>
         <div className="details-row">
           <p className="context-field-label">Label</p>
-          <LabelPicker conversation={conversation} />
+          <ConversationClassification conversation={conversation} />
         </div>
         <div className="details-row">
           <p className="context-field-label">AI Agent</p>
