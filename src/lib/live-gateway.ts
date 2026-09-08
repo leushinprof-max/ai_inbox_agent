@@ -30,12 +30,21 @@ export class LiveGateway implements InboxGateway {
   private draftSearch = { query: "", status: "ready", label: "all" };
   private draftSearchVersion = 0;
   private refreshPromise: Promise<void> | null = null;
+  private pendingReads = new Map<
+    string,
+    { revision: number; unread: boolean }
+  >();
+  private readGeneration = 0;
+  private snapshot: InboxState;
   constructor(
     private state: InboxState,
     private readonly workspaceId: string,
     private readonly userId: string,
-  ) {}
-  getSnapshot = () => this.state;
+    private readonly mutationAction = mutateInbox,
+  ) {
+    this.snapshot = state;
+  }
+  getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {
@@ -44,7 +53,49 @@ export class LiveGateway implements InboxGateway {
   };
   private publish(state: InboxState) {
     this.state = state;
+    let delta = 0;
+    const conversations = state.conversations.map((c) => {
+      const pending = this.pendingReads.get(c.id);
+      if (!pending) return c;
+      // Speculative marks never acquire a server revision or hide newer input.
+      const unread =
+        c.readStateRevision <= pending.revision ? pending.unread : c.unread;
+      delta += Number(unread) - Number(c.unread);
+      return { ...c, unread, readStatePending: true };
+    });
+    this.snapshot = {
+      ...state,
+      conversations,
+      conversationCounts: state.conversationCounts
+        ? {
+            ...state.conversationCounts,
+            unread: Math.max(0, state.conversationCounts.unread + delta),
+          }
+        : undefined,
+    };
     this.listeners.forEach((l) => l());
+  }
+  private confirmRead(id: string, unread: boolean, readStateRevision: number) {
+    const old = this.state.conversations.find((c) => c.id === id);
+    if (!old || old.readStateRevision >= readStateRevision) return;
+    this.readGeneration++;
+    this.publish({
+      ...this.state,
+      conversations: this.state.conversations.map((c) =>
+        c.id === id ? { ...c, unread, readStateRevision } : c,
+      ),
+      conversationCounts: this.state.conversationCounts
+        ? {
+            ...this.state.conversationCounts,
+            unread: Math.max(
+              0,
+              this.state.conversationCounts.unread +
+                Number(unread) -
+                Number(old.unread),
+            ),
+          }
+        : undefined,
+    });
   }
   private check(scope: Scope) {
     if (scope.workspaceId !== this.workspaceId || scope.userId !== this.userId)
@@ -90,9 +141,14 @@ export class LiveGateway implements InboxGateway {
   refresh = async () => {
     if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = (async () => {
+      const generation = this.readGeneration;
       const next = await this.read<InboxState>();
       this.publish({
         ...next,
+        conversationCounts:
+          generation !== this.readGeneration
+            ? this.state.conversationCounts
+            : next.conversationCounts,
         drafts: this.state.drafts,
         conversations: this.mergeConversations(next.conversations),
         paging: {
@@ -116,7 +172,7 @@ export class LiveGateway implements InboxGateway {
   };
   private async mutate(scope: Scope, input: InboxMutation) {
     this.check(scope);
-    const result = await mutateInbox(input);
+    const result = await this.mutationAction(input);
     if (!result.ok)
       throw new InboxError(
         result.code === "conflict"
@@ -164,18 +220,47 @@ export class LiveGateway implements InboxGateway {
     revision: number,
     unread: boolean,
   ) => {
+    this.check(scope);
+    if (this.pendingReads.has(id)) return;
+    this.pendingReads.set(id, { revision, unread });
+    this.publish(this.state);
     try {
-      await this.mutate(scope, {
+      const result = await this.mutationAction({
         kind: "read",
         workspaceId: this.workspaceId,
         id,
         revision,
         unread,
       });
+      if (!result.ok)
+        throw new InboxError(
+          result.code === "conflict"
+            ? "conflict"
+            : result.code === "forbidden"
+              ? "forbidden"
+              : "invalid",
+          result.error,
+        );
+      // The CAS RPC increments exactly once. Older fetches cannot undo this ack.
+      this.confirmRead(id, unread, revision + 1);
     } catch (error) {
-      await this.refresh().catch(() => {});
+      // Reconcile only this mark, including a write whose response was lost.
+      await this.read<{ unread: boolean; readStateRevision: number }>({
+        view: "read-state",
+        id,
+      })
+        .then((mark) =>
+          this.confirmRead(id, mark.unread, mark.readStateRevision),
+        )
+        .catch(() => {});
       throw error;
+    } finally {
+      this.pendingReads.delete(id);
+      this.publish(this.state);
     }
+    // Only a read-filtered list needs refilling; never block the control on it.
+    if (this.search.read !== "all")
+      void this.reloadConversationPages(this.conversationPages).catch(() => {});
   };
   note = (scope: Scope, id: string, notes: string, revision?: number) =>
     this.mutate(scope, {

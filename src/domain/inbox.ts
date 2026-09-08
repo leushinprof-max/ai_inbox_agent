@@ -81,6 +81,8 @@ export interface Conversation {
   archived: boolean;
   unread: boolean;
   readStateRevision: number;
+  /** Client-only optimistic save indicator; never used as a server revision. */
+  readStatePending?: boolean;
   loadedRevision?: number;
 }
 export interface Draft {

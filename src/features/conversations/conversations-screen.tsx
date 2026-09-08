@@ -123,6 +123,12 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
     ? state.paging.conversationIds
         .map((id) => conversations.find((c) => c.id === id))
         .filter((c) => !!c)
+        .filter(
+          (c) =>
+            c.readStatePending ||
+            read === "all" ||
+            c.unread === (read === "unread"),
+        )
     : conversations.filter(
         (c) =>
           `${c.contact.name} ${c.contact.company} ${c.messages.at(-1)?.body ?? ""}`

@@ -35,7 +35,7 @@ export function ReadStateControl({
     conversation;
   const update = useCallback(
     async (next: boolean) => {
-      if (inFlight.current) return;
+      if (inFlight.current || conversation.readStatePending) return;
       inFlight.current = true;
       requested.current = next;
       setBusy(true);
@@ -60,7 +60,14 @@ export function ReadStateControl({
         if (button.current?.isConnected) setBusy(false);
       }
     },
-    [repository, workspaceId, userId, id, readStateRevision],
+    [
+      repository,
+      workspaceId,
+      userId,
+      id,
+      readStateRevision,
+      conversation.readStatePending,
+    ],
   );
   useEffect(() => {
     if (
@@ -69,6 +76,7 @@ export function ReadStateControl({
       !loaded ||
       manualUnread ||
       busy ||
+      conversation.readStatePending ||
       error ||
       (mode !== "demo" && loadedRevision !== revision)
     )
@@ -112,6 +120,7 @@ export function ReadStateControl({
     unread,
     manualUnread,
     busy,
+    conversation.readStatePending,
     error,
     mode,
     loadedRevision,
@@ -126,7 +135,8 @@ export function ReadStateControl({
         ref={button}
         type="button"
         className="read-button"
-        disabled={busy}
+        aria-disabled={busy || conversation.readStatePending}
+        aria-busy={busy || conversation.readStatePending}
         aria-label={
           error
             ? "Retry updating read status"
@@ -135,7 +145,9 @@ export function ReadStateControl({
               : "Mark as unread"
         }
         title={
-          error ||
+          (busy || conversation.readStatePending
+            ? "Saving read status…"
+            : error) ||
           (unread ? "Mark as read for the team" : "Mark as unread for the team")
         }
         onClick={(e) => {
