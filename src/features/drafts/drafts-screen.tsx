@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { relativeReplyTime } from "@/lib/relative-reply-time";
 import { useInbox } from "@/lib/inbox-context";
-import { Avatar, Button, Empty, Icon, Topbar, Notice } from "@/components/ui";
+import { Avatar, Button, Empty, Icon, Notice } from "@/components/ui";
 import {
   ConversationThread,
   ContactContext,
@@ -97,15 +97,8 @@ export function DraftsScreen() {
   const conversation = selected
     ? state.conversations.find((c) => c.id === selected.conversationId)!
     : null;
-  const toReview = state.paging
-    ? (state.paging.draftCounts.ready ?? 0) +
-      (state.paging.draftCounts.needs_input ?? 0)
-    : drafts.filter((d) => d.status !== "snoozed").length;
   return (
     <>
-      <Topbar title="Drafts">
-        <span className="small muted">{toReview} to review</span>
-      </Topbar>
       {error ? <Notice variant="error">{error}</Notice> : null}
       {!(state.paging
         ? Object.values(state.paging.draftCounts).reduce((a, b) => a + b, 0)
