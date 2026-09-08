@@ -378,6 +378,25 @@
 .kimi-thread .thread-scroll {
   padding: 24px;
 }
+.thread-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 80px;
+}
+.thread-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: message-send-spin 800ms linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-loading-spinner {
+    animation: none;
+  }
+}
 .kimi-thread .thread-content,
 .kimi-thread .composer {
   width: 100%;

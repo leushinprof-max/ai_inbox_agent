@@ -3,7 +3,13 @@
 import "./conversations.css";
 import { ReadStateControl } from "./read-state-control";
 import { LabelPicker } from "./label-picker";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useInbox } from "@/lib/inbox-context";
 import {
@@ -33,25 +39,28 @@ export function ConversationThread({
 }) {
   const { repository, state, workspace } = useInbox();
   const [loadError, setLoadError] = useState("");
-  const [loading, setLoading] = useState(!!repository.openConversation);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
+    repository.openConversation ? "loading" : "ready",
+  );
+  const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
     if (!repository.openConversation) return;
     let active = true;
     void repository
       .openConversation(conversation.id)
       .then(() => {
-        if (active) setLoading(false);
+        if (active) setLoadState("ready");
       })
       .catch(() => {
         if (active) {
-          setLoading(false);
+          setLoadState("error");
           setLoadError("Messages could not be loaded.");
         }
       });
     return () => {
       active = false;
     };
-  }, [conversation.id, repository]);
+  }, [conversation.id, repository, loadAttempt]);
   const outgoing = useOutgoing(repository);
   useEffect(() => {
     for (const item of outgoing) {
@@ -84,9 +93,13 @@ export function ConversationThread({
   ];
   const scroll = useRef<HTMLDivElement>(null);
   const latestMessageId = messages.at(-1)?.id;
-  useEffect(() => {
-    if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [conversation.id, latestMessageId, mobileOpen]);
+  // The list preview can already have the same last ID as the loaded history.
+  // Position the completed thread before paint, including after a successful retry.
+  useLayoutEffect(() => {
+    if (loadState === "ready" && active && scroll.current) {
+      scroll.current.scrollTop = scroll.current.scrollHeight;
+    }
+  }, [conversation.id, latestMessageId, mobileOpen, active, loadState]);
   return (
     <section className="thread kimi-thread">
       <header className="thread-header">
@@ -113,7 +126,7 @@ export function ConversationThread({
           key={`${conversation.id}-${mobileOpen}`}
           conversation={conversation}
           autoRead
-          loaded={active && !loading && !loadError}
+          loaded={active && loadState === "ready" && !loadError}
           visibilityKey={mobileOpen}
         />
         <IconButton
@@ -127,108 +140,129 @@ export function ConversationThread({
         className="thread-scroll"
         role="log"
         aria-label="Conversation messages"
+        aria-busy={loadState === "loading"}
       >
-        <div className="thread-content">
-          {loadError ? (
-            <Notice variant="error">
-              {loadError}
-              <Button
-                onClick={() =>
-                  void repository
-                    .openConversation?.(conversation.id)
-                    .then(() => setLoadError(""))
-                    .catch(() =>
-                      setLoadError("Messages are still unavailable."),
-                    )
-                }
-              >
-                Retry
-              </Button>
-            </Notice>
-          ) : null}
-          {loading ? <p role="status">Loading conversation…</p> : null}
-          {state.paging?.messageNext[conversation.id] ? (
-            <Button
-              variant="ghost"
-              onClick={() =>
-                void repository
-                  .olderMessages?.(conversation.id)
-                  .catch(() =>
-                    setLoadError("Older messages could not be loaded."),
-                  )
-              }
-            >
-              Load earlier messages
-            </Button>
-          ) : null}
-          {messages.map((message, index) => (
-            <div key={message.id}>
-              {index === 0 ||
-              message.createdAt.slice(0, 10) !==
-                messages[index - 1].createdAt.slice(0, 10) ? (
-                <div className="date-divider">
-                  {new Date(message.createdAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    timeZone: workspace.timezone,
-                  })}
-                </div>
-              ) : null}
-              <div
-                className={`message ${message.direction === "outbound" ? "outbound" : ""}`}
-              >
-                <div className="message-meta">
-                  {message.direction !== messages[index + 1]?.direction ? (
-                    <Avatar
-                      photoUrl={
-                        message.direction === "inbound"
-                          ? conversation.contact.photoUrl
-                          : conversation.senderPhotoUrl
-                      }
-                      initials={
-                        message.direction === "outbound"
-                          ? conversation.senderName
-                              .split(/\s+/)
-                              .slice(0, 2)
-                              .map((p) => p[0])
-                              .join("")
-                          : conversation.contact.initials
-                      }
-                      color={
-                        message.direction === "outbound"
-                          ? "purple"
-                          : conversation.contact.color
-                      }
-                    />
-                  ) : null}
-                  <span>
-                    {message.direction === "outbound"
-                      ? conversation.senderName
-                      : conversation.contact.name}
-                  </span>
-                  <time dateTime={message.createdAt}>
-                    {new Date(message.createdAt).toLocaleTimeString("en-GB", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      timeZone: workspace.timezone,
-                    })}
-                  </time>
-                </div>
-                <div className="bubble">{message.body}</div>
-                {message.deliveryStatus === "sending" ? (
-                  <div className="message-delivery" role="status">
-                    <span className="message-spinner" aria-hidden="true" />{" "}
-                    Sending…
-                  </div>
-                ) : message.deliveryStatus === "unknown" ? (
-                  <div className="message-delivery" role="status">
-                    Send status unavailable
-                  </div>
+        {loadState === "loading" ? (
+          <div
+            className="thread-loading"
+            role="status"
+            aria-label="Loading conversation"
+          >
+            <span className="thread-loading-spinner" aria-hidden="true" />
+          </div>
+        ) : (
+          <div className="thread-content">
+            {loadError ? (
+              <Notice variant="error">
+                {loadError}
+                <Button
+                  onClick={() => {
+                    setLoadError("");
+                    setLoadState("loading");
+                    setLoadAttempt((attempt) => attempt + 1);
+                  }}
+                >
+                  Retry
+                </Button>
+              </Notice>
+            ) : null}
+            {loadState === "ready" ? (
+              <>
+                {state.paging?.messageNext[conversation.id] ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      void repository
+                        .olderMessages?.(conversation.id)
+                        .catch(() =>
+                          setLoadError("Older messages could not be loaded."),
+                        )
+                    }
+                  >
+                    Load earlier messages
+                  </Button>
                 ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
+                {messages.map((message, index) => (
+                  <div key={message.id}>
+                    {index === 0 ||
+                    message.createdAt.slice(0, 10) !==
+                      messages[index - 1].createdAt.slice(0, 10) ? (
+                      <div className="date-divider">
+                        {new Date(message.createdAt).toLocaleDateString(
+                          "en-GB",
+                          {
+                            day: "numeric",
+                            month: "long",
+                            timeZone: workspace.timezone,
+                          },
+                        )}
+                      </div>
+                    ) : null}
+                    <div
+                      className={`message ${message.direction === "outbound" ? "outbound" : ""}`}
+                    >
+                      <div className="message-meta">
+                        {message.direction !==
+                        messages[index + 1]?.direction ? (
+                          <Avatar
+                            photoUrl={
+                              message.direction === "inbound"
+                                ? conversation.contact.photoUrl
+                                : conversation.senderPhotoUrl
+                            }
+                            initials={
+                              message.direction === "outbound"
+                                ? conversation.senderName
+                                    .split(/\s+/)
+                                    .slice(0, 2)
+                                    .map((p) => p[0])
+                                    .join("")
+                                : conversation.contact.initials
+                            }
+                            color={
+                              message.direction === "outbound"
+                                ? "purple"
+                                : conversation.contact.color
+                            }
+                          />
+                        ) : null}
+                        <span>
+                          {message.direction === "outbound"
+                            ? conversation.senderName
+                            : conversation.contact.name}
+                        </span>
+                        <time dateTime={message.createdAt}>
+                          {new Date(message.createdAt).toLocaleTimeString(
+                            "en-GB",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone: workspace.timezone,
+                            },
+                          )}
+                        </time>
+                      </div>
+                      <div className="bubble">{message.body}</div>
+                      {message.deliveryStatus === "sending" ? (
+                        <div className="message-delivery" role="status">
+                          <span
+                            className="message-spinner"
+                            aria-hidden="true"
+                          />{" "}
+                          Sending…
+                        </div>
+                      ) : message.deliveryStatus === "unknown" ? (
+                        <div className="message-delivery" role="status">
+                          Send status unavailable
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : null}
+          </div>
+        )}
       </div>
       {children}
     </section>
