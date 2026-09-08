@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { displayDate } from "@/lib/display-date";
+import { relativeReplyTime } from "@/lib/relative-reply-time";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar, Button, Empty, Icon, Topbar, Notice } from "@/components/ui";
 import {
@@ -15,6 +15,17 @@ import { usePreferences } from "@/lib/preferences";
 import { useContactDetails } from "@/lib/use-contact-details";
 
 export function DraftsScreen() {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    update();
+    const interval = setInterval(update, 60_000);
+    window.addEventListener("focus", update);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", update);
+    };
+  }, []);
   const { state, scope, repository, basePath, workspace } = useInbox();
   const { preferences } = usePreferences(scope.userId);
   const [awaitingSelection, setAwaitingSelection] = useState(false);
@@ -201,11 +212,12 @@ export function DraftsScreen() {
                       <span className="draft-lead-footer">
                         <ConversationLabel conversation={c} />
                         <span className="time">
-                          {displayDate(
-                            leadMessage?.createdAt ??
-                              c.messages.at(-1)?.createdAt,
-                            workspace.timezone,
-                          )}
+                          {now !== null &&
+                            relativeReplyTime(
+                              leadMessage?.createdAt ??
+                                c.messages.at(-1)?.createdAt,
+                              now,
+                            )}
                         </span>
                       </span>
                     </span>
