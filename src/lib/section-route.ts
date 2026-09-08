@@ -34,6 +34,7 @@ export function sectionRoute(pathname: string) {
     framed:
       section === "drafts" ||
       section === "conversations" ||
-      section === "agents",
+      section === "agents" ||
+      section === "settings",
   };
 }
