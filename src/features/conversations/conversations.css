@@ -897,7 +897,7 @@
   padding: 0 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: 9px;
-  background: var(--raised);
+  background: transparent;
   overflow: visible;
 }
 .reference-context .context-section > .eyebrow {
@@ -1004,6 +1004,7 @@
 .reference-context .context-notes textarea {
   min-height: 110px;
   border-radius: 9px;
+  background: transparent;
 }
 @media (max-width: 680px) {
   .kimi-thread .thread-header {
