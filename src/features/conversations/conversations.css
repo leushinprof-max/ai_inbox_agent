@@ -422,6 +422,13 @@
 }
 .kimi-thread .thread-scroll {
   padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+.kimi-thread .thread-content {
+  /* Spare space stays above short histories; long histories remain scrollable. */
+  margin-top: auto;
+  flex-shrink: 0;
 }
 .thread-loading {
   display: grid;
