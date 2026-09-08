@@ -105,11 +105,6 @@ export interface InboxState {
   platformOwner?: boolean;
   aiConfigVersion?: number;
   labelCatalogRevision?: number;
-  agentDefaults?: {
-    goal: string;
-    language: string;
-    replyGroups: IntentGroup[];
-  };
   workspaces: Workspace[];
   memberships: Membership[];
   connections: Connection[];

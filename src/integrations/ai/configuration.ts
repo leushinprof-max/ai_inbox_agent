@@ -39,6 +39,8 @@ export const aiConfiguration = z
         ) as Record<(typeof systemLabels)[number]["key"], typeof instruction>,
       )
       .strict(),
+    // Retained only for compatibility with saved configuration versions.
+    // New agents use the creation form's defaults instead.
     defaults: z
       .object({
         goal: z.string().max(8000),

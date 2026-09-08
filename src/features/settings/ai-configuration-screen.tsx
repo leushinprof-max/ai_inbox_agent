@@ -4,7 +4,7 @@ import { useInbox } from "@/lib/inbox-context";
 import { Button, Notice, Topbar } from "@/components/ui";
 import { LabelBadge } from "@/components/label-badge";
 import { AIModelSettings } from "./ai-model-settings";
-import { systemLabels, intentGroup } from "@/domain/labels";
+import { systemLabels } from "@/domain/labels";
 import {
   initialAIConfiguration,
   validateConfiguration,
@@ -92,12 +92,13 @@ export function AIConfigurationScreen() {
   const changed = published
     ? Object.keys(config).filter(
         (k) =>
+          k !== "defaults" &&
           JSON.stringify(config[k as keyof AIConfiguration]) !==
-          JSON.stringify(
-            validateConfiguration(published.configuration)[
-              k as keyof AIConfiguration
-            ],
-          ),
+            JSON.stringify(
+              validateConfiguration(published.configuration)[
+                k as keyof AIConfiguration
+              ],
+            ),
       )
     : [];
   const sample = {
@@ -248,12 +249,6 @@ export function AIConfigurationScreen() {
                 >
                   System labels
                 </Button>
-                <Button
-                  variant="ghost small"
-                  onClick={() => setSection("defaults")}
-                >
-                  Agent defaults
-                </Button>
               </nav>
               {sections.some(([key]) => key === section) && (
                 <div className="field">
@@ -298,70 +293,6 @@ export function AIConfigurationScreen() {
                     />
                   </div>
                 ))}
-              {section === "defaults" && (
-                <div className="stack">
-                  <p className="muted">
-                    Defaults apply to newly created agents. Existing agents keep
-                    their saved values.
-                  </p>
-                  <div className="field">
-                    <label htmlFor="default-goal">Goal</label>
-                    <textarea
-                      id="default-goal"
-                      value={config.defaults.goal}
-                      onChange={(e) =>
-                        update({
-                          ...config,
-                          defaults: {
-                            ...config.defaults,
-                            goal: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="default-language">Language</label>
-                    <input
-                      id="default-language"
-                      value={config.defaults.language}
-                      onChange={(e) =>
-                        update({
-                          ...config,
-                          defaults: {
-                            ...config.defaults,
-                            language: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="row wrap">
-                    {intentGroup.options.map((g) => (
-                      <label className="row" key={g}>
-                        <input
-                          type="checkbox"
-                          checked={config.defaults.replyGroups.includes(g)}
-                          onChange={(e) =>
-                            update({
-                              ...config,
-                              defaults: {
-                                ...config.defaults,
-                                replyGroups: e.target.checked
-                                  ? [...config.defaults.replyGroups, g]
-                                  : config.defaults.replyGroups.filter(
-                                      (v) => v !== g,
-                                    ),
-                              },
-                            })
-                          }
-                        />
-                        {g}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
               <details>
                 <summary>
                   Compare with published version ({changed.length} changed
