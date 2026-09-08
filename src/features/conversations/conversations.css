@@ -380,8 +380,8 @@
 }
 .kimi-thread .thread-content,
 .kimi-thread .composer {
-  width: 100%;
-  max-width: none;
+  width: 94%;
+  max-width: 1280px;
 }
 .kimi-thread .message {
   position: relative;
@@ -399,6 +399,7 @@
 }
 .kimi-thread .message-meta > span:not(.avatar) {
   min-width: 0;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .kimi-thread .message-meta time {
@@ -560,6 +561,10 @@
   }
   .kimi-thread .thread-scroll {
     padding: 20px 16px;
+  }
+  .kimi-thread .thread-content,
+  .kimi-thread .composer {
+    width: 100%;
   }
   .kimi-thread .composer-wrap {
     padding: 0 12px 12px;
