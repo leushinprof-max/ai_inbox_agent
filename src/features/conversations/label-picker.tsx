@@ -172,16 +172,24 @@ export function LabelPicker({ conversation }: { conversation: Conversation }) {
           Saving…
         </small>
       )}
-      {conversation.labelState === "failed" && (
+      {writable && conversation.revision > 0 && (
         <Button
-          disabled={!writable || busy}
+          variant="ghost"
+          icon="refresh"
+          className="label-reclassify"
+          disabled={busy || conversation.labelState === "pending"}
+          title="Reassess the conversation using current classification rules. No draft is generated."
           onClick={() =>
             void act(() =>
               retryClassification(scope.workspaceId, conversation.id),
             )
           }
         >
-          Retry classification
+          {conversation.labelState === "pending"
+            ? "Classifying…"
+            : conversation.labelState === "failed"
+              ? "Retry classification"
+              : "Reclassify"}
         </Button>
       )}
       {error && <Notice variant="error">{error}</Notice>}

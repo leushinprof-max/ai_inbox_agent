@@ -261,6 +261,8 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           revision: z.number().int().nonnegative(),
           runId: z.uuid().nullable().optional(),
           generateDraft: z.boolean(),
+          reclassify: z.boolean().optional(),
+          assignmentRevision: z.number().int().nonnegative().optional(),
         })
         .parse(job.payload);
       const [conversation, routing, messages] = await Promise.all([
@@ -324,45 +326,51 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         job.workspace_id,
         payload.conversationId,
       );
-      const result = matches
-        ? await runRecordedAI(
-            db,
-            deps.model,
-            {
-              ...ai,
-              agent: config,
-              messages: transcript,
-              historyTruncated: (messages.data?.length ?? 0) > 50,
-              generateDraft: payload.generateDraft && !!config,
-            },
-            {
-              workspaceId: job.workspace_id,
-              conversationId: payload.conversationId,
-              catalogRevision: ai.catalogRevision,
-              agentId,
-              agentVersion,
-              scenario: payload.generateDraft
-                ? "classify_and_reply"
-                : "classify_only",
-            },
-          )
-        : {
-            labelId: null,
-            evidenceMessageId: null,
-            evidenceQuote: "",
-            draft: "",
-            missingKnowledge: "",
-            shouldReply: false,
-            noReplyReason: "",
-            contactStopped: false,
-          };
+      // An explicit rerun must not overwrite a label changed after it was queued.
+      const assignmentMatches =
+        payload.assignmentRevision === undefined ||
+        ai.assignmentRevision === payload.assignmentRevision;
+      const result =
+        matches && assignmentMatches
+          ? await runRecordedAI(
+              db,
+              deps.model,
+              {
+                ...ai,
+                previous: payload.reclassify ? undefined : ai.previous,
+                agent: config,
+                messages: transcript,
+                historyTruncated: (messages.data?.length ?? 0) > 50,
+                generateDraft: payload.generateDraft && !!config,
+              },
+              {
+                workspaceId: job.workspace_id,
+                conversationId: payload.conversationId,
+                catalogRevision: ai.catalogRevision,
+                agentId,
+                agentVersion,
+                scenario: payload.generateDraft
+                  ? "classify_and_reply"
+                  : "classify_only",
+              },
+            )
+          : {
+              labelId: null,
+              evidenceMessageId: null,
+              evidenceQuote: "",
+              draft: "",
+              missingKnowledge: "",
+              shouldReply: false,
+              noReplyReason: "",
+              contactStopped: false,
+            };
       databaseError(
         (
           await db.rpc("server_apply_intent", {
             p_workspace: job.workspace_id,
             p_conversation: payload.conversationId,
             p_revision: payload.revision,
-            p_assignment: ai.assignmentRevision,
+            p_assignment: payload.assignmentRevision ?? ai.assignmentRevision,
             p_catalog: ai.catalogRevision,
             p_config: ai.configurationVersion,
             p_result: { ...result },

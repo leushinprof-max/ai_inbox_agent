@@ -610,6 +610,103 @@ test("Explicit generation records no-reply without replacing a human draft", asy
   );
 });
 
+test("Explicit reclassification preserves the old label, deduplicates requests and protects newer edits", async () => {
+  await apply();
+  await user(viewer);
+  await assert.rejects(
+    db.query("select public.retry_classification($1,$2)", [
+      workspace,
+      conversation,
+    ]),
+  );
+  await user(other);
+  await assert.rejects(
+    db.query("select public.retry_classification($1,$2)", [
+      workspace,
+      conversation,
+    ]),
+  );
+  await user(member);
+  await db.query("select public.retry_classification($1,$2)", [
+    workspace,
+    conversation,
+  ]);
+  const pending = await row<{
+    label_id: string;
+    label_state: string;
+    label_assignment_revision: number;
+  }>("select * from public.conversations where id=$1", [conversation]);
+  assert.equal(pending.label_state, "pending");
+  assert.equal(pending.label_id, meeting);
+  await db.query("select public.retry_classification($1,$2)", [
+    workspace,
+    conversation,
+  ]);
+  await privileged();
+  const jobs = (
+    await db.query<{ id: string; payload: Record<string, unknown> }>(
+      "select id,payload from app_private.jobs where workspace_id=$1 and payload->>'conversationId'=$2 and payload->>'reclassify'='true'",
+      [workspace, conversation],
+    )
+  ).rows;
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].payload.generateDraft, false);
+  assert.equal(
+    jobs[0].payload.assignmentRevision,
+    pending.label_assignment_revision,
+  );
+  // A failure of this exact request is visible, even after an earlier success.
+  await db.query("update app_private.jobs set status='failed' where id=$1", [
+    jobs[0].id,
+  ]);
+  assert.equal(
+    (
+      await row<{ label_state: string }>(
+        "select label_state from public.conversations where id=$1",
+        [conversation],
+      )
+    ).label_state,
+    "failed",
+  );
+  assert.equal(
+    await apply({}, { assignment: pending.label_assignment_revision - 1 }),
+    false,
+  );
+  assert.equal(await apply({}, { generate: false }), true);
+  await db.query("update app_private.jobs set status='failed' where id=$1", [
+    jobs[0].id,
+  ]);
+  assert.equal(
+    (
+      await row<{ label_state: string }>(
+        "select label_state from public.conversations where id=$1",
+        [conversation],
+      )
+    ).label_state,
+    "classified",
+  );
+  await user(member);
+  const c = await row<{ label_assignment_revision: number }>(
+    "select label_assignment_revision from public.conversations where id=$1",
+    [conversation],
+  );
+  await db.query("select public.assign_conversation_label($1,$2,$3,2,$4)", [
+    workspace,
+    conversation,
+    meeting,
+    c.label_assignment_revision,
+  ]);
+  await db.query("select public.retry_classification($1,$2)", [
+    workspace,
+    conversation,
+  ]);
+  assert.equal(
+    await apply({}, { generate: false }),
+    true,
+    "Explicit rerun can replace a manual label",
+  );
+});
+
 test("Draft intent filters execute in SQL and classification failure cannot erase a newer success", async () => {
   await user(member);
   assert.equal(
