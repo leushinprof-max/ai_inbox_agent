@@ -415,15 +415,15 @@
   position: relative;
   width: fit-content;
   max-width: min(82%, 760px);
-  padding-left: 34px;
+  padding-left: 42px;
   margin-bottom: 18px;
 }
 .kimi-thread .message-meta {
-  min-height: 20px;
-  align-items: baseline;
+  min-height: 32px;
+  align-items: center;
   gap: 12px;
   margin-bottom: 6px;
-  font-size: 11.5px;
+  font-size: 14px;
 }
 .kimi-thread .message-meta > span:not(.avatar) {
   min-width: 0;
@@ -438,8 +438,9 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
+  font-size: 10px;
 }
 .kimi-thread .bubble {
   width: fit-content;
@@ -605,7 +606,7 @@
   }
   .kimi-thread .message {
     max-width: 94%;
-    padding-left: 30px;
+    padding-left: 40px;
   }
   .draft-layout .kimi-thread .thread-back {
     display: grid;
