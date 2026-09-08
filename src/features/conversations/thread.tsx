@@ -395,39 +395,31 @@ export function ContactContext({
       </div>
       <div className="context-section">
         <p className="eyebrow">Conversation</p>
-        <div className="details-row">
-          <span>Campaign</span>
-          <span>{conversation.campaign || "—"}</span>
-        </div>
-        <div className="details-row">
-          <span>Sender</span>
-          <span>{conversation.senderName}</span>
-        </div>
-        <div className="details-row">
-          <span>Label</span>
+        <div className="context-field">
+          <p className="context-field-label">Label</p>
           <LabelPicker conversation={conversation} />
         </div>
+        <div className="context-field">
+          <p className="context-field-label">Assigned agent</p>
+          {agent ? (
+            <Link
+              className="agent-link"
+              href={`${basePath}/agents/${agent.id}`}
+            >
+              <Spark />
+              <span className="grow">
+                <strong>{agent.name}</strong>
+                <small>
+                  {agent.status} ·{" "}
+                  {sender?.agentId ? "Sender assignment" : "Workspace default"}
+                </small>
+              </span>
+            </Link>
+          ) : (
+            <p className="muted">No agent assigned</p>
+          )}
+        </div>
       </div>
-      {agent ? (
-        <div className="context-section">
-          <p className="eyebrow">Assigned agent</p>
-          <Link className="agent-link" href={`${basePath}/agents/${agent.id}`}>
-            <Spark />
-            <span className="grow">
-              <strong>{agent.name}</strong>
-              <small>
-                {agent.status} ·{" "}
-                {sender?.agentId ? "Sender assignment" : "Workspace default"}
-              </small>
-            </span>
-          </Link>
-        </div>
-      ) : (
-        <div className="context-section">
-          <p className="eyebrow">Assigned agent</p>
-          <p className="muted">No agent assigned</p>
-        </div>
-      )}
       <div className="context-section">
         <label className="eyebrow" htmlFor="contact-notes">
           Notes

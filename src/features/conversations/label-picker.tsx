@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Conversation } from "@/domain/inbox";
 import { useInbox } from "@/lib/inbox-context";
 import { ConversationLabel } from "@/components/label-badge";
-import { Button, Notice } from "@/components/ui";
+import { Button, Icon, Notice } from "@/components/ui";
 import { assignLabel, retryClassification } from "@/server/label-actions";
 export function LabelPicker({ conversation }: { conversation: Conversation }) {
   const { state, scope, mode, repository } = useInbox();
@@ -32,38 +32,50 @@ export function LabelPicker({ conversation }: { conversation: Conversation }) {
     }
   }
   return (
-    <div className="stack">
-      <ConversationLabel conversation={conversation} />
-      <select
-        aria-label="Change conversation label"
-        disabled={!writable || busy}
-        value={conversation.labelId ?? ""}
-        onChange={(e) =>
-          void act(() =>
-            assignLabel(
-              scope.workspaceId,
-              conversation.id,
-              e.target.value || null,
-              conversation.revision,
-              conversation.labelAssignmentRevision ?? 0,
-            ),
-          )
-        }
-      >
-        <option value="">No label</option>
-        {(state.labelCatalog ?? [])
-          .filter(
-            (l) => (l.enabled && !l.archived) || l.id === conversation.labelId,
-          )
-          .map((l) => (
-            <option value={l.id} key={l.id} disabled={!l.enabled || l.archived}>
-              {l.name}
-            </option>
-          ))}
-      </select>
-      <small className="muted">
-        Manual corrections stay until the next lead reply.
-      </small>
+    <div className="label-picker" aria-busy={busy}>
+      <div className={`label-picker-control ${writable ? "editable" : ""}`}>
+        <ConversationLabel conversation={conversation} />
+        {writable && <Icon name="chevron" />}
+        {writable && (
+          <select
+            aria-label="Change conversation label"
+            disabled={!writable || busy}
+            value={conversation.labelId ?? ""}
+            onChange={(e) =>
+              void act(() =>
+                assignLabel(
+                  scope.workspaceId,
+                  conversation.id,
+                  e.target.value || null,
+                  conversation.revision,
+                  conversation.labelAssignmentRevision ?? 0,
+                ),
+              )
+            }
+          >
+            <option value="">No label</option>
+            {(state.labelCatalog ?? [])
+              .filter(
+                (l) =>
+                  (l.enabled && !l.archived) || l.id === conversation.labelId,
+              )
+              .map((l) => (
+                <option
+                  value={l.id}
+                  key={l.id}
+                  disabled={!l.enabled || l.archived}
+                >
+                  {l.name}
+                </option>
+              ))}
+          </select>
+        )}
+      </div>
+      {writable && (
+        <small className="muted" role="status">
+          {busy ? "Saving…" : "Updates automatically after the next reply."}
+        </small>
+      )}
       {conversation.labelState === "failed" && (
         <Button
           disabled={!writable || busy}
