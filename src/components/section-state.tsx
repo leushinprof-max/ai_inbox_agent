@@ -276,17 +276,23 @@ export function SectionSkeleton({
             </section>
           </div>
         ) : (
-          <div className="ai-admin-page">
-            <Line width="short" />
-            <Line />
-            <div className="ai-admin-grid">
-              {[0, 1].map((i) => (
-                <div className="card" key={i}>
-                  <Line />
-                  <div className="loading-note" />
-                </div>
+          <div className="settings-layout">
+            <nav className="settings-nav" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <Line key={i} />
               ))}
-            </div>
+            </nav>
+            <section className="setting-content">
+              <Line width="short" />
+              <div className="loading-form">
+                {[0, 1].map((i) => (
+                  <div className="card" key={i}>
+                    <Line />
+                    <div className="loading-control" />
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         )}
       </div>

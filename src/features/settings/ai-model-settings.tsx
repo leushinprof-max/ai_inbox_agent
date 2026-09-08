@@ -1,6 +1,5 @@
 import {
   defaultInboxModel,
-  resolveModels,
   type AIConfiguration,
 } from "@/integrations/ai/configuration";
 import {
@@ -10,22 +9,20 @@ import {
   supportedReasoningEfforts,
   type ReasoningEffort,
 } from "@/integrations/ai/model-catalog";
-import "./ai-model-settings.css";
+import { Icon } from "@/components/ui";
+import { AdminSelect } from "./admin-select";
 
 export function AIModelSettings({
   configuration,
-  published,
   fallback = defaultInboxModel,
   disabled,
   onChange,
 }: {
   configuration: AIConfiguration;
-  published?: AIConfiguration;
   fallback?: string;
   disabled: boolean;
   onChange: (configuration: AIConfiguration) => void;
 }) {
-  const active = published ? resolveModels(published, fallback) : null;
   function changeModel(key: "classification" | "draft", model: string) {
     const effort = configuration.reasoning[key];
     onChange({
@@ -41,145 +38,105 @@ export function AIModelSettings({
     });
   }
   return (
-    <fieldset
-      className="card ai-model-settings"
-      disabled={disabled}
-      aria-labelledby="ai-models-title"
-    >
-      <h2 id="ai-models-title">Models</h2>
-      <p className="muted">
-        Choose an OpenAI model for each task. Changes take effect after you save
-        and publish a version.
-      </p>
-      <div className="ai-model-fields">
-        {(
-          [
-            [
-              "classification",
-              "Classification model",
-              "Assigns intent labels to incoming replies and imported conversations.",
-            ],
-            [
-              "draft",
-              "Reply model",
-              "Prepares drafts, rewrites replies and completes answers when missing knowledge is supplied.",
-            ],
-          ] as const
-        ).map(([key, title, description]) => {
-          const value = configuration.models[key];
-          const effectiveModel = value ?? fallback;
-          const effort = configuration.reasoning[key];
-          const custom =
-            value !== null && !modelOptions.some(({ id }) => id === value);
-          return (
-            <div className="field" key={key}>
-              <label htmlFor={`ai-model-${key}`}>{title}</label>
-              <select
-                id={`ai-model-${key}`}
-                value={custom ? "custom" : (value ?? "default")}
-                onChange={(e) =>
-                  changeModel(
-                    key,
-                    e.target.value === "custom" ? "" : e.target.value,
-                  )
-                }
-              >
-                {value === null && (
-                  <option value="default" disabled>
-                    Saved default · {fallback}
-                  </option>
-                )}
-                {modelOptions.map(({ id, name }) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-                <option value="custom">Custom model ID…</option>
-              </select>
+    <fieldset className="admin-models" disabled={disabled} aria-label="Models">
+      {(
+        [
+          ["classification", "Classification", "inbox"],
+          ["draft", "Reply", "draft"],
+        ] as const
+      ).map(([key, title, icon]) => {
+        const value = configuration.models[key];
+        const effective = value ?? fallback;
+        const custom =
+          value !== null && !modelOptions.some(({ id }) => id === value);
+        return (
+          <section className="admin-model-row" key={key}>
+            <div className="admin-model-title">
+              <span className="admin-model-icon">
+                <Icon name={icon} />
+              </span>
+              <h2>{title}</h2>
+            </div>
+            <div className="admin-model-controls">
+              <div className="field">
+                <label htmlFor={`ai-model-${key}`}>Model</label>
+                <AdminSelect
+                  id={`ai-model-${key}`}
+                  label={`${title} model`}
+                  disabled={disabled}
+                  value={custom ? "custom" : (value ?? "default")}
+                  options={[
+                    ...(value === null
+                      ? [
+                          {
+                            value: "default",
+                            label: `Saved default (${fallback})`,
+                            disabled: true,
+                          },
+                        ]
+                      : []),
+                    ...modelOptions.map(({ id, name }) => ({
+                      value: id,
+                      label: name,
+                    })),
+                    { value: "custom", label: "Custom model…" },
+                  ]}
+                  onChange={(next) =>
+                    changeModel(key, next === "custom" ? "" : next)
+                  }
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`ai-reasoning-${key}`}>Reasoning</label>
+                <AdminSelect
+                  id={`ai-reasoning-${key}`}
+                  label={`${title} reasoning`}
+                  disabled={disabled}
+                  value={configuration.reasoning[key] ?? "default"}
+                  options={[
+                    {
+                      value: "default",
+                      label: reasoningSelectionLabel(effective, null).replace(
+                        "Model default · ",
+                        "Default · ",
+                      ),
+                    },
+                    ...supportedReasoningEfforts(effective).map((level) => ({
+                      value: level,
+                      label: reasoningLabels[level],
+                    })),
+                  ]}
+                  onChange={(next) =>
+                    onChange({
+                      ...configuration,
+                      reasoning: {
+                        ...configuration.reasoning,
+                        [key]:
+                          next === "default" ? null : (next as ReasoningEffort),
+                      },
+                    })
+                  }
+                />
+              </div>
               {custom && (
-                <>
+                <div className="field admin-custom-model">
                   <label htmlFor={`ai-model-custom-${key}`}>
-                    Custom {key === "draft" ? "reply" : "classification"} model
-                    ID
+                    Custom model ID
                   </label>
                   <input
                     id={`ai-model-custom-${key}`}
                     value={value}
                     maxLength={200}
                     spellCheck={false}
-                    placeholder="Enter an OpenAI model or snapshot ID"
-                    onChange={(e) => changeModel(key, e.target.value)}
+                    placeholder="Model or snapshot ID"
+                    onChange={(event) => changeModel(key, event.target.value)}
                   />
-                </>
+                </div>
               )}
-              <small className="help">{description}</small>
-              <small className="muted">
-                Published: {active?.[key] ?? "Loading…"}
-              </small>
-              <div className="ai-reasoning-field">
-                <label htmlFor={`ai-reasoning-${key}`}>
-                  {key === "classification" ? "Classification" : "Reply"}{" "}
-                  reasoning
-                </label>
-                <select
-                  id={`ai-reasoning-${key}`}
-                  value={effort ?? "default"}
-                  onChange={(e) =>
-                    onChange({
-                      ...configuration,
-                      reasoning: {
-                        ...configuration.reasoning,
-                        [key]:
-                          e.target.value === "default"
-                            ? null
-                            : (e.target.value as ReasoningEffort),
-                      },
-                    })
-                  }
-                >
-                  <option value="default">
-                    {reasoningSelectionLabel(effectiveModel, null)}
-                  </option>
-                  {supportedReasoningEfforts(effectiveModel).map((level) => (
-                    <option key={level} value={level}>
-                      {reasoningLabels[level]}
-                    </option>
-                  ))}
-                </select>
-                <small className="help">
-                  {key === "classification"
-                    ? "Controls reasoning when assigning intent labels."
-                    : "Controls reasoning for reply decisions, drafts, rewrites and completed answers."}
-                </small>
-                <small className="muted">
-                  Published reasoning:{" "}
-                  {active && published
-                    ? reasoningSelectionLabel(
-                        active[key],
-                        published.reasoning[key],
-                      )
-                    : "Loading…"}
-                </small>
-              </div>
             </div>
-          );
-        })}
-      </div>
-      <p className="help">
-        Model default uses the model’s own reasoning level; None disables
-        reasoning. Higher levels may take longer and use more tokens. When
-        switching models, an unsupported level resets to Model default.
-      </p>
-      <p className="help">
-        Processing always uses separate stages: first classify the lead’s
-        intent, then decide whether to reply and prepare an eligible draft.
-        Selecting the same model for both tasks still uses separate requests.
-      </p>
-      <p className="help">
-        Model access depends on the connected OpenAI account. Custom models must
-        support Responses and structured outputs. Use Run test to check your
-        selection before publishing.
-      </p>
+          </section>
+        );
+      })}
     </fieldset>
   );
 }

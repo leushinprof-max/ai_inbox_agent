@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
-import { Button, Notice, Topbar } from "@/components/ui";
-import { LabelBadge } from "@/components/label-badge";
+import { Button, Icon, Notice, Topbar, type IconName } from "@/components/ui";
+import { Dialog } from "@/components/dialog";
 import { AIModelSettings } from "./ai-model-settings";
+import { AdminSelect } from "./admin-select";
+import { AIPlayground } from "./ai-playground";
 import { systemLabels } from "@/domain/labels";
 import {
   initialAIConfiguration,
@@ -14,9 +16,8 @@ import {
   readAIAdmin,
   saveAIAdmin,
   publishAIAdmin,
-  previewAIAdmin,
-  testAIAdmin,
 } from "@/server/ai-admin-actions";
+import "./ai-admin.css";
 
 const sections = [
   ["classification", "Classification"],
@@ -26,49 +27,52 @@ const sections = [
   ["needsInput", "Missing knowledge"],
   ["agentTemplate", "Agent template"],
 ] as const;
+const pages: { id: string; label: string; icon: IconName }[] = [
+  { id: "models", label: "Models", icon: "agent" },
+  { id: "instructions", label: "Instructions", icon: "book" },
+  { id: "test", label: "Preview & test", icon: "spark" },
+  { id: "versions", label: "Version history", icon: "clock" },
+];
+type AdminData = Awaited<ReturnType<typeof readAIAdmin>>;
+function displayValue(value: unknown) {
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+function blockName(key: string) {
+  return (
+    sections.find(([id]) => id === key)?.[1] ??
+    (
+      {
+        models: "Models",
+        reasoning: "Reasoning",
+        labels: "System labels",
+      } as Record<string, string>
+    )[key] ??
+    key
+  );
+}
+
 export function AIConfigurationScreen() {
-  const { state, scope } = useInbox();
-  const [data, setData] = useState<Awaited<
-    ReturnType<typeof readAIAdmin>
-  > | null>(null);
+  const { state } = useInbox();
+  const [data, setData] = useState<AdminData | null>(null);
   const [config, setConfig] = useState<AIConfiguration>(initialAIConfiguration);
   const [selected, setSelected] = useState(0);
-  const [section, setSection] = useState<string>("classification");
+  const [page, setPage] = useState("models");
+  const [section, setSection] = useState("classification");
+  const [labelKey, setLabelKey] = useState<string>(systemLabels[0].key);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [agentId, setAgent] = useState("");
-  const [conversationId, setConversation] = useState("");
-  const [transcript, setTranscript] = useState(
-    "Team: Would a short demo be useful?\nLead: Yes, can we meet next Tuesday?",
-  );
-  const [scenario, setScenario] = useState<
-    "classify" | "reply" | "rewrite" | "needs_input"
-  >("classify");
-  const [draftEnabled, setDraftEnabled] = useState(true);
-  const [instructions, setInstructions] = useState("");
-  const [approvedAnswer, setAnswer] = useState("");
-  const [currentDraft, setDraft] = useState("");
-  const [preview, setPreview] = useState<Awaited<
-    ReturnType<typeof previewAIAdmin>
-  > | null>(null);
-  const [result, setResult] = useState<Awaited<
-    ReturnType<typeof testAIAdmin>
-  > | null>(null);
-  const [batch, setBatch] = useState(false);
-  const [batchResults, setBatchResults] = useState<
-    Awaited<ReturnType<typeof testAIAdmin>>[]
-  >([]);
+  const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   useEffect(() => {
     let active = true;
     readAIAdmin()
-      .then((d) => {
+      .then((next) => {
         if (active) {
-          setData(d);
-          setSelected(d.release.version_id);
+          setData(next);
+          setSelected(next.release.version_id);
           setConfig(
             validateConfiguration(
-              d.versions.find((v) => v.id === d.release.version_id)!
+              next.versions.find((v) => v.id === next.release.version_id)!
                 .configuration,
             ),
           );
@@ -82,36 +86,33 @@ export function AIConfigurationScreen() {
     };
   }, []);
   const baseline = data?.versions.find((v) => v.id === selected);
-  const dirty = baseline
-    ? JSON.stringify(config) !==
-      JSON.stringify(validateConfiguration(baseline.configuration))
-    : true;
   const published = data?.versions.find(
     (v) => v.id === data.release.version_id,
   );
-  const changed = published
+  const publishedConfig = published
+    ? validateConfiguration(published.configuration)
+    : null;
+  const dirty = baseline
+    ? JSON.stringify(config) !==
+      JSON.stringify(validateConfiguration(baseline.configuration))
+    : false;
+  const changed = publishedConfig
     ? Object.keys(config).filter(
-        (k) =>
-          k !== "defaults" &&
-          JSON.stringify(config[k as keyof AIConfiguration]) !==
-            JSON.stringify(
-              validateConfiguration(published.configuration)[
-                k as keyof AIConfiguration
-              ],
-            ),
+        (key) =>
+          key !== "defaults" &&
+          JSON.stringify(config[key as keyof AIConfiguration]) !==
+            JSON.stringify(publishedConfig[key as keyof AIConfiguration]),
       )
     : [];
-  const sample = {
-    workspaceId: scope.workspaceId,
-    agentId: agentId || null,
-    conversationId: conversationId || null,
-    transcript,
-    scenario,
-    generateDraft: draftEnabled,
-    instructions,
-    approvedAnswer,
-    currentDraft,
-  };
+  const selectedLabel = systemLabels.find((label) => label.key === labelKey)!;
+  const instructionTitle =
+    section === "labels"
+      ? selectedLabel.name
+      : sections.find(([id]) => id === section)?.[1];
+  const instructionValue =
+    section === "labels"
+      ? config.labels[selectedLabel.key]
+      : config[section as (typeof sections)[number][0]];
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -126,460 +127,287 @@ export function AIConfigurationScreen() {
   }
   function update(next: AIConfiguration) {
     setConfig(next);
-    setPreview(null);
-    setResult(null);
-    setBatchResults([]);
+    setNotice("");
+  }
+  function loadVersion(id: number) {
+    setSelected(id);
+    update(
+      validateConfiguration(
+        data!.versions.find((v) => v.id === id)!.configuration,
+      ),
+    );
+    setPendingVersion(null);
+  }
+  function chooseVersion(id: number) {
+    if (dirty) setPendingVersion(id);
+    else loadVersion(id);
   }
   if (!state.platformOwner)
     return <Notice variant="error">Platform owner access required.</Notice>;
   return (
     <>
       <Topbar title="Product admin" />
-      <div className="content-scroll">
-        <div className="ai-admin-page">
-          <div className="row between wrap">
-            <div>
-              <h1>AI configuration</h1>
-              <p className="muted">
-                {data?.environment ?? "Loading"} · Published version{" "}
-                {data?.release.version_id ?? "—"} · Applies to all workspaces in
-                this environment
-              </p>
-            </div>
-            <div className="row wrap">
-              <Button
-                disabled={busy || !data || !dirty}
-                onClick={() =>
-                  void run(async () => {
-                    const id = await saveAIAdmin(config);
-                    const saved = await readAIAdmin();
-                    setData(saved);
-                    update(
-                      validateConfiguration(
-                        saved.versions.find((v) => v.id === id)!.configuration,
-                      ),
-                    );
-                    setSelected(id);
-                    setNotice(
-                      "Version saved. The published configuration has not changed.",
-                    );
-                  })
-                }
+      <div className="content-scroll product-admin-scroll">
+        <div className="settings-layout product-admin-layout">
+          <nav
+            className="settings-nav product-admin-nav"
+            aria-label="Product admin navigation"
+          >
+            {pages.map((item) => (
+              <button
+                key={item.id}
+                className={`settings-tab ${page === item.id ? "active" : ""}`}
+                aria-current={page === item.id ? "page" : undefined}
+                onClick={() => setPage(item.id)}
               >
-                Save version
-              </Button>
-              <Button
-                variant="primary"
-                disabled={
-                  busy ||
-                  !data ||
-                  dirty ||
-                  selected === data?.release.version_id
-                }
-                onClick={() =>
-                  void run(async () => {
-                    await publishAIAdmin(selected, data!.release.revision);
-                    setData(await readAIAdmin());
-                    setNotice(`Version ${selected} is now published.`);
-                  })
-                }
-              >
-                Publish version {selected || ""}
-              </Button>
-            </div>
-          </div>
-          {error && <Notice variant="error">{error}</Notice>}
-          {notice && <Notice>{notice}</Notice>}
-          <div className="row wrap">
-            <label htmlFor="ai-version">Version</label>
-            <select
-              id="ai-version"
-              disabled={busy}
-              value={selected}
-              onChange={(e) => {
-                const id = Number(e.target.value);
-                setSelected(id);
-                update(
-                  validateConfiguration(
-                    data!.versions.find((v) => v.id === id)!.configuration,
-                  ),
-                );
-              }}
-            >
-              {data?.versions.map((v) => (
-                <option key={v.id} value={v.id}>
-                  v{v.id}
-                  {v.id === data.release.version_id
-                    ? " · published"
-                    : ""} · {new Date(v.created_at).toLocaleString()}
-                </option>
-              ))}
-            </select>
-            <small className="muted">
-              To roll back, select an earlier version and publish it.
-            </small>
-          </div>
-          <AIModelSettings
-            configuration={config}
-            published={
-              published
-                ? validateConfiguration(published.configuration)
-                : undefined
-            }
-            fallback={data?.fallbackModel}
-            disabled={busy || !data}
-            onChange={update}
-          />
-          <fieldset className="ai-admin-grid" disabled={busy || !data}>
-            <section className="card">
-              <h2>Instructions</h2>
-              <nav className="row wrap" aria-label="Instruction blocks">
-                {sections.map(([key, title]) => (
-                  <Button
-                    key={key}
-                    variant={section === key ? "primary small" : "ghost small"}
-                    onClick={() => setSection(key)}
-                  >
-                    {title}
-                  </Button>
-                ))}
+                <Icon name={item.icon} />
+                {item.label}
+              </button>
+            ))}
+            {data && (
+              <div className="admin-environment">
+                <span className="admin-live-dot" />
+                {data.environment}
+                <span>Live v{data.release.version_id}</span>
+              </div>
+            )}
+          </nav>
+          <section className="admin-content">
+            <div className="admin-heading">
+              <div>
+                <h1>{pages.find((item) => item.id === page)?.label}</h1>
+                <div className="admin-version-status" role="status">
+                  {!data
+                    ? "Loading configuration…"
+                    : dirty
+                      ? "Unsaved changes"
+                      : selected === data.release.version_id
+                        ? `Version ${selected} is live`
+                        : `Version ${selected} · unpublished`}
+                </div>
+              </div>
+              <div className="admin-publish-actions">
                 <Button
-                  variant="ghost small"
-                  onClick={() => setSection("labels")}
+                  disabled={busy || !data || !dirty}
+                  onClick={() =>
+                    void run(async () => {
+                      const id = await saveAIAdmin(config);
+                      const next = await readAIAdmin();
+                      setData(next);
+                      setSelected(id);
+                      setConfig(
+                        validateConfiguration(
+                          next.versions.find((v) => v.id === id)!.configuration,
+                        ),
+                      );
+                      setNotice(`Version ${id} saved. Ready to publish.`);
+                    })
+                  }
                 >
-                  System labels
+                  Save version
                 </Button>
-              </nav>
-              {sections.some(([key]) => key === section) && (
-                <div className="field">
-                  <label htmlFor="prompt-editor">
-                    {sections.find(([key]) => key === section)?.[1]}
-                  </label>
+                <Button
+                  variant="primary"
+                  disabled={
+                    busy ||
+                    !data ||
+                    dirty ||
+                    selected === data.release.version_id
+                  }
+                  onClick={() =>
+                    void run(async () => {
+                      await publishAIAdmin(selected, data!.release.revision);
+                      setData(await readAIAdmin());
+                      setNotice(`Version ${selected} published.`);
+                    })
+                  }
+                >
+                  Publish
+                </Button>
+              </div>
+            </div>
+            {error && <Notice variant="error">{error}</Notice>}
+            {notice && <Notice>{notice}</Notice>}
+            <div hidden={page !== "models"}>
+              <AIModelSettings
+                configuration={config}
+                fallback={data?.fallbackModel}
+                disabled={busy || !data}
+                onChange={update}
+              />
+            </div>
+            <div hidden={page !== "instructions"}>
+              <fieldset className="admin-instructions" disabled={busy || !data}>
+                <nav
+                  className="admin-instruction-nav"
+                  aria-label="Instruction blocks"
+                >
+                  {sections.map(([key, title]) => (
+                    <button
+                      type="button"
+                      key={key}
+                      className={section === key ? "active" : ""}
+                      aria-current={section === key ? "true" : undefined}
+                      onClick={() => setSection(key)}
+                    >
+                      {title}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={section === "labels" ? "active" : ""}
+                    aria-current={section === "labels" ? "true" : undefined}
+                    onClick={() => setSection("labels")}
+                  >
+                    System labels
+                  </button>
+                </nav>
+                <div className="admin-instruction-editor">
+                  <div className="admin-editor-heading">
+                    <label htmlFor="prompt-editor">{instructionTitle}</label>
+                    {section === "labels" && (
+                      <AdminSelect
+                        label="System label"
+                        value={labelKey}
+                        options={systemLabels.map((label) => ({
+                          value: label.key,
+                          label: label.name,
+                        }))}
+                        disabled={busy || !data}
+                        onChange={setLabelKey}
+                      />
+                    )}
+                  </div>
                   <textarea
-                    className="prompt-editor"
                     id="prompt-editor"
-                    value={config[section as (typeof sections)[number][0]]}
+                    aria-label={instructionTitle}
+                    value={instructionValue}
                     maxLength={12000}
-                    onChange={(e) =>
-                      update({ ...config, [section]: e.target.value })
+                    spellCheck={false}
+                    onChange={(event) =>
+                      update(
+                        section === "labels"
+                          ? {
+                              ...config,
+                              labels: {
+                                ...config.labels,
+                                [selectedLabel.key]: event.target.value,
+                              },
+                            }
+                          : { ...config, [section]: event.target.value },
+                      )
                     }
                   />
-                  {section === "agentTemplate" && (
-                    <p className="help">
-                      Variables:{" "}
-                      {
-                        "{{name}}, {{goal}}, {{language}}, {{replyGroups}}, {{knowledge}}"
-                      }
-                      . Values come from the saved agent. Text substitutions
-                      cannot run code.
-                    </p>
-                  )}
-                </div>
-              )}
-              {section === "labels" &&
-                systemLabels.map((l) => (
-                  <div className="field" key={l.key}>
-                    <label htmlFor={`rule-${l.key}`}>{l.name}</label>
-                    <textarea
-                      id={`rule-${l.key}`}
-                      value={config.labels[l.key]}
-                      maxLength={12000}
-                      onChange={(e) =>
-                        update({
-                          ...config,
-                          labels: { ...config.labels, [l.key]: e.target.value },
-                        })
-                      }
-                    />
+                  <div className="admin-editor-footer">
+                    <span>
+                      {instructionValue.length.toLocaleString()} / 12,000
+                    </span>
+                    {section === "agentTemplate" && (
+                      <details className="admin-details">
+                        <summary>Template variables</summary>
+                        <p>
+                          {
+                            "{{name}}, {{goal}}, {{language}}, {{replyGroups}}, {{knowledge}}"
+                          }
+                        </p>
+                      </details>
+                    )}
                   </div>
-                ))}
-              <details>
+                </div>
+              </fieldset>
+            </div>
+            <div hidden={page !== "test"}>
+              <AIPlayground
+                configuration={config}
+                version={selected}
+                disabled={busy || !data}
+                onBusy={setBusy}
+              />
+            </div>
+            <div hidden={page !== "versions"} className="admin-versions">
+              <div className="admin-version-picker field">
+                <label htmlFor="ai-version">Version</label>
+                <AdminSelect
+                  id="ai-version"
+                  label="Configuration version"
+                  value={String(selected)}
+                  disabled={busy || !data}
+                  options={
+                    data?.versions.map((v) => ({
+                      value: String(v.id),
+                      label: `Version ${v.id}${v.id === data.release.version_id ? " · Live" : ""} · ${new Date(v.created_at).toLocaleString()}`,
+                    })) ?? []
+                  }
+                  onChange={(value) => chooseVersion(Number(value))}
+                />
+              </div>
+              <details className="admin-details admin-diff">
                 <summary>
-                  Compare with published version ({changed.length} changed
-                  blocks)
+                  Changes from live version{" "}
+                  <span className="admin-count">{changed.length}</span>
                 </summary>
-                {changed.map((k) => (
-                  <div key={k}>
-                    <h3>{k}</h3>
-                    <p>Published</p>
-                    <pre className="prompt-preview">
-                      {JSON.stringify(
-                        validateConfiguration(published!.configuration)[
-                          k as keyof AIConfiguration
-                        ],
-                        null,
-                        2,
-                      )}
-                    </pre>
-                    <p>Edited</p>
-                    <pre className="prompt-preview">
-                      {JSON.stringify(
-                        config[k as keyof AIConfiguration],
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
+                {!changed.length && (
+                  <p className="muted">
+                    This version matches the live configuration.
+                  </p>
+                )}
+                {changed.map((key) => (
+                  <section key={key}>
+                    <h3>{blockName(key)}</h3>
+                    <div className="admin-diff-columns">
+                      <div>
+                        <h4>Live</h4>
+                        <pre>
+                          {displayValue(
+                            publishedConfig![key as keyof AIConfiguration],
+                          )}
+                        </pre>
+                      </div>
+                      <div>
+                        <h4>Selected version{dirty ? " with edits" : ""}</h4>
+                        <pre>
+                          {displayValue(config[key as keyof AIConfiguration])}
+                        </pre>
+                      </div>
+                    </div>
+                  </section>
                 ))}
               </details>
-            </section>
-            <section className="card">
-              <h2>Preview and test</h2>
-              <p className="muted">
-                Preview uses the exact request builder used by the worker. Tests
-                do not change conversations or send messages.
-              </p>
-              <div className="field">
-                <label htmlFor="preview-agent">Saved agent</label>
-                <select
-                  id="preview-agent"
-                  value={agentId}
-                  onChange={(e) => {
-                    setAgent(e.target.value);
-                    setPreview(null);
-                    setResult(null);
-                    setBatchResults([]);
-                  }}
-                >
-                  <option value="">No agent · classification only</option>
-                  {state.agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} · v{a.version}
-                    </option>
-                  ))}
-                </select>
+              <h2 className="admin-history-title">Publications</h2>
+              <div className="admin-history-list">
+                {data?.publications.map((publication) => (
+                  <div className="admin-history-row" key={publication.id}>
+                    <Icon name="clock" />
+                    <strong>Version {publication.version_id}</strong>
+                    <time>
+                      {new Date(publication.created_at).toLocaleString()}
+                    </time>
+                  </div>
+                ))}
               </div>
-              <div className="field">
-                <label htmlFor="preview-conversation">Conversation</label>
-                <select
-                  id="preview-conversation"
-                  value={conversationId}
-                  onChange={(e) => {
-                    setConversation(e.target.value);
-                    setPreview(null);
-                    setResult(null);
-                    setBatchResults([]);
-                  }}
-                >
-                  <option value="">Synthetic example</option>
-                  {state.conversations.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.contact.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {!conversationId && (
-                <div className="field">
-                  <label htmlFor="test-transcript">Conversation text</label>
-                  <textarea
-                    id="test-transcript"
-                    value={transcript}
-                    maxLength={48000}
-                    onChange={(e) => {
-                      setTranscript(e.target.value);
-                      setPreview(null);
-                      setResult(null);
-                      setBatchResults([]);
-                    }}
-                  />
-                  <small>
-                    Prefix messages with Lead: or Team:. For a batch of up to 10
-                    examples, separate them with a line containing ---.
-                  </small>
-                  <label className="row">
-                    <input
-                      type="checkbox"
-                      checked={batch}
-                      onChange={(e) => setBatch(e.target.checked)}
-                    />
-                    Test a set of examples
-                  </label>
-                </div>
-              )}
-              <div className="row wrap">
-                <select
-                  aria-label="AI scenario"
-                  value={scenario}
-                  onChange={(e) => {
-                    setScenario(e.target.value as typeof scenario);
-                    setPreview(null);
-                    setResult(null);
-                    setBatchResults([]);
-                  }}
-                >
-                  <option value="classify">Classify incoming reply</option>
-                  <option value="reply">Prepare reply · saved label</option>
-                  <option value="rewrite">Rewrite draft · saved label</option>
-                  <option value="needs_input">Resolve missing knowledge</option>
-                </select>
-                <label className="row">
-                  <input
-                    type="checkbox"
-                    checked={draftEnabled}
-                    onChange={(e) => {
-                      setDraftEnabled(e.target.checked);
-                      setPreview(null);
-                      setResult(null);
-                      setBatchResults([]);
-                    }}
-                  />
-                  Consider a draft
-                </label>
-              </div>
-              <details>
-                <summary>Operator instructions and current draft</summary>
-                <div className="field">
-                  <label>
-                    Instructions
-                    <textarea
-                      value={instructions}
-                      maxLength={2000}
-                      onChange={(e) => {
-                        setInstructions(e.target.value);
-                        setPreview(null);
-                        setResult(null);
-                        setBatchResults([]);
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Approved answer
-                    <textarea
-                      value={approvedAnswer}
-                      maxLength={8000}
-                      onChange={(e) => {
-                        setAnswer(e.target.value);
-                        setPreview(null);
-                        setResult(null);
-                        setBatchResults([]);
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Current draft
-                    <textarea
-                      value={currentDraft}
-                      maxLength={8000}
-                      onChange={(e) => {
-                        setDraft(e.target.value);
-                        setPreview(null);
-                        setResult(null);
-                        setBatchResults([]);
-                      }}
-                    />
-                  </label>
-                </div>
-              </details>
-              <div className="row wrap">
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      setPreview(await previewAIAdmin(sample, config));
-                    })
-                  }
-                >
-                  Preview full request
-                </Button>
-                <Button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      setResult(null);
-                      setBatchResults([]);
-                      if (batch && !conversationId) {
-                        const results = [];
-                        const examples = transcript.split(/\n---\n/);
-                        if (examples.length > 10)
-                          throw new Error("Use at most 10 examples per test.");
-                        for (const text of examples) {
-                          results.push(
-                            await testAIAdmin(
-                              { ...sample, transcript: text },
-                              config,
-                            ),
-                          );
-                          setBatchResults([...results]);
-                        }
-                      } else setResult(await testAIAdmin(sample, config));
-                    })
-                  }
-                >
-                  {busy ? "Working…" : "Run test"}
-                </Button>
-              </div>
-              {preview && (
-                <details open>
-                  <summary>
-                    {preview.request.text.format.name === "inbox_classification"
-                      ? "Classification request"
-                      : "Reply request"}{" "}
-                    · {preview.request.model} ·{" "}
-                    {preview.context.includedMessages} messages ·{" "}
-                    {preview.context.bodyCharacters} body characters
-                    {preview.context.truncated ? " · context truncated" : ""}
-                  </summary>
-                  <pre className="prompt-preview">
-                    {JSON.stringify(preview.request, null, 2)}
-                  </pre>
-                  {preview.draftModel && (
-                    <p className="help">
-                      Reply stage · {preview.draftModel}. A separate request
-                      decides whether a reply is needed and prepares it using
-                      the classification result. The second request is created
-                      after classification, only for an eligible intent without
-                      a contact stop.
-                    </p>
-                  )}
-                </details>
-              )}
-              {[...(result ? [result] : []), ...batchResults].map((r, i) => (
-                <div className="test-result" key={i}>
-                  <LabelBadge label={r.label} />
-                  <p>
-                    {r.output.contactStopped
-                      ? "Contact stop detected"
-                      : r.output.noReplyReason ||
-                        (r.output.shouldReply
-                          ? "Reply needed"
-                          : "No draft eligible")}
-                  </p>
-                  <p className="draft-text">
-                    {r.output.draft || r.output.missingKnowledge}
-                  </p>
-                  <small className="muted">
-                    Published base v{r.versions.publishedBase} · Agent v
-                    {r.versions.agent ?? "—"} · Catalog v{r.versions.catalog} ·
-                    Uses the configuration in this editor
-                  </small>
-                  <br />
-                  <small className="muted">
-                    Models used:{" "}
-                    {r.calls
-                      .map((call) => `${call.model} (${call.scenario})`)
-                      .join(" → ")}
-                  </small>
-                  <br />
-                  <small className="muted">
-                    Evidence: {r.output.evidenceQuote || "No category evidence"}
-                  </small>
-                </div>
-              ))}
-            </section>
-          </fieldset>
-          <details>
-            <summary>Publication history</summary>
-            {data?.publications.map((p) => (
-              <p key={p.id}>
-                Version {p.version_id} ·{" "}
-                {new Date(p.created_at).toLocaleString()} ·{" "}
-                {p.actor ?? "Initial setup"}
-              </p>
-            ))}
-          </details>
+            </div>
+          </section>
         </div>
       </div>
+      {pendingVersion !== null && (
+        <Dialog
+          title="Discard unsaved changes?"
+          onClose={() => setPendingVersion(null)}
+        >
+          <p>Switching versions will replace your current edits.</p>
+          <div className="row end">
+            <Button onClick={() => setPendingVersion(null)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => loadVersion(pendingVersion)}
+            >
+              Switch version
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </>
   );
 }
