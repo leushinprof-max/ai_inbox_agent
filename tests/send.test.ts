@@ -41,6 +41,7 @@ test("HTTP 200 with empty body means Sent; the sender comes from the conversatio
   );
   const conversation = repository.getSnapshot().conversations[0];
   assert.equal(conversation.messages.at(-1)?.source, "accepted_send");
+  assert.equal(conversation.messages.at(-1)?.aiGenerated, true);
   assert.equal(
     conversation.revision,
     1,
@@ -57,6 +58,10 @@ test("HTTP 200 with empty body means Sent; the sender comes from the conversatio
     "sent",
   );
   assert.equal(calls, 2);
+  assert.equal(
+    repository.getSnapshot().conversations[0].messages.at(-1)?.aiGenerated,
+    false,
+  );
 });
 
 test("Repeated and concurrent requests call the provider once", async () => {

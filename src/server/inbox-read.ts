@@ -42,6 +42,7 @@ export function messageDto(m: Tables<"messages">): Message {
 export function conversationDto(
   c: Tables<"conversations">,
   messages: Tables<"messages">[] = [],
+  aiMessageIds: ReadonlySet<string> = new Set(),
 ): Conversation {
   return {
     id: c.id,
@@ -96,7 +97,7 @@ export function conversationDto(
           a.occurred_at.localeCompare(b.occurred_at) ||
           a.id.localeCompare(b.id),
       )
-      .map(messageDto),
+      .map((m) => ({ ...messageDto(m), aiGenerated: aiMessageIds.has(m.id) })),
   };
 }
 export function agentDto(a: Tables<"agents">): Agent {
@@ -223,6 +224,38 @@ export async function draftPage(
         : null,
   };
 }
+async function aiGeneratedMessageIds(
+  db: DB,
+  workspaceId: string,
+  messages: { id: string; direction: string }[],
+) {
+  const ids = messages
+    .filter((m) => m.direction === "outbound")
+    .map((m) => m.id);
+  if (!ids.length) return new Set<string>();
+  // The operation remains linked when provider reconciliation changes the source.
+  const { data, error } = await db
+    .from("send_operations")
+    .select("message_id,request")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "sent")
+    .in("message_id", ids);
+  databaseError(error);
+  return new Set(
+    (data ?? []).flatMap((operation) => {
+      const request = operation.request;
+      return operation.message_id &&
+        request &&
+        typeof request === "object" &&
+        !Array.isArray(request) &&
+        typeof request.draftId === "string" &&
+        request.draftId
+        ? [operation.message_id]
+        : [];
+    }),
+  );
+}
+
 export async function withPreviews(
   db: DB,
   workspaceId: string,
@@ -234,7 +267,8 @@ export async function withPreviews(
     p_ids: rows.map((c) => c.id),
   });
   databaseError(error);
-  return rows.map((c) => conversationDto(c, data ?? []));
+  const aiMessageIds = await aiGeneratedMessageIds(db, workspaceId, data ?? []);
+  return rows.map((c) => conversationDto(c, data ?? [], aiMessageIds));
 }
 export async function readWorkspace(
   db: DB,
@@ -503,9 +537,10 @@ export async function readConversation(
   databaseError(messages.error);
   const rows = messages.data ?? [];
   const items = rows.slice(0, 50);
+  const aiMessageIds = await aiGeneratedMessageIds(db, workspaceId, items);
   const last = items.at(-1);
   return {
-    conversation: conversationDto(conversation.data, items),
+    conversation: conversationDto(conversation.data, items, aiMessageIds),
     draft: draft.data ? draftDto(draft.data) : null,
     next:
       rows.length > 50 && last ? { at: last.occurred_at, id: last.id } : null,

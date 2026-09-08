@@ -10,6 +10,7 @@ export interface OutgoingMessage {
   createdAt: string;
   status: "sending" | "sent" | "unknown";
   previousIds: string[];
+  aiGenerated?: boolean;
 }
 export class OutgoingStore {
   private items: OutgoingMessage[] = [];

@@ -265,6 +265,7 @@ export function Composer({
       createdAt: new Date().toISOString(),
       status: "sending" as const,
       previousIds: conversation.messages.map((m) => m.id),
+      aiGenerated: !!draft && mode !== "manual",
     };
     const outbox = outgoingStore(repository);
     outbox.put(pending);
