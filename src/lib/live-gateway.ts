@@ -31,7 +31,7 @@ export class LiveGateway implements InboxGateway {
   private providerRefreshes = new Map<string, Promise<void>>();
   private conversationPages = 1;
   private draftPages = 1;
-  private draftSearch = { query: "", status: "ready", label: "all" };
+  private draftSearch = { query: "", status: "", label: "all" };
   private draftSearchVersion = 0;
   private refreshPromise: Promise<void> | null = null;
   private pendingReads = new Map<

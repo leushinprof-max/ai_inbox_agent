@@ -701,6 +701,20 @@ h3 {
 .draft-lead-footer .time {
   align-self: center;
 }
+.draft-input-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--amber);
+  color: #302005;
+  font-size: 13px;
+  font-weight: 700;
+}
 .queue-item .queue-status.warning {
   color: var(--amber);
 }
