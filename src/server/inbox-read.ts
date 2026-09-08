@@ -1,4 +1,5 @@
 import "server-only";
+import { agentGuidance, grammaticalForm } from "@/domain/agent-guidance";
 import { linkedinProfileUrl } from "@/lib/linkedin-profile";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -102,6 +103,11 @@ export function conversationDto(
 }
 export function agentDto(a: Tables<"agents">): Agent {
   return {
+    ...agentGuidance.parse({
+      customInstructions: a.custom_instructions,
+      meetingInstructions: a.meeting_instructions,
+      resources: a.resources,
+    }),
     id: a.id,
     workspaceId: a.workspace_id,
     name: a.name,
@@ -321,7 +327,7 @@ export async function readWorkspace(
       .eq("archived", false),
     db
       .from("senders")
-      .select("provider_id,name,auth_valid,agent_id")
+      .select("provider_id,name,auth_valid,agent_id,grammatical_form")
       .eq("workspace_id", workspaceId)
       .order("name")
       .limit(1000),
@@ -440,6 +446,7 @@ export async function readWorkspace(
       name: s.name,
       authValid: s.auth_valid,
       agentId: s.agent_id,
+      grammaticalForm: grammaticalForm.parse(s.grammatical_form),
     })),
     imports: (imports.data ?? []).map((r) => ({
       id: r.id,

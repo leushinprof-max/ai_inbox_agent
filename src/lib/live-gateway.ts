@@ -303,7 +303,12 @@ export class LiveGateway implements InboxGateway {
       workspaceId: this.workspaceId,
       id: agent.id,
       revision: agent.version,
-      config: agent,
+      config: {
+        ...agent,
+        customInstructions: agent.customInstructions ?? "",
+        meetingInstructions: agent.meetingInstructions ?? "",
+        resources: agent.resources ?? [],
+      },
     });
   renameWorkspace = (scope: Scope, name: string, timezone: string) =>
     this.mutate(scope, {

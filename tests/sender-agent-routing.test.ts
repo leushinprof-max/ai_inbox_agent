@@ -13,7 +13,7 @@ test("Sender routing enforces tenant boundaries, pause, fallback, conflicts and 
     return (await db.query<T>(sql, args)).rows[0];
   }
   try {
-    await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
+    await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); create schema auth;
     create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb,email_confirmed_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema public,auth to authenticated,anon;`);

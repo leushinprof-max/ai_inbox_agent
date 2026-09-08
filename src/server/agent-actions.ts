@@ -6,6 +6,7 @@ import { adminClient } from "./admin";
 import { runRecordedAI } from "./ai-run";
 import { loadAIContext } from "./ai-context";
 import { createInboxModel, ModelError } from "@/integrations/ai/classify";
+import { agentGuidance, grammaticalForm } from "@/domain/agent-guidance";
 
 export async function selectDefaultAgent(workspaceId: string, agentId: string) {
   try {
@@ -37,6 +38,9 @@ export async function testAgent(input: unknown) {
       agentId: z.uuid(),
       version: z.number().int().positive(),
       message: z.string().trim().min(1).max(8000),
+      previousMessage: z.string().max(8000).default(""),
+      approvedAnswer: z.string().max(8000).default(""),
+      senderId: z.number().int().positive().nullable().default(null),
     })
     .safeParse(input);
   if (!parsed.success)
@@ -45,7 +49,15 @@ export async function testAgent(input: unknown) {
       error: "Save your agent and enter a sample message first.",
     };
   try {
-    const { workspaceId, agentId, version, message } = parsed.data;
+    const {
+      workspaceId,
+      agentId,
+      version,
+      message,
+      previousMessage,
+      approvedAnswer,
+      senderId,
+    } = parsed.data;
     const { db, user } = await authenticatedClient();
     const role = await authorizeWorkspace(db, user.id, workspaceId);
     if (!["owner", "admin"].includes(role))
@@ -72,12 +84,34 @@ export async function testAgent(input: unknown) {
       process.env.INBOX_MODEL,
     );
     const ai = await loadAIContext(adminClient(), workspaceId);
+    const sender = senderId
+      ? await db
+          .from("senders")
+          .select("name,grammatical_form")
+          .eq("workspace_id", workspaceId)
+          .eq("provider_id", senderId)
+          .single()
+      : null;
+    if (sender) databaseError(sender.error);
     const output = await runRecordedAI(
       adminClient(),
       model,
       {
         ...ai,
+        sender: sender?.data
+          ? {
+              name: sender.data.name,
+              grammaticalForm: grammaticalForm.parse(
+                sender.data.grammatical_form,
+              ),
+            }
+          : null,
         agent: {
+          ...agentGuidance.parse({
+            customInstructions: a.custom_instructions,
+            meetingInstructions: a.meeting_instructions,
+            resources: a.resources,
+          }),
           name: a.name,
           goal: a.goal,
           language: a.language,
@@ -86,7 +120,19 @@ export async function testAgent(input: unknown) {
             .parse(a.reply_groups),
           knowledge: a.knowledge,
         },
-        messages: [{ id: "sample", direction: "inbound", body: message }],
+        messages: [
+          ...(previousMessage.trim()
+            ? [
+                {
+                  id: "team",
+                  direction: "outbound" as const,
+                  body: previousMessage,
+                },
+              ]
+            : []),
+          { id: "sample", direction: "inbound", body: message },
+        ],
+        operator: { instructions: "", approvedAnswer, currentDraft: "" },
         generateDraft: true,
       },
       {
@@ -106,6 +152,38 @@ export async function testAgent(input: unknown) {
           ? "AI is not configured on this server yet."
           : "The test could not complete. Check the saved version and try again.",
     };
+  }
+}
+
+export async function saveSenderVoice(input: unknown) {
+  const parsed = z
+    .object({
+      workspaceId: z.uuid(),
+      senderId: z.number().int().positive(),
+      form: grammaticalForm,
+      expected: grammaticalForm,
+    })
+    .safeParse(input);
+  if (!parsed.success)
+    return { ok: false as const, error: "Choose a valid speaking form." };
+  try {
+    const { db } = await authenticatedClient();
+    const v = parsed.data;
+    const result = await db.rpc("save_sender_voice", {
+      p_workspace: v.workspaceId,
+      p_sender: v.senderId,
+      p_form: v.form,
+      p_expected: v.expected,
+    });
+    if (result.error?.code === "PT409")
+      return {
+        ok: false as const,
+        error: "This sender changed. Reload before saving.",
+      };
+    databaseError(result.error);
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "Could not save the speaking form." };
   }
 }
 
