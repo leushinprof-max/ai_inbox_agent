@@ -82,6 +82,12 @@ export function ConversationThread({
         deliveryStatus: m.status,
       })),
   ];
+  const latestInboundId = messages.findLast(
+    (message) => message.direction === "inbound",
+  )?.id;
+  const latestOutboundId = messages.findLast(
+    (message) => message.direction === "outbound",
+  )?.id;
   const scroll = useRef<HTMLDivElement>(null);
   const latestMessageId = messages.at(-1)?.id;
   useEffect(() => {
@@ -178,27 +184,30 @@ export function ConversationThread({
                 className={`message ${message.direction === "outbound" ? "outbound" : ""}`}
               >
                 <div className="message-meta">
-                  <Avatar
-                    photoUrl={
-                      message.direction === "inbound"
-                        ? conversation.contact.photoUrl
-                        : conversation.senderPhotoUrl
-                    }
-                    initials={
-                      message.direction === "outbound"
-                        ? conversation.senderName
-                            .split(/\s+/)
-                            .slice(0, 2)
-                            .map((p) => p[0])
-                            .join("")
-                        : conversation.contact.initials
-                    }
-                    color={
-                      message.direction === "outbound"
-                        ? "purple"
-                        : conversation.contact.color
-                    }
-                  />
+                  {message.id === latestInboundId ||
+                  message.id === latestOutboundId ? (
+                    <Avatar
+                      photoUrl={
+                        message.direction === "inbound"
+                          ? conversation.contact.photoUrl
+                          : conversation.senderPhotoUrl
+                      }
+                      initials={
+                        message.direction === "outbound"
+                          ? conversation.senderName
+                              .split(/\s+/)
+                              .slice(0, 2)
+                              .map((p) => p[0])
+                              .join("")
+                          : conversation.contact.initials
+                      }
+                      color={
+                        message.direction === "outbound"
+                          ? "purple"
+                          : conversation.contact.color
+                      }
+                    />
+                  ) : null}
                   <span>
                     {message.direction === "outbound"
                       ? conversation.senderName

@@ -204,11 +204,18 @@ export function Composer({
     if (!input) return;
     const resize = () => {
       input.style.height = "0px";
-      input.style.height = `${Math.min(180, Math.max(56, input.scrollHeight))}px`;
+      input.style.height = `${Math.min(180, Math.max(44, input.scrollHeight))}px`;
     };
     resize();
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
+    // Opening lead details changes the available width without a window resize.
+    let width = input.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (input.clientWidth === width) return;
+      width = input.clientWidth;
+      resize();
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
   }, [text, editable, generating, redrafting, draft?.status]);
 
   async function run(action: () => void | Promise<void>) {
