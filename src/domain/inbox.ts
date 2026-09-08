@@ -1,4 +1,5 @@
 import type { IntentGroup, LabelDefinition } from "./labels";
+import type { AgentResource, GrammaticalForm } from "./agent-guidance";
 export type Role = "owner" | "admin" | "member" | "viewer";
 export type DraftStatus =
   "ready" | "needs_input" | "snoozed" | "sent" | "dismissed";
@@ -33,6 +34,9 @@ export interface Agent {
   language: string;
   replyGroups: IntentGroup[];
   knowledge: string;
+  customInstructions?: string;
+  meetingInstructions?: string;
+  resources?: AgentResource[];
   version: number;
 }
 export interface Contact {
@@ -117,6 +121,7 @@ export interface InboxState {
     authValid: boolean;
     workspaceId?: string;
     agentId?: string | null;
+    grammaticalForm?: GrammaticalForm;
   }[];
   imports?: {
     id: string;

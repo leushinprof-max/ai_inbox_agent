@@ -1,4 +1,5 @@
 "use server";
+import { agentGuidance } from "@/domain/agent-guidance";
 import { z } from "zod";
 import { authenticatedClient, databaseError } from "./session";
 import { authorizeWorkspace } from "./inbox-read";
@@ -119,6 +120,11 @@ async function adminInput(value: unknown, configValue: unknown) {
     databaseError(a.error);
     agentVersion = a.data!.version;
     agent = {
+      ...agentGuidance.parse({
+        customInstructions: a.data!.custom_instructions,
+        meetingInstructions: a.data!.meeting_instructions,
+        resources: a.data!.resources,
+      }),
       name: a.data!.name,
       goal: a.data!.goal,
       language: a.data!.language,

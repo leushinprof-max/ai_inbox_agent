@@ -6,6 +6,7 @@ import { validateConfiguration } from "@/integrations/ai/configuration";
 import type { ModelInput } from "@/integrations/ai/classify";
 import { databaseError } from "./session";
 import { adminClient } from "./admin";
+import { grammaticalForm } from "@/domain/agent-guidance";
 
 export async function publishedAI(db = adminClient()) {
   const release = await db
@@ -65,7 +66,7 @@ export async function loadAIContext(
   const [workspace, conversation] = await Promise.all([
     db
       .from("workspaces")
-      .select("label_revision,workspace_labels(*)")
+      .select("label_revision,timezone,workspace_labels(*)")
       .eq("id", workspaceId)
       .single(),
     conversationId
@@ -99,6 +100,15 @@ export async function loadAIContext(
     }),
   );
   const c = conversation.data;
+  const sender = c
+    ? await db
+        .from("senders")
+        .select("name,grammatical_form")
+        .eq("workspace_id", workspaceId)
+        .eq("provider_id", c.sender_id)
+        .maybeSingle()
+    : null;
+  if (sender) databaseError(sender.error);
   const previous: ModelInput["previous"] = c
     ? {
         labelId: c.label_id,
@@ -121,5 +131,15 @@ export async function loadAIContext(
     assignmentRevision: c?.label_assignment_revision ?? 0,
     previous,
     conversation: c,
+    sender: c
+      ? {
+          name: sender?.data?.name || c.sender_name,
+          grammaticalForm: grammaticalForm.parse(
+            sender?.data?.grammatical_form ?? "unspecified",
+          ),
+        }
+      : null,
+    workspaceTimezone: workspace.data!.timezone,
+    currentTime: new Date().toISOString(),
   };
 }

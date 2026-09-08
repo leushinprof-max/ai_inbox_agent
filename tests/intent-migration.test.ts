@@ -7,7 +7,7 @@ test("Populated upgrade maps single labels, queues replied history once and pres
   const db = new PGlite();
   try {
     await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
-      create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb,email_confirmed_at timestamptz);
+      create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb,email_confirmed_at timestamptz);
       create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       grant usage on schema public,auth to authenticated,anon;`);
     const dir = new URL("../supabase/migrations/", import.meta.url);

@@ -454,6 +454,10 @@ export function Composer({
                 />
                 Save this answer to the agent’s Knowledge
               </label>
+              <p className="help">
+                Save lasting product facts only. Keep meeting slots and
+                availability in this conversation.
+              </p>
             </div>
             <div className="composer-actions">
               <Button

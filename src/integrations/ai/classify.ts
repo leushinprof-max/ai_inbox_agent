@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { readAgentKnowledge } from "@/domain/agent-knowledge";
+import type { AgentResource, GrammaticalForm } from "@/domain/agent-guidance";
+import { replyGuidance } from "./agent-guidance";
 import { boundedJson } from "@/integrations/heyreach/client";
 import { assertReasoningSupported } from "./model-catalog";
 import {
@@ -47,7 +50,13 @@ export interface ModelInput {
     language: string;
     replyGroups: IntentGroup[];
     knowledge: string;
+    customInstructions?: string;
+    meetingInstructions?: string;
+    resources?: AgentResource[];
   } | null;
+  sender?: { name: string; grammaticalForm: GrammaticalForm } | null;
+  currentTime?: string;
+  workspaceTimezone?: string;
   messages: { id: string; direction: "inbound" | "outbound"; body: string }[];
   labels: LabelDefinition[];
   previous?: {
@@ -84,7 +93,7 @@ const invariant =
 const classificationInvariant =
   "This stage only classifies the lead's intent and detects explicit requests to stop contact. Use supplied active label IDs only. Evidence must be a verbatim excerpt of a supplied inbound message. Do not decide whether to reply or write a draft. Reply-related annotations in classification examples are context only; return only labelId, evidenceMessageId, evidenceQuote and contactStopped.";
 const replyInvariant =
-  "The lead's intent has already been classified. Use previous.labelId as the fixed label; do not reclassify or produce labels or evidence. Decide whether a response is needed, then prepare it when appropriate. Generate only when generateDraft is true, an agent is present, the selected label's group is allowed, the latest message is inbound, and contact is not explicitly stopped. Detect explicit requests to stop contact independently. Use only approved knowledge and operator.approvedAnswer for factual claims, prices and URLs. When no draft is permitted or appropriate leave draft and missingKnowledge empty. Missing essential knowledge means shouldReply=true, draft empty, and a precise missingKnowledge question.";
+  "The lead's intent has already been classified. Use previous.labelId as the fixed label; do not reclassify or produce labels or evidence. Decide whether a response is needed, then prepare it when appropriate. Generate only when generateDraft is true, an agent is present, the selected label's group is allowed, the latest message is inbound, and contact is not explicitly stopped. Detect explicit requests to stop contact independently. Use only approved knowledge and operator.approvedAnswer for factual claims and prices; exact resource URLs are also approved for sharing. When no draft is permitted or appropriate leave draft and missingKnowledge empty. Missing essential knowledge means shouldReply=true, draft empty, and a precise missingKnowledge question.";
 
 export function buildModelRequest(
   input: ModelInput,
@@ -138,7 +147,7 @@ export function buildModelRequest(
         /\{\{([^{}]+)\}\}/g,
         (_, key: keyof NonNullable<ModelInput["agent"]>) => {
           const value = agent[key];
-          return Array.isArray(value) ? value.join(", ") : value;
+          return Array.isArray(value) ? value.join(", ") : (value ?? "");
         },
       )
     : null;
@@ -156,6 +165,7 @@ export function buildModelRequest(
       ? [config.classification, classificationInvariant]
       : [
           replyInvariant,
+          replyGuidance,
           config.replyDecision,
           ...(generateDraft ? [config.draft, config.needsInput] : []),
           ...(scenario === "rewrite" ? [config.rewrite] : []),
@@ -167,6 +177,25 @@ export function buildModelRequest(
     ...(!classifying
       ? {
           agent: renderedAgent,
+          replyContext: {
+            sender: input.sender ?? null,
+            companyName: agent
+              ? readAgentKnowledge(agent.knowledge).companyName
+              : "",
+            customInstructions: agent?.customInstructions ?? "",
+            meetingInstructions: agent?.meetingInstructions ?? "",
+            resources: (agent?.resources ?? []).map(
+              ({ name, url, whenToUse, kind }) => ({
+                name,
+                url,
+                whenToUse,
+                kind,
+              }),
+            ),
+            scheduling: "manual",
+            currentTime: input.currentTime ?? null,
+            workspaceTimezone: input.workspaceTimezone ?? null,
+          },
           eligibleGroups: agent?.replyGroups ?? [],
           operator: input.operator ?? null,
         }

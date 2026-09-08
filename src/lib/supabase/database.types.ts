@@ -69,42 +69,51 @@ export type Database = {
       agents: {
         Row: {
           created_at: string;
+          custom_instructions: string;
           description: string;
           goal: string;
           id: string;
           knowledge: string;
           language: string;
+          meeting_instructions: string;
           name: string;
           reply_groups: string[];
           reply_policy: string;
+          resources: Json;
           status: string;
           version: number;
           workspace_id: string;
         };
         Insert: {
           created_at?: string;
+          custom_instructions?: string;
           description?: string;
           goal?: string;
           id?: string;
           knowledge?: string;
           language?: string;
+          meeting_instructions?: string;
           name: string;
           reply_groups?: string[];
           reply_policy?: string;
+          resources?: Json;
           status?: string;
           version?: number;
           workspace_id: string;
         };
         Update: {
           created_at?: string;
+          custom_instructions?: string;
           description?: string;
           goal?: string;
           id?: string;
           knowledge?: string;
           language?: string;
+          meeting_instructions?: string;
           name?: string;
           reply_groups?: string[];
           reply_policy?: string;
+          resources?: Json;
           status?: string;
           version?: number;
           workspace_id?: string;
@@ -308,8 +317,8 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_photo_url: string | null;
-          contact_profile_url: string | null;
           contact_position: string;
+          contact_profile_url: string | null;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -345,8 +354,8 @@ export type Database = {
           contact_company?: string;
           contact_name: string;
           contact_photo_url?: string | null;
-          contact_profile_url?: string | null;
           contact_position?: string;
+          contact_profile_url?: string | null;
           contact_stopped?: boolean;
           created_at?: string;
           evidence_message_id?: string | null;
@@ -382,8 +391,8 @@ export type Database = {
           contact_company?: string;
           contact_name?: string;
           contact_photo_url?: string | null;
-          contact_profile_url?: string | null;
           contact_position?: string;
+          contact_profile_url?: string | null;
           contact_stopped?: boolean;
           created_at?: string;
           evidence_message_id?: string | null;
@@ -739,6 +748,7 @@ export type Database = {
         Row: {
           agent_id: string | null;
           auth_valid: boolean;
+          grammatical_form: string;
           name: string;
           provider_id: number;
           updated_at: string;
@@ -747,6 +757,7 @@ export type Database = {
         Insert: {
           agent_id?: string | null;
           auth_valid: boolean;
+          grammatical_form?: string;
           name: string;
           provider_id: number;
           updated_at?: string;
@@ -755,6 +766,7 @@ export type Database = {
         Update: {
           agent_id?: string | null;
           auth_valid?: boolean;
+          grammatical_form?: string;
           name?: string;
           provider_id?: number;
           updated_at?: string;
@@ -955,8 +967,8 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_photo_url: string | null;
-          contact_profile_url: string | null;
           contact_position: string;
+          contact_profile_url: string | null;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -1009,8 +1021,8 @@ export type Database = {
           contact_company: string;
           contact_name: string;
           contact_photo_url: string | null;
-          contact_profile_url: string | null;
           contact_position: string;
+          contact_profile_url: string | null;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -1214,6 +1226,15 @@ export type Database = {
           p_default: boolean;
           p_revision: number;
           p_senders: number[];
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
+      save_sender_voice: {
+        Args: {
+          p_expected: string;
+          p_form: string;
+          p_sender: number;
           p_workspace: string;
         };
         Returns: undefined;

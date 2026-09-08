@@ -11,6 +11,7 @@ import { runRecordedAI } from "./ai-run";
 import { loadAIContext } from "./ai-context";
 import { decryptConnection } from "./credentials";
 import { databaseError } from "./session";
+import { agentModelConfig as agentConfig } from "@/domain/agent-guidance";
 
 const jobSchema = z.object({
   id: z.uuid(),
@@ -19,13 +20,6 @@ const jobSchema = z.object({
   payload: z.record(z.string(), z.unknown()),
   lease_token: z.uuid(),
   attempts: z.number().int(),
-});
-const agentConfig = z.object({
-  name: z.string(),
-  goal: z.string(),
-  language: z.string(),
-  replyGroups: z.array(z.enum(["positive", "neutral", "negative"])),
-  knowledge: z.string(),
 });
 type Provider = Pick<
   ReturnType<typeof createHeyReachClient>,
@@ -201,6 +195,34 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         ]);
         [version, messages, draft].forEach((r) => databaseError(r.error));
         const ai = await loadAIContext(db, job.workspace_id, g.conversation_id);
+        // Preserve operator facts through a rewrite of the same inbound revision.
+        // Never carry old availability into a later lead reply or another agent.
+        const approvals = await db
+          .from("draft_generations")
+          .select("approved_answer,created_at")
+          .eq("workspace_id", job.workspace_id)
+          .eq("conversation_id", g.conversation_id)
+          .eq("agent_id", g.agent_id)
+          .eq("source_revision", g.source_revision)
+          .eq("status", "completed")
+          .neq("approved_answer", "")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        databaseError(approvals.error);
+        const approvedAnswer = !approvals.data?.length
+          ? g.approved_answer
+          : [
+              ...(approvals.data ?? [])
+                .reverse()
+                .map(
+                  (a) => `Approved at ${a.created_at}: ${a.approved_answer}`,
+                ),
+              ...(g.approved_answer
+                ? [`Current operator answer: ${g.approved_answer}`]
+                : []),
+            ]
+              .join("\n\n")
+              .slice(-16000);
         const output = await runRecordedAI(
           db,
           deps.model,
@@ -224,7 +246,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             generateDraft: true,
             operator: {
               instructions: g.instructions,
-              approvedAnswer: g.approved_answer,
+              approvedAnswer,
               currentDraft: draft.data?.body ?? "",
             },
           },

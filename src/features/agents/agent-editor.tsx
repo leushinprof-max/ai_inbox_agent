@@ -2,6 +2,8 @@
 
 import "./agents.css";
 import { AgentMark } from "./agent-mark";
+import { AgentResources } from "./agent-resources";
+import { agentGuidance } from "@/domain/agent-guidance";
 import {
   readAgentKnowledge,
   writeAgentKnowledge,
@@ -24,7 +26,7 @@ import {
   Icon,
 } from "@/components/ui";
 
-const steps = ["Basics", "Knowledge", "Follow-ups", "Test", "Launch"];
+const steps = ["Basics", "Knowledge", "Instructions", "Test", "Launch"];
 
 export function AgentEditor({ id }: { id: string }) {
   const { state, scope, repository, basePath, mode, workspace } = useInbox();
@@ -36,6 +38,7 @@ export function AgentEditor({ id }: { id: string }) {
       ["owner", "admin"].includes(m.role),
   );
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const existing = state.agents.find(
     (a) => a.id === id && a.workspaceId === scope.workspaceId,
   );
@@ -83,10 +86,15 @@ export function AgentEditor({ id }: { id: string }) {
     status: Agent["status"] = agent.status,
     navigate = true,
   ): Promise<Agent | undefined> {
-    if (saving) return;
+    if (saving || uploading) return;
     setSaving(true);
     try {
       setError("");
+      const guidance = agentGuidance.safeParse(agent);
+      if (!guidance.success)
+        throw new Error(
+          "Give each resource a name, a valid link and instructions for when to use it. Keep custom instructions under 8,000 characters.",
+        );
       if (agent.knowledge.length > 30000)
         throw new Error(
           "Knowledge is too long. Keep the combined content under 30,000 characters.",
@@ -159,7 +167,10 @@ export function AgentEditor({ id }: { id: string }) {
             ) : null}
           </p>
         </div>
-        <Button disabled={!canManage || saving} onClick={() => save()}>
+        <Button
+          disabled={!canManage || saving || uploading}
+          onClick={() => save()}
+        >
           {saving ? "Saving…" : "Save changes"}
         </Button>
       </header>
@@ -168,6 +179,7 @@ export function AgentEditor({ id }: { id: string }) {
           {steps.map((title, i) => (
             <button
               key={title}
+              disabled={uploading || saving}
               aria-pressed={step === i}
               className={`tab ${step === i ? "active" : ""}`}
               onClick={() => setStep(i)}
@@ -185,7 +197,7 @@ export function AgentEditor({ id }: { id: string }) {
               [
                 "Define what your agent should do and how it should reply.",
                 "Give your agent approved information it can use in conversations.",
-                "Decide when your team should follow up.",
+                "Set how your agent should handle your conversations.",
                 "Check how your agent uses its instructions.",
                 "Choose which LinkedIn senders this agent should handle.",
               ][step]
@@ -319,19 +331,6 @@ export function AgentEditor({ id }: { id: string }) {
                   </p>
                 </div>
               </div>
-              <div className="field">
-                <label htmlFor="agent-description">
-                  Description{" "}
-                  <small className="muted">Optional · internal note</small>
-                </label>
-                <textarea
-                  id="agent-description"
-                  value={agent.description}
-                  onChange={(e) => field("description", e.target.value)}
-                  placeholder="What does this agent help your team with?"
-                  maxLength={1000}
-                />
-              </div>
             </div>
           ) : null}
           {step === 1 ? (
@@ -444,18 +443,70 @@ export function AgentEditor({ id }: { id: string }) {
                 If approved Knowledge is missing an answer, the agent asks your
                 team for input.
               </Notice>
+              <AgentResources
+                workspaceId={scope.workspaceId}
+                value={agent.resources ?? []}
+                onChange={(resources) => field("resources", resources)}
+                onBusy={setUploading}
+                disabled={!canManage || saving}
+                demo={mode === "demo"}
+              />
             </>
           ) : null}
           {step === 2 ? (
-            <div className="card">
-              <div className="row between">
-                <h2>Follow-ups</h2>
-                <Badge>Off</Badge>
+            <div className="agent-instructions">
+              <div className="field">
+                <label htmlFor="agent-custom-instructions">
+                  Custom instructions <small className="muted">Optional</small>
+                </label>
+                <p className="help">
+                  Describe how to respond in situations specific to your
+                  outreach.
+                </p>
+                <textarea
+                  id="agent-custom-instructions"
+                  className="agent-custom-instructions"
+                  value={agent.customInstructions ?? ""}
+                  maxLength={8000}
+                  disabled={!canManage}
+                  placeholder="If the lead confirms they work with international contractors, briefly explain how we can help before suggesting a call."
+                  onChange={(e) => field("customInstructions", e.target.value)}
+                />
               </div>
-              <p className="page-description">
-                Automatic follow-ups are outside the initial release. You can
-                snooze a draft and return to it later.
-              </p>
+              <section
+                className="agent-meeting-settings"
+                aria-labelledby="agent-meeting-title"
+              >
+                <div className="agent-section-heading">
+                  <h2 id="agent-meeting-title">Meeting coordination</h2>
+                  <Badge>Manual</Badge>
+                </div>
+                <p className="help">
+                  When a lead wants to find a time, the draft moves to Needs
+                  input. Add available dates, times and a time zone, and the
+                  agent prepares the reply.
+                </p>
+                <div className="field">
+                  <label htmlFor="agent-meeting-instructions">
+                    Meeting instructions{" "}
+                    <small className="muted">Optional</small>
+                  </label>
+                  <textarea
+                    id="agent-meeting-instructions"
+                    value={agent.meetingInstructions ?? ""}
+                    maxLength={2000}
+                    disabled={!canManage}
+                    placeholder="Before arranging a call, ask which payout setup the lead currently uses."
+                    onChange={(e) =>
+                      field("meetingInstructions", e.target.value)
+                    }
+                  />
+                </div>
+                <p className="help">
+                  Provide available slots in the conversation&apos;s Needs input
+                  request. They are not saved as permanent instructions.
+                </p>
+              </section>
             </div>
           ) : null}
           {step === 3 ? (
@@ -518,6 +569,7 @@ export function AgentEditor({ id }: { id: string }) {
           ) : null}
           <div hidden={step !== 4}>
             <AgentLaunch
+              onSenderSaved={setAgent}
               agent={agent}
               canManage={canManage}
               onSave={(status) => save(status, false)}
@@ -528,6 +580,7 @@ export function AgentEditor({ id }: { id: string }) {
               <Button
                 variant="primary"
                 icon="arrow"
+                disabled={uploading || saving}
                 onClick={() => setStep(step + 1)}
               >
                 Next: {steps[step + 1]}

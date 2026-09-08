@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authenticatedClient, databaseError } from "./session";
 import { authorizeWorkspace, uuid } from "./inbox-read";
 import { InboxError } from "@/domain/inbox";
+import { agentGuidance } from "@/domain/agent-guidance";
+import { validateResourceFiles } from "./resource-validation";
 
 const revision = z.number().int().nonnegative();
 const mutation = z.discriminatedUnion("kind", [
@@ -36,7 +38,7 @@ const mutation = z.discriminatedUnion("kind", [
     workspaceId: uuid,
     id: uuid,
     revision,
-    config: z.object({
+    config: agentGuidance.extend({
       name: z.string().trim().min(1).max(100),
       description: z.string().max(1000),
       goal: z.string().max(8000),
@@ -106,7 +108,10 @@ export async function mutateInbox(
           })
         ).error,
       );
-    if (value.kind === "agent")
+    if (value.kind === "agent") {
+      if (!["owner", "admin"].includes(role))
+        throw new InboxError("forbidden", "Only admins can change agents.");
+      await validateResourceFiles(value.workspaceId, value.config.resources);
       databaseError(
         (
           await db.rpc("save_agent", {
@@ -117,6 +122,7 @@ export async function mutateInbox(
           })
         ).error,
       );
+    }
     if (value.kind === "workspace") {
       if (!["owner", "admin"].includes(role))
         throw new InboxError(
