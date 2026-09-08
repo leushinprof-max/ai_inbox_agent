@@ -30,6 +30,22 @@ export async function GET(
       ? cursor.parse(JSON.parse(q.get("before")!))
       : undefined;
     switch (q.get("view")) {
+      case "read-state": {
+        const result = await db
+          .from("conversations")
+          .select("unread,read_state_revision")
+          .eq("workspace_id", workspaceId)
+          .eq("id", z.uuid().parse(q.get("id")))
+          .single();
+        databaseError(result.error);
+        return NextResponse.json(
+          {
+            unread: result.data!.unread,
+            readStateRevision: result.data!.read_state_revision,
+          },
+          { headers },
+        );
+      }
       case "conversation":
         return NextResponse.json(
           await readConversation(db, workspaceId, q.get("id") ?? "", before),

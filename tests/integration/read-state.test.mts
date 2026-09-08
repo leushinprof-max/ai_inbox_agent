@@ -121,7 +121,28 @@ test("Shared read state persists across authenticated sessions and reloads; view
     const body = await response.json();
     assert.equal(body.conversation.unread, true);
     assert.equal(body.conversation.readStateRevision, 3);
+    const markResponse = await fetch(
+      `${api}?view=read-state&id=${conversation}`,
+      { headers: headers(user) },
+    );
+    assert.equal(markResponse.status, 200);
+    assert.deepEqual(await markResponse.json(), {
+      unread: true,
+      readStateRevision: 3,
+    });
   }
+  assert.notEqual(
+    (await fetch(`${api}?view=read-state&id=${conversation}`)).status,
+    200,
+  );
+  assert.notEqual(
+    (
+      await fetch(`${api}?view=read-state&id=${randomUUID()}`, {
+        headers: headers(owner),
+      })
+    ).status,
+    200,
+  );
   assert.deepEqual(
     await read(owner),
     { unread: true, read_state_revision: 3 },
