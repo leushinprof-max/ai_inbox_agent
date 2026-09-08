@@ -19,7 +19,7 @@ import {
   useOutgoing,
 } from "@/lib/outgoing-messages";
 import type { Conversation, Message } from "@/domain/inbox";
-import { Avatar, Button, IconButton, Spark, Notice } from "@/components/ui";
+import { Avatar, Button, IconButton, Notice } from "@/components/ui";
 
 export function ConversationThread({
   conversation,
@@ -122,17 +122,30 @@ export function ConversationThread({
           className="thread-back"
           onClick={onBack}
         />
-        <Avatar
-          photoUrl={conversation.contact.photoUrl}
-          initials={conversation.contact.initials}
-          color={conversation.contact.color}
-        />
+        <div className="thread-participants">
+          <Avatar
+            photoUrl={conversation.contact.photoUrl}
+            initials={conversation.contact.initials}
+            color={conversation.contact.color}
+          />
+          <span
+            className="thread-sender-avatar"
+            title={conversation.senderName}
+          >
+            <Avatar
+              photoUrl={conversation.senderPhotoUrl}
+              initials={conversation.senderName
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join("")}
+            />
+          </span>
+        </div>
         <div className="grow">
           <h2>{conversation.contact.name}</h2>
           <p>
-            {[conversation.contact.company, "LinkedIn"]
-              .filter(Boolean)
-              .join(" · ")}
+            Sending as <span>{conversation.senderName}</span>
           </p>
         </div>
         <RefreshConversationControl
@@ -335,7 +348,7 @@ export function ContactContext({
   return (
     <aside
       ref={panel}
-      className="context kimi-context"
+      className="context kimi-context reference-context"
       aria-label="Lead context"
       role={overlay ? "dialog" : undefined}
       aria-modal={overlay || undefined}
@@ -364,63 +377,55 @@ export function ContactContext({
       }}
     >
       <div className="context-profile">
-        <div className="row between">
-          <Avatar
-            photoUrl={conversation.contact.photoUrl}
-            initials={conversation.contact.initials}
-            color={conversation.contact.color}
-            large
-          />
-          <IconButton label="Close details" icon="close" onClick={onClose} />
+        <Avatar
+          photoUrl={conversation.contact.photoUrl}
+          initials={conversation.contact.initials}
+          color={conversation.contact.color}
+          large
+        />
+        <div className="grow">
+          <h2>{conversation.contact.name}</h2>
+          <p>LinkedIn contact</p>
         </div>
-        <h2>{conversation.contact.name}</h2>
-        <p>
-          {[conversation.contact.position, conversation.contact.company]
-            .filter(Boolean)
-            .join(" at ")}
-        </p>
+        {overlay && (
+          <IconButton label="Close details" icon="close" onClick={onClose} />
+        )}
       </div>
       <div className="context-section">
         <p className="eyebrow">Lead details</p>
         {[
           ["Company", conversation.contact.company],
           ["Position", conversation.contact.position],
-          ["Industry", conversation.contact.industry],
         ].map(([label, value]) => (
           <div className="details-row" key={label}>
             <span>{label}</span>
-            <span>{value || "—"}</span>
+            <span className={!value ? "muted" : undefined}>
+              {value || "Not specified"}
+            </span>
           </div>
         ))}
       </div>
       <div className="context-section">
-        <p className="eyebrow">Conversation</p>
-        <div className="context-field">
+        <p className="eyebrow">Automation</p>
+        <div className="details-row">
           <p className="context-field-label">Label</p>
           <LabelPicker conversation={conversation} />
         </div>
-        <div className="context-field">
-          <p className="context-field-label">Assigned agent</p>
+        <div className="details-row">
+          <p className="context-field-label">AI Agent</p>
           {agent ? (
             <Link
-              className="agent-link"
+              className="context-agent-link"
               href={`${basePath}/agents/${agent.id}`}
             >
-              <Spark />
-              <span className="grow">
-                <strong>{agent.name}</strong>
-                <small>
-                  {agent.status} ·{" "}
-                  {sender?.agentId ? "Sender assignment" : "Workspace default"}
-                </small>
-              </span>
+              {agent.name}
             </Link>
           ) : (
             <p className="muted">No agent assigned</p>
           )}
         </div>
       </div>
-      <div className="context-section">
+      <div className="context-notes">
         <label className="eyebrow" htmlFor="contact-notes">
           Notes
         </label>
@@ -431,33 +436,37 @@ export function ContactContext({
             setNotes(e.target.value);
             setSaved(false);
           }}
-          placeholder="Add a note for your team…"
+          placeholder="Add context for your team…"
           maxLength={8000}
         />
-        <Button
-          variant="ghost small"
-          onClick={async () => {
-            try {
-              await repository.note(
-                scope,
-                conversation.id,
-                notes,
-                noteRevision.current,
-              );
-              noteRevision.current = repository
-                .getSnapshot()
-                .conversations.find(
-                  (c) => c.id === conversation.id,
-                )?.notesRevision;
-              setSaved(true);
-              setError("");
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Could not save note.");
-            }
-          }}
-        >
-          {saved ? "Saved" : "Save note"}
-        </Button>
+        {(notes !== conversation.notes || saved) && (
+          <Button
+            variant="ghost small"
+            onClick={async () => {
+              try {
+                await repository.note(
+                  scope,
+                  conversation.id,
+                  notes,
+                  noteRevision.current,
+                );
+                noteRevision.current = repository
+                  .getSnapshot()
+                  .conversations.find(
+                    (c) => c.id === conversation.id,
+                  )?.notesRevision;
+                setSaved(true);
+                setError("");
+              } catch (e) {
+                setError(
+                  e instanceof Error ? e.message : "Could not save note.",
+                );
+              }
+            }}
+          >
+            {saved ? "Saved" : "Save note"}
+          </Button>
+        )}
         {error ? (
           <Notice variant="error">
             {error}

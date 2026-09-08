@@ -353,9 +353,9 @@
   width: 296px;
 }
 .kimi-thread .thread-header {
-  height: 54px;
-  padding: 0 20px;
-  gap: 10px;
+  height: 96px;
+  padding: 0 28px;
+  gap: 14px;
 }
 .kimi-thread .thread-header .grow {
   min-width: 0;
@@ -367,13 +367,45 @@
   white-space: nowrap;
 }
 .kimi-thread .thread-header h2 {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
 }
 .kimi-thread .thread-header .avatar {
-  width: 28px;
-  height: 28px;
+  width: 54px;
+  height: 54px;
   font-size: 11px;
+}
+.thread-participants {
+  position: relative;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+.thread-sender-avatar {
+  position: absolute;
+  right: -5px;
+  bottom: -2px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+}
+.kimi-thread .thread-header .thread-sender-avatar .avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 9px;
+}
+.kimi-thread .thread-header p {
+  margin-top: 5px;
+  font-size: 12px;
+}
+.kimi-thread .thread-header p span {
+  color: var(--text);
+}
+.kimi-thread .thread-header > .icon-only:not(.thread-back),
+.kimi-thread .thread-header .thread-refresh,
+.kimi-thread .thread-header .read-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
 }
 .kimi-thread .thread-scroll {
   padding: 24px;
@@ -815,6 +847,115 @@
   margin-top: 7px;
   color: var(--muted);
   font-size: 11px;
+}
+.reference-context .context-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 96px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.reference-context .context-profile .grow {
+  min-width: 0;
+}
+.reference-context .context-profile .avatar {
+  width: 54px;
+  height: 54px;
+}
+.reference-context .context-profile h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.reference-context .context-profile p {
+  margin: 0;
+  font-size: 12px;
+}
+.reference-context .context-section {
+  margin: 0 16px 10px;
+  padding: 0 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--raised);
+  overflow: hidden;
+}
+.reference-context .context-section > .eyebrow {
+  padding: 12px 14px;
+  margin: 0 0 6px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.reference-context .details-row {
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 14px;
+  margin: 0;
+}
+.reference-context .details-row > :last-child {
+  text-align: right;
+}
+.reference-context .context-field-label {
+  margin: 0;
+}
+.reference-context .context-agent-link {
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.reference-context .context-agent-link:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}
+.reference-context .label-picker {
+  justify-items: end;
+}
+.reference-context .label-picker-control {
+  min-height: 28px;
+  max-width: 100%;
+  padding: 0;
+  gap: 4px;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+}
+.reference-context .label-picker-control .pill {
+  border-radius: 15px;
+  padding: 4px 10px;
+  line-height: 18px;
+  white-space: normal;
+}
+.reference-context .label-picker-control .icon {
+  width: 12px;
+  height: 12px;
+}
+.reference-context .context-notes {
+  margin: 18px 16px;
+}
+.reference-context .context-notes .eyebrow {
+  display: block;
+  margin-bottom: 8px;
+}
+.reference-context .context-notes textarea {
+  min-height: 110px;
+  border-radius: 9px;
+}
+@media (max-width: 680px) {
+  .kimi-thread .thread-header {
+    height: 80px;
+  }
+  .kimi-thread .thread-header .thread-participants > .avatar {
+    width: 36px;
+    height: 36px;
+  }
+  .kimi-thread .thread-header > .icon-only:not(.thread-back),
+  .kimi-thread .thread-header .thread-refresh,
+  .kimi-thread .thread-header .read-button {
+    width: 30px;
+    height: 32px;
+    border-radius: 8px;
+  }
 }
 .message-spinner {
   width: 12px;

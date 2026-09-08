@@ -33,7 +33,10 @@ export function LabelPicker({ conversation }: { conversation: Conversation }) {
   }
   return (
     <div className="label-picker" aria-busy={busy}>
-      <div className={`label-picker-control ${writable ? "editable" : ""}`}>
+      <div
+        className={`label-picker-control ${writable ? "editable" : ""}`}
+        title="Change label. Updates automatically after the next lead reply."
+      >
         <ConversationLabel conversation={conversation} />
         {writable && <Icon name="chevron" />}
         {writable && (
@@ -71,9 +74,9 @@ export function LabelPicker({ conversation }: { conversation: Conversation }) {
           </select>
         )}
       </div>
-      {writable && (
+      {writable && busy && (
         <small className="muted" role="status">
-          {busy ? "Saving…" : "Updates automatically after the next reply."}
+          Saving…
         </small>
       )}
       {conversation.labelState === "failed" && (
