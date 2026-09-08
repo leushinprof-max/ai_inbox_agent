@@ -267,7 +267,7 @@ h3 {
   height: 34px;
   background: #23334e;
   color: #a9c6f9;
-  border: 1px solid #344768;
+  border: 0;
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
@@ -279,22 +279,18 @@ h3 {
 .avatar.purple {
   background: #2e2046;
   color: #c2a8ec;
-  border-color: #47325f;
 }
 .avatar.teal {
   background: #143d35;
   color: #8adecc;
-  border-color: #285247;
 }
 .avatar.amber {
   background: #3b291d;
   color: #e7bd99;
-  border-color: #543c2c;
 }
 .avatar.pink {
   background: #391b33;
   color: #df99cb;
-  border-color: #552c4b;
 }
 .avatar.agent {
   border-radius: 9px;
