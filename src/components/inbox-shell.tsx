@@ -6,6 +6,10 @@ import { useState, type ReactNode } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar, Icon, type IconName } from "./ui";
 import { Dialog } from "./dialog";
+import { sectionRoute } from "@/lib/section-route";
+// Keep layout CSS available before a route's loading boundary resolves.
+import "@/features/conversations/conversations.css";
+import "@/features/agents/agents.css";
 
 const navigation: { route: string; title: string; icon: IconName }[] = [
   { route: "conversations", title: "Conversations", icon: "chat" },
@@ -16,6 +20,7 @@ const navigation: { route: string; title: string; icon: IconName }[] = [
 
 export function InboxShell({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const { framed } = sectionRoute(path);
   const { state, workspace, scope, switchWorkspace, basePath, mode } =
     useInbox();
   const member = state.memberships.find(
@@ -31,7 +36,7 @@ export function InboxShell({ children }: { children: ReactNode }) {
           ["ready", "needs_input"].includes(d.status),
       ).length;
   return (
-    <div className="shell">
+    <div className={`shell${framed ? " shell-framed" : ""}`}>
       <aside className="sidebar">
         <button
           className="workspace-button"
@@ -99,7 +104,7 @@ export function InboxShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main className="workspace-main" key={workspace.id}>
-        {children}
+        {framed ? <div className="workspace-frame">{children}</div> : children}
       </main>
       {switcher ? (
         <Dialog title="Workspaces" onClose={() => setSwitcher(false)}>

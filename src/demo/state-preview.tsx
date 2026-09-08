@@ -20,7 +20,10 @@ export function StatePreview({
   scene: string;
 }) {
   const router = useRouter();
-  if (scene === "loading") return <SectionLoading section={section} />;
+  if (scene === "loading" || scene === "loading-detail")
+    return (
+      <SectionLoading section={section} detail={scene === "loading-detail"} />
+    );
   if (scene === "error")
     return (
       <SectionError
@@ -45,9 +48,18 @@ export function StateCatalog() {
       (scene) =>
         `${scene.startsWith("import-") ? "settings" : "drafts"}/${scene}`,
     ),
-    ...["drafts", "conversations", "agents"].flatMap((section) =>
+    ...[
+      "drafts",
+      "conversations",
+      "agents",
+      "settings",
+      "product-admin",
+      "setup",
+    ].flatMap((section) =>
       ["loading", "error"].map((scene) => `${section}/${scene}`),
     ),
+    "conversations/loading-detail",
+    "agents/loading-detail",
   ];
   return (
     <>

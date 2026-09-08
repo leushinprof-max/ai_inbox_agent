@@ -524,66 +524,41 @@ h3 {
   grid-template-columns: 278px minmax(340px, 1fr);
 }
 /* Shared inset frame for inbox and agent workspaces. */
+.workspace-frame {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
 @media (min-width: 681px) {
-  .shell:has(
-      > .workspace-main
-        > :is(
-          .draft-layout,
-          .conversations-page,
-          .conversation-detail-layout,
-          .agents-page,
-          .agent-editor
-        )
-    )
-    > .sidebar {
+  .shell-framed > .sidebar {
     border-right-color: transparent;
   }
-  .workspace-main:has(
-    > :is(
-      .draft-layout,
-      .conversations-page,
-      .conversation-detail-layout,
-      .agents-page,
-      .agent-editor
-    )
-  ) {
+  .shell-framed > .workspace-main {
     padding: 24px 12px 12px;
     background: var(--side);
   }
-  .workspace-main
-    > :is(
-      .draft-layout,
-      .conversations-page,
-      .conversation-detail-layout,
-      .agents-page,
-      .agent-editor
-    ) {
-    position: relative;
-    overflow: hidden;
+  .workspace-frame {
     border: 1px solid var(--line-strong);
     border-radius: 14px;
     background: var(--bg);
   }
-  .workspace-main > .conversation-detail-layout > .context {
+  .workspace-frame > .conversation-detail-layout > .context {
     background: var(--bg);
   }
 }
 @media (min-width: 681px) and (max-width: 1180px),
   (min-width: 681px) and (max-height: 800px) {
-  .workspace-main:has(
-    > :is(
-      .draft-layout,
-      .conversations-page,
-      .conversation-detail-layout,
-      .agents-page,
-      .agent-editor
-    )
-  ) {
+  .shell-framed > .workspace-main {
     padding: 16px 8px 8px;
   }
 }
 @media (min-width: 681px) and (max-width: 1180px) {
-  .workspace-main > .draft-layout > .context {
+  .workspace-frame > .draft-layout > .context {
     top: 0;
     max-width: 100%;
   }
