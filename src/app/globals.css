@@ -580,6 +580,18 @@ h3 {
   width: 100%;
   justify-content: space-between;
 }
+.draft-layout .queue-head .search {
+  height: 44px;
+  padding: 0 12px;
+  gap: 10px;
+}
+.draft-layout .queue-head .search input {
+  font-size: 14px;
+}
+.draft-layout .queue-head .search .icon {
+  width: 18px;
+  height: 18px;
+}
 .queue-list {
   overflow-y: auto;
   padding: 0 8px;
