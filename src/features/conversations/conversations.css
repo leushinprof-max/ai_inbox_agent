@@ -423,7 +423,7 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }
 .kimi-thread .message-meta > span:not(.avatar) {
   min-width: 0;
