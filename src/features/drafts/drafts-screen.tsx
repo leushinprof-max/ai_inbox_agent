@@ -30,16 +30,14 @@ export function DraftsScreen() {
   const { preferences } = usePreferences(scope.userId);
   const [awaitingSelection, setAwaitingSelection] = useState(false);
   const [error, setError] = useState("");
-  const [queue, setQueue] = useState("ready");
   const [selectedId, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [label, setLabel] = useState("all");
   useEffect(() => {
     if (!repository.searchDrafts) return;
     let active = true;
     const timer = setTimeout(
       () =>
-        void repository.searchDrafts!(query, queue, label)
+        void repository.searchDrafts!(query, "", "all")
           .then(() => {
             if (active) setError("");
           })
@@ -52,7 +50,7 @@ export function DraftsScreen() {
       active = false;
       clearTimeout(timer);
     };
-  }, [repository, query, queue, label]);
+  }, [repository, query]);
   const [details, setDetails, wideDetails] = useContactDetails(
     preferences.details,
   );
@@ -67,28 +65,14 @@ export function DraftsScreen() {
         .map((id) => drafts.find((d) => d.id === id))
         .filter((d): d is NonNullable<typeof d> => !!d)
     : drafts;
-  const visible = orderedDrafts
-    .filter((d) => d.status === queue)
-    .filter((d) => {
-      if (state.paging || label === "all") return true;
-      const c = state.conversations.find((c) => c.id === d.conversationId);
-      return (
-        c &&
-        (c.labelId === label ||
-          (label === "uncategorized" && c.labelState === "uncategorized") ||
-          state.labelCatalog?.some(
-            (l) => l.id === c.labelId && `group:${l.group}` === label,
-          ))
-      );
-    })
-    .filter((d) => {
-      const contact = state.conversations.find(
-        (c) => c.id === d.conversationId,
-      )?.contact;
-      return `${contact?.name} ${contact?.company}`
-        .toLowerCase()
-        .includes(query.toLowerCase());
-    });
+  const visible = orderedDrafts.filter((d) => {
+    const contact = state.conversations.find(
+      (c) => c.id === d.conversationId,
+    )?.contact;
+    return `${contact?.name} ${contact?.company}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+  });
   const selected = awaitingSelection
     ? undefined
     : (visible.find((d) => d.id === selectedId) ?? visible[0]);
@@ -120,31 +104,6 @@ export function DraftsScreen() {
         >
           <aside className="queue">
             <div className="queue-head">
-              <div className="tabs" role="tablist" aria-label="Draft queue">
-                {[
-                  ["ready", "Ready"],
-                  ["needs_input", "Needs input"],
-                  ["snoozed", "Later"],
-                ].map(([id, label]) => (
-                  <button
-                    key={id}
-                    role="tab"
-                    aria-selected={queue === id}
-                    className={`tab ${queue === id ? "active" : ""}`}
-                    onClick={() => {
-                      setQueue(id);
-                      setAwaitingSelection(false);
-                      setSelected(null);
-                    }}
-                  >
-                    {label}
-                    <span className="num">
-                      {state.paging?.draftCounts[id] ??
-                        drafts.filter((d) => d.status === id).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
               <label className="search">
                 <Icon name="search" />
                 <input
@@ -154,27 +113,6 @@ export function DraftsScreen() {
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </label>
-              <select
-                aria-label="Filter drafts by label"
-                value={label}
-                onChange={(e) => {
-                  setLabel(e.target.value);
-                  setSelected(null);
-                }}
-              >
-                <option value="all">All labels</option>
-                {["positive", "neutral", "negative"].map((g) => (
-                  <option key={g} value={`group:${g}`}>
-                    {g} intent
-                  </option>
-                ))}
-                <option value="uncategorized">Unable to categorize</option>
-                {(state.labelCatalog ?? []).map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="queue-list">
               {visible.map((draft) => {
@@ -204,6 +142,16 @@ export function DraftsScreen() {
                       <span className="snippet">{leadMessage?.body}</span>
                       <span className="draft-lead-footer">
                         <ConversationLabel conversation={c} />
+                        {draft.status === "needs_input" ? (
+                          <span
+                            className="draft-input-indicator"
+                            role="img"
+                            aria-label="Agent needs your input"
+                            title="Agent needs your input"
+                          >
+                            ?
+                          </span>
+                        ) : null}
                         <span className="time">
                           {now !== null &&
                             relativeReplyTime(
@@ -271,10 +219,6 @@ export function DraftsScreen() {
                               selected.id,
                               selected.revision,
                             );
-                            const restored = repository
-                              .getSnapshot()
-                              .drafts.find((d) => d.id === selected.id);
-                            setQueue(restored?.status ?? "ready");
                             setSelected(selected.id);
                             setError("");
                           } catch (e) {
@@ -286,7 +230,7 @@ export function DraftsScreen() {
                           }
                         }}
                       >
-                        Move to Ready
+                        Return to review
                       </Button>
                     </div>
                   </div>
@@ -314,7 +258,7 @@ export function DraftsScreen() {
               >
                 {awaitingSelection
                   ? "Your reply was sent. Select a conversation when you’re ready."
-                  : "Choose another queue or come back when new drafts arrive."}
+                  : "Come back when new drafts arrive."}
               </Empty>
             </div>
           )}

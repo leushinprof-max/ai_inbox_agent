@@ -29,11 +29,12 @@ export function InboxShell({ children }: { children: ReactNode }) {
   const [switcher, setSwitcher] = useState(false);
   const count = state.paging
     ? (state.paging.draftCounts.ready ?? 0) +
-      (state.paging.draftCounts.needs_input ?? 0)
+      (state.paging.draftCounts.needs_input ?? 0) +
+      (state.paging.draftCounts.snoozed ?? 0)
     : state.drafts.filter(
         (d) =>
           d.workspaceId === scope.workspaceId &&
-          ["ready", "needs_input"].includes(d.status),
+          ["ready", "needs_input", "snoozed"].includes(d.status),
       ).length;
   return (
     <div className={`shell${framed ? " shell-framed" : ""}`}>
