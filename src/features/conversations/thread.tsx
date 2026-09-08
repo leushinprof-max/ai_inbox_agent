@@ -431,11 +431,7 @@ export function ContactContext({
         ))}
       </div>
       <div className="context-section">
-        <p className="eyebrow">Automation</p>
-        <div className="details-row">
-          <p className="context-field-label">Label</p>
-          <ConversationClassification conversation={conversation} />
-        </div>
+        <ConversationClassification conversation={conversation} />
         <div className="details-row">
           <p className="context-field-label">AI Agent</p>
           {agent ? (
