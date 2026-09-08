@@ -14,6 +14,7 @@ function createDemoGateway(
 ): InboxGateway {
   return {
     getSnapshot: repository.getSnapshot,
+    setConversationRead: (...args) => repository.setConversationRead(...args),
     subscribe: repository.subscribe,
     editDraft: async (...args) => repository.editDraft(...args),
     dismiss: async (...args) => repository.dismiss(...args),

@@ -17,7 +17,11 @@ import type { SendRequest } from "@/domain/send";
 /** Browser snapshot cache. The authenticated server and RLS own all durable state and authority. */
 export class LiveGateway implements InboxGateway {
   private listeners = new Set<() => void>();
-  private search = { query: "", label: "all" };
+  private search: {
+    query: string;
+    label: string;
+    read: "all" | "unread" | "read";
+  } = { query: "", label: "all", read: "all" };
   private searchVersion = 0;
   private detailId: string | null = null;
   private loadedDetails = new Set<string>();
@@ -68,6 +72,15 @@ export class LiveGateway implements InboxGateway {
       const old = byId.get(item.id);
       byId.set(item.id, {
         ...item,
+        unread:
+          old && old.readStateRevision > item.readStateRevision
+            ? old.unread
+            : item.unread,
+        readStateRevision: Math.max(
+          old?.readStateRevision ?? 0,
+          item.readStateRevision,
+        ),
+        loadedRevision: old?.loadedRevision,
         messages:
           this.loadedDetails.has(item.id) && old ? old.messages : item.messages,
       });
@@ -113,6 +126,8 @@ export class LiveGateway implements InboxGateway {
             : "invalid",
         result.error,
       );
+    // A refresh started before the mutation may contain the old mark.
+    if (this.refreshPromise) await this.refreshPromise.catch(() => {});
     await this.refresh();
   }
   private draft(
@@ -143,6 +158,25 @@ export class LiveGateway implements InboxGateway {
     this.draft(s, id, r, "snooze", undefined, until);
   restore = (s: Scope, id: string, r: number) =>
     this.draft(s, id, r, "restore");
+  setConversationRead = async (
+    scope: Scope,
+    id: string,
+    revision: number,
+    unread: boolean,
+  ) => {
+    try {
+      await this.mutate(scope, {
+        kind: "read",
+        workspaceId: this.workspaceId,
+        id,
+        revision,
+        unread,
+      });
+    } catch (error) {
+      await this.refresh().catch(() => {});
+      throw error;
+    }
+  };
   note = (scope: Scope, id: string, notes: string, revision?: number) =>
     this.mutate(scope, {
       kind: "note",
@@ -249,6 +283,7 @@ export class LiveGateway implements InboxGateway {
           view: "conversations",
           q: this.search.query,
           label: this.search.label,
+          read: this.search.read,
           ...(before ? { before: JSON.stringify(before) } : {}),
         });
       items.push(...result.items);
@@ -266,9 +301,13 @@ export class LiveGateway implements InboxGateway {
       },
     });
   }
-  searchConversations = async (query: string, label: string) => {
+  searchConversations = async (
+    query: string,
+    label: string,
+    read: "all" | "unread" | "read" = "all",
+  ) => {
     this.searchVersion++;
-    this.search = { query, label };
+    this.search = { query, label, read };
     this.conversationPages = 1;
     await this.reloadConversationPages(1);
   };
@@ -319,6 +358,7 @@ export class LiveGateway implements InboxGateway {
         view: "conversations",
         q: this.search.query,
         label: this.search.label,
+        read: this.search.read,
         before: JSON.stringify(before),
       });
     if (version !== this.searchVersion) return;
@@ -411,7 +451,22 @@ export class LiveGateway implements InboxGateway {
     const others = this.state.conversations.filter((c) => c.id !== id);
     this.publish({
       ...this.state,
-      conversations: [...others, { ...result.conversation, messages }],
+      conversations: [
+        ...others,
+        {
+          ...result.conversation,
+          unread:
+            old && old.readStateRevision > result.conversation.readStateRevision
+              ? old.unread
+              : result.conversation.unread,
+          readStateRevision: Math.max(
+            old?.readStateRevision ?? 0,
+            result.conversation.readStateRevision,
+          ),
+          loadedRevision: result.conversation.revision,
+          messages,
+        },
+      ],
       drafts: [
         ...this.state.drafts.filter((d) => d.conversationId !== id),
         ...(result.draft ? [result.draft] : []),

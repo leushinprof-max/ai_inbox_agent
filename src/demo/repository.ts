@@ -54,6 +54,26 @@ export class DemoRepository implements SendRepository {
     this.listeners.forEach((l) => l());
   }
 
+  async setConversationRead(
+    scope: Scope,
+    id: string,
+    revision: number,
+    unread: boolean,
+  ) {
+    assertMember(this.state, scope, true);
+    const c = this.state.conversations.find(
+      (c) => c.id === id && c.workspaceId === scope.workspaceId,
+    );
+    if (!c) throw new InboxError("not_found", "Conversation not found.");
+    if (c.readStateRevision !== revision)
+      throw new InboxError("conflict", "Read state changed. Try again.");
+    this.publish({
+      ...this.state,
+      conversations: this.state.conversations.map((item) =>
+        item === c ? { ...c, unread, readStateRevision: revision + 1 } : item,
+      ),
+    });
+  }
   editDraft(scope: Scope, id: string, revision: number, body: string) {
     this.publish(
       updateDraft(this.state, scope, id, revision, { body }, new Date()),

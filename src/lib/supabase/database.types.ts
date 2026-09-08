@@ -307,8 +307,8 @@ export type Database = {
           classified_revision: number | null;
           contact_company: string;
           contact_name: string;
-          contact_position: string;
           contact_photo_url: string | null;
+          contact_position: string;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -325,6 +325,7 @@ export type Database = {
           notes: string;
           notes_revision: number;
           provider_conversation_id: string;
+          read_state_revision: number;
           reply_agent_id: string | null;
           reply_agent_version: number | null;
           reply_catalog_revision: number | null;
@@ -333,6 +334,7 @@ export type Database = {
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
+          unread: boolean;
           workspace_id: string;
         };
         Insert: {
@@ -341,8 +343,8 @@ export type Database = {
           classified_revision?: number | null;
           contact_company?: string;
           contact_name: string;
-          contact_position?: string;
           contact_photo_url?: string | null;
+          contact_position?: string;
           contact_stopped?: boolean;
           created_at?: string;
           evidence_message_id?: string | null;
@@ -359,6 +361,7 @@ export type Database = {
           notes?: string;
           notes_revision?: number;
           provider_conversation_id: string;
+          read_state_revision?: number;
           reply_agent_id?: string | null;
           reply_agent_version?: number | null;
           reply_catalog_revision?: number | null;
@@ -367,6 +370,7 @@ export type Database = {
           sender_id: number;
           sender_name: string;
           sender_photo_url?: string | null;
+          unread?: boolean;
           workspace_id: string;
         };
         Update: {
@@ -375,8 +379,8 @@ export type Database = {
           classified_revision?: number | null;
           contact_company?: string;
           contact_name?: string;
-          contact_position?: string;
           contact_photo_url?: string | null;
+          contact_position?: string;
           contact_stopped?: boolean;
           created_at?: string;
           evidence_message_id?: string | null;
@@ -393,6 +397,7 @@ export type Database = {
           notes?: string;
           notes_revision?: number;
           provider_conversation_id?: string;
+          read_state_revision?: number;
           reply_agent_id?: string | null;
           reply_agent_version?: number | null;
           reply_catalog_revision?: number | null;
@@ -401,6 +406,7 @@ export type Database = {
           sender_id?: number;
           sender_name?: string;
           sender_photo_url?: string | null;
+          unread?: boolean;
           workspace_id?: string;
         };
         Relationships: [
@@ -753,6 +759,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "sender_agent_workspace_fk";
+            columns: ["workspace_id", "agent_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["workspace_id", "id"];
+          },
+          {
             foreignKeyName: "senders_workspace_id_fkey";
             columns: ["workspace_id"];
             isOneToOne: false;
@@ -839,27 +852,27 @@ export type Database = {
       };
       workspaces: {
         Row: {
+          agent_assignment_revision: number;
           created_at: string;
           default_agent_id: string | null;
-          agent_assignment_revision: number;
           id: string;
           label_revision: number;
           name: string;
           timezone: string;
         };
         Insert: {
+          agent_assignment_revision?: number;
           created_at?: string;
           default_agent_id?: string | null;
-          agent_assignment_revision?: number;
           id?: string;
           label_revision?: number;
           name: string;
           timezone?: string;
         };
         Update: {
+          agent_assignment_revision?: number;
           created_at?: string;
           default_agent_id?: string | null;
-          agent_assignment_revision?: number;
           id?: string;
           label_revision?: number;
           name?: string;
@@ -880,20 +893,6 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      save_sender_assignments: {
-        Args: {
-          p_workspace: string;
-          p_agent: string;
-          p_senders: number[];
-          p_default: boolean;
-          p_revision: number;
-        };
-        Returns: undefined;
-      };
-      server_resolve_agent: {
-        Args: { p_workspace: string; p_conversation: string };
-        Returns: string | null;
-      };
       accept_workspace_invite: { Args: { p_hash: string }; Returns: string };
       act_on_draft: {
         Args: {
@@ -936,6 +935,7 @@ export type Database = {
         Args: { p_role: string; p_user: string; p_workspace: string };
         Returns: undefined;
       };
+      conversation_counts: { Args: { p_workspace: string }; Returns: Json };
       conversation_page: {
         Args: {
           p_before?: string;
@@ -951,8 +951,8 @@ export type Database = {
           classified_revision: number | null;
           contact_company: string;
           contact_name: string;
-          contact_position: string;
           contact_photo_url: string | null;
+          contact_position: string;
           contact_stopped: boolean;
           created_at: string;
           evidence_message_id: string | null;
@@ -969,6 +969,7 @@ export type Database = {
           notes: string;
           notes_revision: number;
           provider_conversation_id: string;
+          read_state_revision: number;
           reply_agent_id: string | null;
           reply_agent_version: number | null;
           reply_catalog_revision: number | null;
@@ -977,6 +978,60 @@ export type Database = {
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
+          unread: boolean;
+          workspace_id: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "conversations";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      conversation_page_v2: {
+        Args: {
+          p_before?: string;
+          p_before_id?: string;
+          p_label?: string;
+          p_limit?: number;
+          p_query?: string;
+          p_read?: string;
+          p_workspace: string;
+        };
+        Returns: {
+          archived: boolean;
+          campaign: string;
+          classified_revision: number | null;
+          contact_company: string;
+          contact_name: string;
+          contact_photo_url: string | null;
+          contact_position: string;
+          contact_stopped: boolean;
+          created_at: string;
+          evidence_message_id: string | null;
+          evidence_quote: string;
+          id: string;
+          inbound_revision: number;
+          label_assignment_revision: number;
+          label_id: string | null;
+          label_source: string | null;
+          label_state: string;
+          labels: string[];
+          last_message_at: string | null;
+          no_reply_reason: string;
+          notes: string;
+          notes_revision: number;
+          provider_conversation_id: string;
+          read_state_revision: number;
+          reply_agent_id: string | null;
+          reply_agent_version: number | null;
+          reply_catalog_revision: number | null;
+          reply_config_version: number | null;
+          reply_decision_revision: number | null;
+          sender_id: number;
+          sender_name: string;
+          sender_photo_url: string | null;
+          unread: boolean;
           workspace_id: string;
         }[];
         SetofOptions: {
@@ -1148,6 +1203,16 @@ export type Database = {
         };
         Returns: number;
       };
+      save_sender_assignments: {
+        Args: {
+          p_agent: string;
+          p_default: boolean;
+          p_revision: number;
+          p_senders: number[];
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
       save_workspace_label: {
         Args: {
           p_id: string;
@@ -1278,6 +1343,19 @@ export type Database = {
       };
       server_refresh_senders: {
         Args: { p_revision: number; p_senders: Json; p_workspace: string };
+        Returns: undefined;
+      };
+      server_resolve_agent: {
+        Args: { p_conversation: string; p_workspace: string };
+        Returns: string;
+      };
+      set_conversation_read_state: {
+        Args: {
+          p_id: string;
+          p_revision: number;
+          p_unread: boolean;
+          p_workspace: string;
+        };
         Returns: undefined;
       };
       set_default_agent: {

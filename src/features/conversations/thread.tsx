@@ -1,5 +1,7 @@
 "use client";
 
+import "./conversations.css";
+import { ReadStateControl } from "./read-state-control";
 import { LabelPicker } from "./label-picker";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -13,12 +15,16 @@ export function ConversationThread({
   onBack,
   onToggleDetails,
   mobileOpen = false,
+  active = true,
+  backLabel = "Back to conversations",
 }: {
   conversation: Conversation;
   children: ReactNode;
   onBack: () => void;
   onToggleDetails: () => void;
   mobileOpen?: boolean;
+  active?: boolean;
+  backLabel?: string;
 }) {
   const { repository, state, workspace } = useInbox();
   const [loadError, setLoadError] = useState("");
@@ -47,12 +53,12 @@ export function ConversationThread({
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [conversation.id, latestMessageId, mobileOpen]);
   return (
-    <section className="thread">
+    <section className="thread kimi-thread">
       <header className="thread-header">
         <IconButton
-          label="Back to queue"
+          label={backLabel}
           icon="back"
-          className="mobile-only"
+          className="thread-back"
           onClick={onBack}
         />
         <Avatar
@@ -62,8 +68,19 @@ export function ConversationThread({
         />
         <div className="grow">
           <h2>{conversation.contact.name}</h2>
-          <p>{conversation.contact.company} · LinkedIn</p>
+          <p>
+            {[conversation.contact.company, "LinkedIn"]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
         </div>
+        <ReadStateControl
+          key={`${conversation.id}-${mobileOpen}`}
+          conversation={conversation}
+          autoRead
+          loaded={active && !loading && !loadError}
+          visibilityKey={mobileOpen}
+        />
         <IconButton
           label="Show lead details"
           icon="panel"
@@ -179,19 +196,66 @@ export function ConversationThread({
 export function ContactContext({
   conversation,
   onClose,
+  overlay = false,
 }: {
   conversation: Conversation;
   onClose: () => void;
+  overlay?: boolean;
 }) {
-  const { state, repository, scope, basePath } = useInbox();
+  const { state, repository, scope, basePath, workspace } = useInbox();
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!overlay) return;
+    const previous = document.activeElement as HTMLElement | null;
+    panel.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [overlay]);
   const [notes, setNotes] = useState(conversation.notes);
   const noteRevision = useRef(conversation.notesRevision);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const draft = state.drafts.find((d) => d.conversationId === conversation.id);
-  const agent = state.agents.find((a) => a.id === draft?.agentId);
+  const sender = state.senders?.find(
+    (s) =>
+      (!s.workspaceId || s.workspaceId === scope.workspaceId) &&
+      s.id === conversation.senderId,
+  );
+  const assignedId = sender?.agentId ?? workspace.defaultAgentId;
+  const agent = state.agents.find(
+    (a) => a.workspaceId === scope.workspaceId && a.id === assignedId,
+  );
   return (
-    <aside className="context" aria-label="Lead context">
+    <aside
+      ref={panel}
+      className="context kimi-context"
+      aria-label="Lead context"
+      role={overlay ? "dialog" : undefined}
+      aria-modal={overlay || undefined}
+      onKeyDown={(event) => {
+        if (!overlay) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+        if (event.key !== "Tab") return;
+        const items = [
+          ...(panel.current?.querySelectorAll<HTMLElement>(
+            "button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled)",
+          ) ?? []),
+        ];
+        const first = items[0],
+          last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        }
+        if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
+    >
       <div className="context-profile">
         <div className="row between">
           <Avatar
@@ -204,13 +268,16 @@ export function ContactContext({
         </div>
         <h2>{conversation.contact.name}</h2>
         <p>
-          {conversation.contact.position} at {conversation.contact.company}
+          {[conversation.contact.position, conversation.contact.company]
+            .filter(Boolean)
+            .join(" at ")}
         </p>
       </div>
       <div className="context-section">
         <p className="eyebrow">Lead details</p>
         {[
           ["Company", conversation.contact.company],
+          ["Position", conversation.contact.position],
           ["Industry", conversation.contact.industry],
         ].map(([label, value]) => (
           <div className="details-row" key={label}>
@@ -223,7 +290,7 @@ export function ContactContext({
         <p className="eyebrow">Conversation</p>
         <div className="details-row">
           <span>Campaign</span>
-          <span>{conversation.campaign}</span>
+          <span>{conversation.campaign || "—"}</span>
         </div>
         <div className="details-row">
           <span>Sender</span>
@@ -241,11 +308,19 @@ export function ContactContext({
             <Spark />
             <span className="grow">
               <strong>{agent.name}</strong>
-              <small>{agent.status} · approval required</small>
+              <small>
+                {agent.status} ·{" "}
+                {sender?.agentId ? "Sender assignment" : "Workspace default"}
+              </small>
             </span>
           </Link>
         </div>
-      ) : null}
+      ) : (
+        <div className="context-section">
+          <p className="eyebrow">Assigned agent</p>
+          <p className="muted">No agent assigned</p>
+        </div>
+      )}
       <div className="context-section">
         <label className="eyebrow" htmlFor="contact-notes">
           Notes

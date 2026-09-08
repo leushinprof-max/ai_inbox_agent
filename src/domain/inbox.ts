@@ -79,6 +79,9 @@ export interface Conversation {
   notes: string;
   notesRevision?: number;
   archived: boolean;
+  unread: boolean;
+  readStateRevision: number;
+  loadedRevision?: number;
 }
 export interface Draft {
   id: string;
@@ -126,6 +129,7 @@ export interface InboxState {
     startedAt: string;
   }[];
   agentActivity?: Record<string, number>;
+  conversationCounts?: Record<string, number>;
   generations?: {
     id: string;
     conversationId: string;
@@ -282,7 +286,13 @@ export function recordInbound(
     ...state,
     conversations: state.conversations.map((c) =>
       c.id === conversationId
-        ? { ...c, revision: c.revision + 1, messages: [...c.messages, message] }
+        ? {
+            ...c,
+            unread: true,
+            readStateRevision: c.readStateRevision + 1,
+            revision: c.revision + 1,
+            messages: [...c.messages, message],
+          }
         : c,
     ),
   };

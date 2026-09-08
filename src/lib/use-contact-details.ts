@@ -18,5 +18,9 @@ export function useContactDetails(defaultOpen: boolean) {
     open: boolean;
   } | null>(null);
   const details = override?.wide === wide ? override.open : defaultOpen && wide;
-  return [details, (open: boolean) => setOverride({ wide, open })] as const;
+  return [
+    details,
+    (open: boolean) => setOverride({ wide, open }),
+    wide,
+  ] as const;
 }

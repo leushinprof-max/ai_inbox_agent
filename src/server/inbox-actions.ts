@@ -8,6 +8,13 @@ import { InboxError } from "@/domain/inbox";
 const revision = z.number().int().nonnegative();
 const mutation = z.discriminatedUnion("kind", [
   z.object({
+    kind: z.literal("read"),
+    workspaceId: uuid,
+    id: uuid,
+    revision,
+    unread: z.boolean(),
+  }),
+  z.object({
     kind: z.literal("draft"),
     workspaceId: uuid,
     id: uuid,
@@ -62,6 +69,17 @@ export async function mutateInbox(
       throw new InboxError(
         "forbidden",
         "This workspace is read-only for your account.",
+      );
+    if (value.kind === "read")
+      databaseError(
+        (
+          await db.rpc("set_conversation_read_state", {
+            p_workspace: value.workspaceId,
+            p_id: value.id,
+            p_revision: value.revision,
+            p_unread: value.unread,
+          })
+        ).error,
       );
     if (value.kind === "draft")
       databaseError(

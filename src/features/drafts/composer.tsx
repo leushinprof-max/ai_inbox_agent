@@ -446,7 +446,7 @@ export function Composer({
                   ? "Send status unavailable"
                   : mode === "manual"
                     ? "Your reply"
-                    : "Suggested reply"}
+                    : "AI draft"}
               {draft ? (
                 <span className="version">Draft {draft.revision}</span>
               ) : null}
