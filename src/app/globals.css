@@ -566,6 +566,7 @@ h3 {
 .queue-item .name {
   font-size: 13px;
   font-weight: 550;
+  overflow-wrap: anywhere;
 }
 .queue-item .company {
   font-size: 11px;
@@ -577,13 +578,23 @@ h3 {
   color: var(--faint);
   margin-left: auto;
   align-self: flex-start;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.queue-item > .row > .grow {
+  min-width: 0;
+}
+.queue-item > .pill {
+  align-self: flex-start;
+  margin-left: 44px;
+  max-width: calc(100% - 44px);
 }
 .queue-item .snippet {
   font-size: 12px;
   color: var(--text);
   line-height: 1.55;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   padding-left: 44px;
