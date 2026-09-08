@@ -14,6 +14,9 @@ function createDemoGateway(
 ): InboxGateway {
   return {
     getSnapshot: repository.getSnapshot,
+    refreshConversation: async () => {
+      /* Demo history is already local. */
+    },
     setConversationRead: (...args) => repository.setConversationRead(...args),
     subscribe: repository.subscribe,
     editDraft: async (...args) => repository.editDraft(...args),

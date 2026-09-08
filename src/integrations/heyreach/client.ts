@@ -178,6 +178,7 @@ export function createHeyReachClient(
     let response: Response;
     try {
       response = await fetcher(`${base}${path}`, {
+        cache: "no-store",
         method: body === undefined ? "GET" : "POST",
         headers: { "X-API-KEY": key, "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),

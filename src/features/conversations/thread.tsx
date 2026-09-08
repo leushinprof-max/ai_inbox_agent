@@ -2,6 +2,7 @@
 
 import "./conversations.css";
 import { ReadStateControl } from "./read-state-control";
+import { RefreshConversationControl } from "./refresh-control";
 import { LabelPicker } from "./label-picker";
 import {
   useEffect,
@@ -134,6 +135,15 @@ export function ConversationThread({
               .join(" · ")}
           </p>
         </div>
+        <RefreshConversationControl
+          key={conversation.id}
+          id={conversation.id}
+          onRefreshed={() => {
+            setLoadError("");
+            setLoadState("ready");
+            setVerified(true);
+          }}
+        />
         <ReadStateControl
           key={`${conversation.id}-${mobileOpen}`}
           conversation={conversation}
