@@ -361,6 +361,25 @@ test("HTTP workspace API enforces cookie authentication and tenant ownership", a
     ).status,
     403,
   );
+  // The API runs without Proxy; its Route Handler must still refresh sessions
+  // and return the rotated cookies to the browser.
+  const session = must(await ssr.auth.getSession()).session!;
+  const expired =
+    "base64-" +
+    Buffer.from(JSON.stringify({ ...session, expires_at: 1 })).toString(
+      "base64url",
+    );
+  const detail = await fetch(`${url}?view=conversation&id=${conversationId}`, {
+    headers: { Cookie: `${inboxAuthCookieName(local.API_URL)}=${expired}` },
+  });
+  assert.equal(detail.status, 200);
+  assert.ok(
+    detail.headers
+      .getSetCookie()
+      .some((value) => value.startsWith(inboxAuthCookieName(local.API_URL))),
+  );
+  assert.match(detail.headers.get("server-timing") ?? "", /auth;dur=/);
+  assert.equal((await detail.json()).conversation.id, conversationId);
 });
 
 test("Draft searches refresh empty-state counts and queue transitions without a workspace reload", async () => {
