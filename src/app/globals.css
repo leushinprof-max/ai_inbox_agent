@@ -525,6 +525,9 @@ h3 {
 }
 /* Drafts workspace frame experiment: keep isolated for a one-commit rollback. */
 @media (min-width: 681px) {
+  .shell:has(> .workspace-main > .draft-layout) > .sidebar {
+    border-right-color: transparent;
+  }
   .workspace-main:has(> .draft-layout) {
     padding: 24px 12px 12px;
     background: var(--side);
