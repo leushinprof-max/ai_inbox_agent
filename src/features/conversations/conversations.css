@@ -406,7 +406,7 @@
   height: 36px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: var(--raised);
+  background: transparent;
 }
 .kimi-thread .thread-header > .icon-only:not(.thread-back):hover,
 .kimi-thread .thread-header .thread-refresh:hover,
