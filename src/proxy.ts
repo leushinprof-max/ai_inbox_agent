@@ -32,6 +32,6 @@ export const config = {
     "/invites/:path*",
     "/workspaces/:path*",
     "/w/:path*",
-    "/api/inbox/:path*",
+    // Inbox Route Handlers validate users and refresh cookies themselves.
   ],
 };

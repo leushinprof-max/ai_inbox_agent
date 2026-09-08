@@ -40,8 +40,12 @@ export function ConversationThread({
   const { repository, state, workspace } = useInbox();
   const [loadError, setLoadError] = useState("");
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
-    repository.openConversation ? "loading" : "ready",
+    !repository.openConversation ||
+      repository.hasConversationHistory?.(conversation.id)
+      ? "ready"
+      : "loading",
   );
+  const [verified, setVerified] = useState(!repository.openConversation);
   const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
     if (!repository.openConversation) return;
@@ -49,12 +53,20 @@ export function ConversationThread({
     void repository
       .openConversation(conversation.id)
       .then(() => {
-        if (active) setLoadState("ready");
+        if (active) {
+          setLoadState("ready");
+          setVerified(true);
+        }
       })
       .catch(() => {
         if (active) {
-          setLoadState("error");
-          setLoadError("Messages could not be loaded.");
+          const cached = repository.hasConversationHistory?.(conversation.id);
+          setLoadState(cached ? "ready" : "error");
+          setLoadError(
+            cached
+              ? "Conversation could not be refreshed. Showing saved messages."
+              : "Messages could not be loaded.",
+          );
         }
       });
     return () => {
@@ -126,7 +138,14 @@ export function ConversationThread({
           key={`${conversation.id}-${mobileOpen}`}
           conversation={conversation}
           autoRead
-          loaded={active && loadState === "ready" && !loadError}
+          loaded={
+            active &&
+            verified &&
+            loadState === "ready" &&
+            !loadError &&
+            (!repository.hasConversationHistory ||
+              repository.hasConversationHistory(conversation.id))
+          }
           visibilityKey={mobileOpen}
         />
         <IconButton
@@ -158,7 +177,9 @@ export function ConversationThread({
                 <Button
                   onClick={() => {
                     setLoadError("");
-                    setLoadState("loading");
+                    setVerified(false);
+                    if (!repository.hasConversationHistory?.(conversation.id))
+                      setLoadState("loading");
                     setLoadAttempt((attempt) => attempt + 1);
                   }}
                 >

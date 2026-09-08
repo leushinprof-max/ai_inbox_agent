@@ -25,6 +25,8 @@ export class LiveGateway implements InboxGateway {
   private searchVersion = 0;
   private detailId: string | null = null;
   private loadedDetails = new Set<string>();
+  private detailRequests = new Map<string, Promise<void>>();
+  private detailFetchedAt = new Map<string, number>();
   private conversationPages = 1;
   private draftPages = 1;
   private draftSearch = { query: "", status: "ready", label: "all" };
@@ -110,7 +112,8 @@ export class LiveGateway implements InboxGateway {
       { cache: "no-store" },
     );
     if (!result.ok)
-      throw new Error(
+      throw new InboxError(
+        result.status === 403 ? "forbidden" : "invalid",
         result.status === 403
           ? "Your session or workspace access changed. Sign in again."
           : "Could not load the workspace. Try again.",
@@ -164,7 +167,7 @@ export class LiveGateway implements InboxGateway {
         this.reloadConversationPages(this.conversationPages),
         this.reloadDraftPages(this.draftPages),
       ]);
-      if (this.detailId) await this.openConversation(this.detailId);
+      if (this.detailId) await this.loadConversation(this.detailId);
     })().finally(() => {
       this.refreshPromise = null;
     });
@@ -504,8 +507,52 @@ export class LiveGateway implements InboxGateway {
     });
     this.draftPages++;
   };
-  openConversation = async (id: string) => {
+  hasConversationHistory = (id: string) => {
+    const conversation = this.state.conversations.find((c) => c.id === id);
+    return (
+      this.loadedDetails.has(id) &&
+      !!conversation &&
+      conversation.loadedRevision === conversation.revision
+    );
+  };
+  private freshConversation(id: string) {
+    return (
+      this.hasConversationHistory(id) &&
+      Date.now() - (this.detailFetchedAt.get(id) ?? 0) < 5_000
+    );
+  }
+  prefetchConversation = (id: string): Promise<void> => {
+    if (
+      !this.state.conversations.some(
+        (c) => c.id === id && c.workspaceId === this.workspaceId,
+      ) ||
+      this.freshConversation(id) ||
+      (this.detailRequests.size >= 2 && !this.detailRequests.has(id))
+    )
+      return Promise.resolve();
+    return this.loadConversation(id);
+  };
+  openConversation = (id: string): Promise<void> => {
     this.detailId = id;
+    if (this.freshConversation(id)) return Promise.resolve();
+    return this.loadConversation(id);
+  };
+  private loadConversation(id: string): Promise<void> {
+    const pending = this.detailRequests.get(id);
+    if (pending) return pending;
+    const request = this.fetchConversation(id)
+      .catch((error) => {
+        this.detailFetchedAt.delete(id);
+        if (error instanceof InboxError && error.code === "forbidden") {
+          this.loadedDetails.delete(id);
+        }
+        throw error;
+      })
+      .finally(() => this.detailRequests.delete(id));
+    this.detailRequests.set(id, request);
+    return request;
+  }
+  private async fetchConversation(id: string) {
     const alreadyLoaded = this.loadedDetails.has(id);
     const result = await this.read<{
       conversation: Conversation;
@@ -513,8 +560,9 @@ export class LiveGateway implements InboxGateway {
       next: PageCursor | null;
     }>({ view: "conversation", id });
     const old = this.state.conversations.find((c) => c.id === id);
+    const newer = old && old.revision > result.conversation.revision;
     const messages =
-      alreadyLoaded && old
+      (alreadyLoaded || newer) && old
         ? [
             ...new Map(
               [...old.messages, ...result.conversation.messages].map((m) => [
@@ -533,13 +581,14 @@ export class LiveGateway implements InboxGateway {
         ? this.state.paging!.messageNext[id]
         : result.next;
     this.loadedDetails.add(id);
+    if (!newer) this.detailFetchedAt.set(id, Date.now());
     const others = this.state.conversations.filter((c) => c.id !== id);
     this.publish({
       ...this.state,
       conversations: [
         ...others,
         {
-          ...result.conversation,
+          ...(newer ? old : result.conversation),
           unread:
             old && old.readStateRevision > result.conversation.readStateRevision
               ? old.unread
@@ -548,20 +597,25 @@ export class LiveGateway implements InboxGateway {
             old?.readStateRevision ?? 0,
             result.conversation.readStateRevision,
           ),
-          loadedRevision: result.conversation.revision,
+          loadedRevision: Math.max(
+            old?.loadedRevision ?? 0,
+            result.conversation.revision,
+          ),
           messages,
         },
       ],
-      drafts: [
-        ...this.state.drafts.filter((d) => d.conversationId !== id),
-        ...(result.draft ? [result.draft] : []),
-      ],
+      drafts: newer
+        ? this.state.drafts
+        : [
+            ...this.state.drafts.filter((d) => d.conversationId !== id),
+            ...(result.draft ? [result.draft] : []),
+          ],
       paging: {
         ...this.state.paging!,
         messageNext: { ...this.state.paging!.messageNext, [id]: next },
       },
     });
-  };
+  }
   olderMessages = async (id: string) => {
     const before = this.state.paging?.messageNext[id];
     if (!before) return;

@@ -26,6 +26,23 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const [details, setDetails, wideDetails] = useContactDetails(
     preferences.details,
   );
+  const prefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelPrefetch() {
+    if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+    prefetchTimer.current = null;
+  }
+  function prepareConversation(id: string) {
+    cancelPrefetch();
+    prefetchTimer.current = setTimeout(() => {
+      void repository.prefetchConversation?.(id).catch(() => {});
+    }, 150);
+  }
+  useEffect(
+    () => () => {
+      if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+    },
+    [],
+  );
   const search = useRef<HTMLInputElement>(null);
   const filterWrap = useRef<HTMLDivElement>(null);
   const conversations = state.conversations.filter(
@@ -293,7 +310,16 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
             >
               <button
                 className="conv-open"
-                onClick={() => setSelected(c.id)}
+                onPointerEnter={(event) => {
+                  if (event.pointerType === "mouse") prepareConversation(c.id);
+                }}
+                onPointerLeave={cancelPrefetch}
+                onFocus={() => prepareConversation(c.id)}
+                onBlur={cancelPrefetch}
+                onClick={() => {
+                  cancelPrefetch();
+                  setSelected(c.id);
+                }}
                 aria-label={`Open conversation with ${c.contact.name}${c.unread ? ", unread" : ""}`}
               >
                 <span className="conv-unread-slot">

@@ -20,11 +20,22 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ workspaceId: string }> },
 ) {
-  const headers = { "Cache-Control": "private, no-store" };
+  const headers: Record<string, string> = {
+    "Cache-Control": "private, no-store",
+  };
+  const started = performance.now();
+  const timings: string[] = [];
+  const recordTiming = (name: string, milliseconds: number) => {
+    timings.push(`${name};dur=${milliseconds.toFixed(1)}`);
+  };
   try {
     const { workspaceId } = await params;
+    const authStarted = performance.now();
     const { db, user } = await authenticatedClient();
+    recordTiming("auth", performance.now() - authStarted);
+    const accessStarted = performance.now();
     await authorizeWorkspace(db, user.id, workspaceId);
+    recordTiming("access", performance.now() - accessStarted);
     const q = request.nextUrl.searchParams;
     const before = q.has("before")
       ? cursor.parse(JSON.parse(q.get("before")!))
@@ -46,11 +57,18 @@ export async function GET(
           { headers },
         );
       }
-      case "conversation":
-        return NextResponse.json(
-          await readConversation(db, workspaceId, q.get("id") ?? "", before),
-          { headers },
+      case "conversation": {
+        const result = await readConversation(
+          db,
+          workspaceId,
+          q.get("id") ?? "",
+          before,
+          recordTiming,
         );
+        recordTiming("total", performance.now() - started);
+        headers["Server-Timing"] = timings.join(", ");
+        return NextResponse.json(result, { headers });
+      }
       case "conversations": {
         const page = await conversationPage(
           db,

@@ -451,19 +451,25 @@ export async function readConversation(
   workspaceId: string,
   id: string,
   before?: PageCursor,
+  recordTiming?: (name: string, milliseconds: number) => void,
 ) {
   uuid.parse(id);
   if (before) cursor.parse(before);
-  const conversation = await db
+  async function timed<T>(name: string, query: PromiseLike<T>) {
+    const started = performance.now();
+    try {
+      return await query;
+    } finally {
+      recordTiming?.(name, performance.now() - started);
+    }
+  }
+  const conversationQuery = db
     .from("conversations")
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("id", id)
     .gt("inbound_revision", 0)
     .maybeSingle();
-  databaseError(conversation.error);
-  if (!conversation.data)
-    throw new InboxError("not_found", "Conversation not found.");
   let request = db
     .from("messages")
     .select("*")
@@ -476,14 +482,21 @@ export async function readConversation(
     request = request.or(
       `occurred_at.lt.${before.at},and(occurred_at.eq.${before.at},id.lt.${before.id})`,
     );
-  const messages = await request;
-  const draft = await db
+  const draftQuery = db
     .from("drafts")
     .select("*")
     .eq("workspace_id", workspaceId)
     .eq("conversation_id", id)
     .in("status", ["ready", "needs_input", "snoozed"])
     .maybeSingle();
+  const [conversation, messages, draft] = await Promise.all([
+    timed("conversation", conversationQuery),
+    timed("messages", request),
+    timed("draft", draftQuery),
+  ]);
+  databaseError(conversation.error);
+  if (!conversation.data)
+    throw new InboxError("not_found", "Conversation not found.");
   databaseError(draft.error);
   databaseError(messages.error);
   const rows = messages.data ?? [];

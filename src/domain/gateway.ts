@@ -19,6 +19,8 @@ export interface InboxGateway {
   searchDrafts?(query: string, status: string, label?: string): Promise<void>;
   moreDrafts?(): Promise<void>;
   openConversation?(id: string): Promise<void>;
+  prefetchConversation?(id: string): Promise<void>;
+  hasConversationHistory?(id: string): boolean;
   olderMessages?(id: string): Promise<void>;
   getSnapshot(): InboxState;
   subscribe(listener: () => void): () => void;
