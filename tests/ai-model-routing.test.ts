@@ -15,6 +15,11 @@ import {
   planModelRun,
   runModelPipeline,
 } from "../src/integrations/ai/pipeline";
+import {
+  modelOptions,
+  reasoningSelectionLabel,
+  supportedReasoningEfforts,
+} from "../src/integrations/ai/model-catalog";
 
 const input: ModelInput = {
   configuration: {
@@ -82,7 +87,9 @@ function harness(outputs: unknown[]) {
 test("Older published versions inherit the server model and model IDs are validated", () => {
   const legacy = { ...initialAIConfiguration } as Record<string, unknown>;
   delete legacy.models;
+  delete legacy.reasoning;
   const restored = validateConfiguration(legacy);
+  assert.deepEqual(restored.reasoning, { classification: null, draft: null });
   assert.deepEqual(resolveModels(restored, "existing-deployment"), {
     classification: "existing-deployment",
     draft: "existing-deployment",
@@ -109,6 +116,137 @@ test("Older published versions inherit the server model and model IDs are valida
       ...legacy,
       models: { classification: "ok", draft: "ok", provider: "unknown" },
     }),
+  );
+});
+
+test("Legacy and model-default reasoning omit the API parameter in every stage", () => {
+  const legacy = { ...input.configuration! } as Record<string, unknown>;
+  delete legacy.reasoning;
+  for (const scenario of [
+    "classify",
+    "reply",
+    "rewrite",
+    "needs_input",
+  ] as const) {
+    const request = buildModelRequest({
+      ...input,
+      scenario,
+      configuration: validateConfiguration(legacy),
+    }).request;
+    assert.equal(Object.hasOwn(request, "reasoning"), false);
+  }
+});
+
+test("Independent reasoning reaches both requests even when the same model is used", async () => {
+  const h = harness([intent, reply]);
+  await h.run({
+    ...input,
+    configuration: {
+      ...initialAIConfiguration,
+      models: { classification: "gpt-5.6-luna", draft: "gpt-5.6-luna" },
+      reasoning: { classification: "none", draft: "high" },
+    },
+  });
+  assert.deepEqual(
+    h.requests.map((r) => r.reasoning),
+    [{ effort: "none" }, { effort: "high" }],
+  );
+  assert.equal(h.requests.length, 2);
+});
+
+test("Reply reasoning also applies to rewrites and missing-knowledge completion", () => {
+  for (const scenario of ["reply", "rewrite", "needs_input"] as const) {
+    const request = buildModelRequest({
+      ...input,
+      scenario,
+      configuration: {
+        ...initialAIConfiguration,
+        models: { classification: "gpt-5.6-luna", draft: "gpt-5.6-sol" },
+        reasoning: { classification: "low", draft: "max" },
+      },
+    }).request;
+    assert.equal(request.model, "gpt-5.6-sol");
+    assert.deepEqual(request.reasoning, { effort: "max" });
+  }
+});
+
+test("Reasoning validates values and known model capabilities, including inherited models", () => {
+  for (const reasoning of [
+    { classification: "instant", draft: null },
+    { classification: "minimal", draft: null },
+    { classification: null, draft: "ultra" },
+    { classification: null, draft: null, unknown: true },
+    { classification: null },
+    null,
+  ]) {
+    assert.throws(() =>
+      validateConfiguration({ ...initialAIConfiguration, reasoning }),
+    );
+  }
+  assert.throws(
+    () =>
+      validateConfiguration({
+        ...initialAIConfiguration,
+        models: { classification: "gpt-6-astra", draft: "gpt-5.6-sol" },
+        reasoning: { classification: "none", draft: "medium" },
+      }),
+    /does not support none/,
+  );
+  assert.throws(
+    () =>
+      validateConfiguration({
+        ...initialAIConfiguration,
+        models: { classification: "gpt-5.6-luna", draft: "gpt-5.5" },
+        reasoning: { classification: "low", draft: "max" },
+      }),
+    /does not support max/,
+  );
+  assert.throws(
+    () =>
+      buildModelRequest(
+        {
+          ...input,
+          configuration: {
+            ...initialAIConfiguration,
+            reasoning: { classification: "none", draft: null },
+          },
+        },
+        "gpt-6-astra",
+      ),
+    /does not support none/,
+  );
+  const custom = buildModelRequest({
+    ...input,
+    configuration: {
+      ...initialAIConfiguration,
+      models: { classification: "custom-model-snapshot", draft: null },
+      reasoning: { classification: "medium", draft: null },
+    },
+  }).request;
+  assert.deepEqual(custom.reasoning, { effort: "medium" });
+});
+
+test("The curated catalog starts at GPT-5.5 and distinguishes model default from no reasoning", () => {
+  assert.deepEqual(
+    modelOptions.map((m) => m.id),
+    ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"],
+  );
+  assert.equal(
+    supportedReasoningEfforts("gpt-6-astra").includes("none"),
+    false,
+  );
+  assert.equal(supportedReasoningEfforts("gpt-5.5").includes("max"), false);
+  assert.equal(
+    reasoningSelectionLabel("gpt-5.6-luna", null),
+    "Model default · Medium",
+  );
+  assert.equal(
+    reasoningSelectionLabel("gpt-5.6-sol", "none"),
+    "None · no reasoning",
+  );
+  assert.equal(
+    reasoningSelectionLabel("unknown-snapshot", null),
+    "Model default",
   );
 });
 

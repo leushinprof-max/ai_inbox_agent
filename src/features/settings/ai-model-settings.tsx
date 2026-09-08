@@ -3,20 +3,14 @@ import {
   resolveModels,
   type AIConfiguration,
 } from "@/integrations/ai/configuration";
+import {
+  modelOptions,
+  reasoningLabels,
+  reasoningSelectionLabel,
+  supportedReasoningEfforts,
+  type ReasoningEffort,
+} from "@/integrations/ai/model-catalog";
 import "./ai-model-settings.css";
-
-// Suggestions from the OpenAI model catalog; custom snapshots remain selectable.
-// https://developers.openai.com/api/docs/models
-const modelOptions = [
-  ["gpt-6-astra", "GPT-6 Astra"],
-  ["gpt-5.6-sol", "GPT-5.6 Sol"],
-  ["gpt-5.6-terra", "GPT-5.6 Terra"],
-  ["gpt-5.6-luna", "GPT-5.6 Luna"],
-  ["gpt-5.5", "GPT-5.5"],
-  ["gpt-5.4-mini", "GPT-5.4 Mini"],
-  ["gpt-4.1", "GPT-4.1"],
-  ["gpt-4.1-mini-2025-04-14", "GPT-4.1 Mini · 2025-04-14"],
-] as const;
 
 export function AIModelSettings({
   configuration,
@@ -32,6 +26,20 @@ export function AIModelSettings({
   onChange: (configuration: AIConfiguration) => void;
 }) {
   const active = published ? resolveModels(published, fallback) : null;
+  function changeModel(key: "classification" | "draft", model: string) {
+    const effort = configuration.reasoning[key];
+    onChange({
+      ...configuration,
+      models: { ...configuration.models, [key]: model },
+      reasoning: {
+        ...configuration.reasoning,
+        [key]:
+          effort !== null && !supportedReasoningEfforts(model).includes(effort)
+            ? null
+            : effort,
+      },
+    });
+  }
   return (
     <fieldset
       className="card ai-model-settings"
@@ -59,8 +67,10 @@ export function AIModelSettings({
           ] as const
         ).map(([key, title, description]) => {
           const value = configuration.models[key];
+          const effectiveModel = value ?? fallback;
+          const effort = configuration.reasoning[key];
           const custom =
-            value !== null && !modelOptions.some(([id]) => id === value);
+            value !== null && !modelOptions.some(({ id }) => id === value);
           return (
             <div className="field" key={key}>
               <label htmlFor={`ai-model-${key}`}>{title}</label>
@@ -68,22 +78,18 @@ export function AIModelSettings({
                 id={`ai-model-${key}`}
                 value={custom ? "custom" : (value ?? "default")}
                 onChange={(e) =>
-                  onChange({
-                    ...configuration,
-                    models: {
-                      ...configuration.models,
-                      [key]:
-                        e.target.value === "default"
-                          ? null
-                          : e.target.value === "custom"
-                            ? ""
-                            : e.target.value,
-                    },
-                  })
+                  changeModel(
+                    key,
+                    e.target.value === "custom" ? "" : e.target.value,
+                  )
                 }
               >
-                <option value="default">Server default · {fallback}</option>
-                {modelOptions.map(([id, name]) => (
+                {value === null && (
+                  <option value="default" disabled>
+                    Saved default · {fallback}
+                  </option>
+                )}
+                {modelOptions.map(({ id, name }) => (
                   <option key={id} value={id}>
                     {name}
                   </option>
@@ -102,15 +108,7 @@ export function AIModelSettings({
                     maxLength={200}
                     spellCheck={false}
                     placeholder="Enter an OpenAI model or snapshot ID"
-                    onChange={(e) =>
-                      onChange({
-                        ...configuration,
-                        models: {
-                          ...configuration.models,
-                          [key]: e.target.value,
-                        },
-                      })
-                    }
+                    onChange={(e) => changeModel(key, e.target.value)}
                   />
                 </>
               )}
@@ -118,10 +116,60 @@ export function AIModelSettings({
               <small className="muted">
                 Published: {active?.[key] ?? "Loading…"}
               </small>
+              <div className="ai-reasoning-field">
+                <label htmlFor={`ai-reasoning-${key}`}>
+                  {key === "classification" ? "Classification" : "Reply"}{" "}
+                  reasoning
+                </label>
+                <select
+                  id={`ai-reasoning-${key}`}
+                  value={effort ?? "default"}
+                  onChange={(e) =>
+                    onChange({
+                      ...configuration,
+                      reasoning: {
+                        ...configuration.reasoning,
+                        [key]:
+                          e.target.value === "default"
+                            ? null
+                            : (e.target.value as ReasoningEffort),
+                      },
+                    })
+                  }
+                >
+                  <option value="default">
+                    {reasoningSelectionLabel(effectiveModel, null)}
+                  </option>
+                  {supportedReasoningEfforts(effectiveModel).map((level) => (
+                    <option key={level} value={level}>
+                      {reasoningLabels[level]}
+                    </option>
+                  ))}
+                </select>
+                <small className="help">
+                  {key === "classification"
+                    ? "Controls reasoning when assigning intent labels."
+                    : "Controls reasoning for reply decisions, drafts, rewrites and completed answers."}
+                </small>
+                <small className="muted">
+                  Published reasoning:{" "}
+                  {active && published
+                    ? reasoningSelectionLabel(
+                        active[key],
+                        published.reasoning[key],
+                      )
+                    : "Loading…"}
+                </small>
+              </div>
             </div>
           );
         })}
       </div>
+      <p className="help">
+        Model default uses the model’s own reasoning level; None disables
+        reasoning. Higher levels may take longer and use more tokens. When
+        switching models, an unsupported level resets to Model default.
+      </p>
       <p className="help">
         Processing always uses separate stages: first classify the lead’s
         intent, then decide whether to reply and prepare an eligible draft.
