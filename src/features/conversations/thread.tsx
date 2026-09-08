@@ -3,7 +3,13 @@
 import "./conversations.css";
 import { ReadStateControl } from "./read-state-control";
 import { LabelPicker } from "./label-picker";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useInbox } from "@/lib/inbox-context";
 import {
@@ -32,6 +38,7 @@ export function ConversationThread({
   backLabel?: string;
 }) {
   const { repository, state, workspace } = useInbox();
+  const [wide, setWide] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(!!repository.openConversation);
   useEffect(() => {
@@ -89,12 +96,20 @@ export function ConversationThread({
     (message) => message.direction === "outbound",
   )?.id;
   const scroll = useRef<HTMLDivElement>(null);
+  const keepBottom = useRef(false);
+  useLayoutEffect(() => {
+    if (keepBottom.current && scroll.current) {
+      scroll.current.scrollTop = scroll.current.scrollHeight;
+    }
+  }, [wide]);
   const latestMessageId = messages.at(-1)?.id;
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [conversation.id, latestMessageId, mobileOpen]);
   return (
-    <section className="thread kimi-thread">
+    <section
+      className={`thread kimi-thread${wide ? " thread-width-wide" : ""}`}
+    >
       <header className="thread-header">
         <IconButton
           label={backLabel}
@@ -114,6 +129,31 @@ export function ConversationThread({
               .filter(Boolean)
               .join(" · ")}
           </p>
+        </div>
+        <div
+          className="thread-width-preview"
+          role="group"
+          aria-label="Ширина чата"
+        >
+          {[false, true].map((value) => (
+            <button
+              key={String(value)}
+              type="button"
+              aria-pressed={wide === value}
+              onClick={() => {
+                const element = scroll.current;
+                keepBottom.current =
+                  !!element &&
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight <
+                    32;
+                setWide(value);
+              }}
+            >
+              {value ? "Шире" : "Текущая"}
+            </button>
+          ))}
         </div>
         <ReadStateControl
           key={`${conversation.id}-${mobileOpen}`}
