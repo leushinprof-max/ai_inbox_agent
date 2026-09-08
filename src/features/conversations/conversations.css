@@ -679,3 +679,58 @@
     width: min(296px, calc(100vw - var(--sidebar)));
   }
 }
+
+/* A single writing surface, with actions inside its lower edge. */
+.kimi-thread .composer-reply {
+  padding: 14px 16px 10px;
+  border-radius: 12px;
+  transition: border-color 150ms ease;
+}
+.kimi-thread .composer-reply:focus-within {
+  border-color: var(--accent);
+}
+.kimi-thread .composer textarea.reply-input {
+  display: block;
+  min-height: 56px;
+  max-height: 180px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.65;
+}
+.kimi-thread .reply-input:focus-visible {
+  outline: none;
+}
+.kimi-thread .composer-reply .composer-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 8px;
+  gap: 6px;
+}
+.kimi-thread .composer-reply .composer-title .sparkbox {
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: 0;
+}
+.kimi-thread .composer-reply .composer-actions {
+  margin-top: 8px;
+  gap: 8px;
+}
+.kimi-thread .composer-reply .composer-actions > .row:empty {
+  display: none;
+}
+.kimi-thread .composer-reply .composer-actions > .row:last-child {
+  margin-left: auto;
+}
+.composer-context-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
