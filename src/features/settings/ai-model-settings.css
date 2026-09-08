@@ -1,0 +1,26 @@
+.ai-model-settings {
+  min-width: 0;
+}
+
+.ai-model-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.ai-model-fields select,
+.ai-model-fields input {
+  width: 100%;
+  min-width: 0;
+}
+
+.ai-model-fields small {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .ai-model-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}

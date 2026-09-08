@@ -2,8 +2,22 @@ import { z } from "zod";
 import { intentGroup, systemLabels } from "@/domain/labels";
 
 const instruction = z.string().trim().min(1).max(12000);
+const modelId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/);
+export const defaultInboxModel = "gpt-4.1-mini-2025-04-14";
 export const aiConfiguration = z
   .object({
+    models: z
+      .object({
+        classification: modelId.nullable(),
+        draft: modelId.nullable(),
+      })
+      .strict()
+      .default({ classification: null, draft: null }),
     classification: instruction,
     replyDecision: instruction,
     draft: instruction,
@@ -28,6 +42,7 @@ export const aiConfiguration = z
   .strict();
 export type AIConfiguration = z.infer<typeof aiConfiguration>;
 export const initialAIConfiguration: AIConfiguration = {
+  models: { classification: null, draft: null },
   classification:
     "Classify the LEAD'S current intent, not the team's goal or the subject of our messages. Select exactly one active label ID, or null when no definition fits. Use the lead's replies with preceding team messages only as context. Never infer intent from a team statement.\nMeeting origin is decisive. Meeting Request means the LEAD initiates a call, meeting or live demo. A product pitch is NOT a meeting invitation. If we merely describe the product and the lead asks to talk, choose Meeting Request. If our team explicitly proposes a meeting and the lead accepts it, choose Interested, even when the lead says 'let's talk', proposes a time or reschedules. Preserve this distinction through scheduling and acknowledgements. Do not infer lead initiative from an existing label.\nExamples:\nTeam: 'Прислать ссылку на демо?' Lead: '👍' => Information Request, shouldReply=true; fulfill the accepted offer with the approved link. This is not Interested and not Meeting Request.\nLead: 'Алексей?' with no earlier context => labelId=null, evidenceMessageId=null, evidenceQuote empty, shouldReply=false. This is a question about our identity, NOT Wrong Person. Wrong Person requires the lead to say THEY are not the appropriate contact.\nTeam: 'Мы помогаем с выплатами подрядчикам.' Lead: 'Давайте созвонимся и обсудим. Когда вам удобно?' => Meeting Request.\nTeam: 'Давайте созвонимся?' Lead: 'Да, круто, давайте созвонимся.' => Interested.\nLead: 'Давайте созвонимся во вторник.' Team: 'Приглашение отправлено.' Lead: '👍' => Meeting Request, no reply needed.\nTeam: 'Давайте созвонимся?' Lead: 'Да.' Team: 'Приглашение отправлено.' Lead: '👍' => Interested, no reply needed.\nLead asks about product, fees, documents, payments or a referral program => Information Request. Our later suggestion to call does not change this. Asking whether a referral program exists is not a Referral. Accepting an offer to send a demo link is Information Request; requesting a live demo on the lead's initiative is Meeting Request.\nPrefer a specific request over generic interest. Custom labels have no automatic priority. A substantive new lead intent overrides earlier intent; thanks and emojis alone do not erase it. Verify a previous label against the actual replies and the current definitions: it may have been assigned under older rules or may be wrong. Using a competitor plus asking for details is Information Request; using a competitor plus declining is Not interested. Merely answering a factual qualification question does not establish interest. An ambiguous name with a question mark and no usable context is Unable to categorize.\nFor a label, cite one short exact contiguous excerpt from a supplied inbound message, with its ID, that SUPPORTS that label. Never cite our text or paraphrase. If no label fits, return labelId=null, evidenceMessageId=null, evidenceQuote='', shouldReply=false, draft='', missingKnowledge=''.",
   replyDecision:
@@ -59,4 +74,14 @@ export function validateConfiguration(value: unknown) {
       "Agent template must include name, goal, language, replyGroups and knowledge, with no unknown variables.",
     );
   return config;
+}
+
+export function resolveModels(
+  configuration: AIConfiguration,
+  fallback = defaultInboxModel,
+) {
+  return {
+    classification: configuration.models.classification ?? fallback,
+    draft: configuration.models.draft ?? fallback,
+  };
 }

@@ -5,7 +5,11 @@ import { authorizeWorkspace } from "./inbox-read";
 import { adminClient } from "./admin";
 import { runRecordedAI } from "./ai-run";
 import { loadAIContext } from "./ai-context";
-import { validateConfiguration } from "@/integrations/ai/configuration";
+import {
+  defaultInboxModel,
+  validateConfiguration,
+} from "@/integrations/ai/configuration";
+import { planModelRun } from "@/integrations/ai/pipeline";
 import {
   buildModelRequest,
   createInboxModel,
@@ -51,6 +55,7 @@ export async function readAIAdmin() {
     release: release.data!,
     publications: publications.data ?? [],
     environment: process.env.VERCEL_ENV ?? "local",
+    fallbackModel: process.env.INBOX_MODEL ?? defaultInboxModel,
   };
 }
 export async function saveAIAdmin(value: unknown) {
@@ -177,7 +182,11 @@ async function adminInput(value: unknown, configValue: unknown) {
 }
 export async function previewAIAdmin(value: unknown, config: unknown) {
   const { input } = await adminInput(value, config);
-  return buildModelRequest(input, process.env.INBOX_MODEL);
+  const plan = planModelRun(input, process.env.INBOX_MODEL);
+  return {
+    ...buildModelRequest(plan.first, process.env.INBOX_MODEL),
+    draftModel: plan.hasReplyStage ? plan.models.draft : null,
+  };
 }
 export async function testAIAdmin(value: unknown, config: unknown) {
   const {
@@ -192,6 +201,7 @@ export async function testAIAdmin(value: unknown, config: unknown) {
   databaseError(
     (await db.rpc("reserve_agent_test", { p_workspace: workspaceId })).error,
   );
+  const calls: { model: string; scenario: string }[] = [];
   const output = await runRecordedAI(
     adminClient(),
     createInboxModel(process.env.OPENAI_API_KEY, process.env.INBOX_MODEL),
@@ -203,10 +213,12 @@ export async function testAIAdmin(value: unknown, config: unknown) {
       conversationId: conversationId ?? undefined,
       catalogRevision,
       scenario: `product_test:${input.scenario}`,
+      onModelCall: (call) => calls.push(call),
     },
   );
   return {
     output,
+    calls,
     label: input.labels.find((l) => l.id === output.labelId) ?? null,
     versions: {
       publishedBase: input.configurationVersion,
