@@ -376,24 +376,45 @@
   font-size: 11px;
 }
 .kimi-thread .thread-scroll {
-  padding: 24px 32px;
+  padding: 24px;
 }
 .kimi-thread .thread-content,
 .kimi-thread .composer {
-  max-width: 680px;
+  width: 100%;
+  max-width: none;
 }
 .kimi-thread .message {
-  max-width: 92%;
-  margin-bottom: 20px;
+  position: relative;
+  width: fit-content;
+  max-width: min(82%, 760px);
+  padding-left: 34px;
+  margin-bottom: 18px;
 }
 .kimi-thread .message-meta {
+  min-height: 20px;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
   font-size: 11.5px;
 }
+.kimi-thread .message-meta > span:not(.avatar) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kimi-thread .message-meta time {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .kimi-thread .message-meta .avatar {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 24px;
   height: 24px;
 }
 .kimi-thread .bubble {
+  width: fit-content;
+  max-width: 100%;
   font-size: 13px;
   line-height: 1.65;
   background: var(--raised);
@@ -401,6 +422,7 @@
   border-radius: 12px;
 }
 .kimi-thread .message.outbound .bubble {
+  margin-left: auto;
   background: var(--hover);
 }
 
@@ -410,7 +432,7 @@
 .kimi-thread .composer-wrap {
   background: transparent;
   border-top: 0;
-  padding: 0 32px 16px;
+  padding: 0 24px 16px;
   max-height: 65%;
   overflow: auto;
 }
@@ -546,7 +568,8 @@
     padding: 12px;
   }
   .kimi-thread .message {
-    max-width: 96%;
+    max-width: 94%;
+    padding-left: 30px;
   }
   .draft-layout .kimi-thread .thread-back {
     display: grid;
@@ -688,7 +711,7 @@
 }
 .kimi-thread .composer textarea.reply-input {
   display: block;
-  min-height: 56px;
+  min-height: 44px;
   max-height: 180px;
   padding: 0;
   border: 0;
