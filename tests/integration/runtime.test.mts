@@ -1282,10 +1282,14 @@ test("Reply-only import skips model calls, hides outreach in application reads a
     ["outbound", "inbound"],
   );
   assert.equal(thread.draft?.status, "ready");
-  assert.equal(calls, 2);
+  assert.equal(
+    calls,
+    3,
+    "The first live reply uses separate classification and reply stages",
+  );
   must(await admin.rpc("server_enqueue", hint));
   await processJobs();
-  assert.equal(calls, 2, "Duplicate delivery must not repeat classification");
+  assert.equal(calls, 3, "Duplicate delivery must not repeat either AI stage");
   assert.equal(
     (await readConversation(owner, target, hidden)).conversation.messages
       .length,

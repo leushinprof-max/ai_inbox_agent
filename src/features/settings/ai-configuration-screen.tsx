@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import { Button, Notice, Topbar } from "@/components/ui";
 import { LabelBadge } from "@/components/label-badge";
+import { AIModelSettings } from "./ai-model-settings";
 import { systemLabels, intentGroup } from "@/domain/labels";
 import {
   initialAIConfiguration,
@@ -217,6 +218,17 @@ export function AIConfigurationScreen() {
               To roll back, select an earlier version and publish it.
             </small>
           </div>
+          <AIModelSettings
+            configuration={config}
+            published={
+              published
+                ? validateConfiguration(published.configuration)
+                : undefined
+            }
+            fallback={data?.fallbackModel}
+            disabled={busy || !data}
+            onChange={update}
+          />
           <fieldset className="ai-admin-grid" disabled={busy || !data}>
             <section className="card">
               <h2>Instructions</h2>
@@ -361,9 +373,9 @@ export function AIConfigurationScreen() {
                     <p>Published</p>
                     <pre className="prompt-preview">
                       {JSON.stringify(
-                        (
-                          published!.configuration as unknown as AIConfiguration
-                        )[k as keyof AIConfiguration],
+                        validateConfiguration(published!.configuration)[
+                          k as keyof AIConfiguration
+                        ],
                         null,
                         2,
                       )}
@@ -569,13 +581,26 @@ export function AIConfigurationScreen() {
               {preview && (
                 <details open>
                   <summary>
-                    Full request · {preview.context.includedMessages} messages ·{" "}
+                    {preview.request.text.format.name === "inbox_classification"
+                      ? "Classification request"
+                      : "Reply request"}{" "}
+                    · {preview.request.model} ·{" "}
+                    {preview.context.includedMessages} messages ·{" "}
                     {preview.context.bodyCharacters} body characters
                     {preview.context.truncated ? " · context truncated" : ""}
                   </summary>
                   <pre className="prompt-preview">
                     {JSON.stringify(preview.request, null, 2)}
                   </pre>
+                  {preview.draftModel && (
+                    <p className="help">
+                      Reply stage · {preview.draftModel}. A separate request
+                      decides whether a reply is needed and prepares it using
+                      the classification result. The second request is created
+                      after classification, only for an eligible intent without
+                      a contact stop.
+                    </p>
+                  )}
                 </details>
               )}
               {[...(result ? [result] : []), ...batchResults].map((r, i) => (
@@ -596,6 +621,13 @@ export function AIConfigurationScreen() {
                     Published base v{r.versions.publishedBase} · Agent v
                     {r.versions.agent ?? "—"} · Catalog v{r.versions.catalog} ·
                     Uses the configuration in this editor
+                  </small>
+                  <br />
+                  <small className="muted">
+                    Models used:{" "}
+                    {r.calls
+                      .map((call) => `${call.model} (${call.scenario})`)
+                      .join(" → ")}
                   </small>
                   <br />
                   <small className="muted">

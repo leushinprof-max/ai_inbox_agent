@@ -47,12 +47,12 @@ test("Evidence schema excludes outbound IDs and preserves earlier verified inbou
     },
   });
   assert.deepEqual(
-    built.request.text.format.schema.properties.evidenceMessageId.enum,
+    built.request.text.format.schema.properties.evidenceMessageId!.enum,
     ["lead", "earlier", null],
   );
   assert.deepEqual(
     buildModelRequest({ ...base, messages: [] }).request.text.format.schema
-      .properties.evidenceMessageId.enum,
+      .properties.evidenceMessageId!.enum,
     [null],
   );
 });
@@ -250,6 +250,7 @@ test("Reply-only scenarios cannot reclassify and templates substitute values wit
   );
   const built = buildModelRequest({
     ...base,
+    scenario: "reply",
     agent: { ...base.agent!, goal: "Literal {{knowledge}}" },
   });
   assert.ok(
@@ -267,6 +268,7 @@ test("Reply-only scenarios cannot reclassify and templates substitute values wit
   assert.ok(
     buildModelRequest({
       ...base,
+      scenario: "reply",
       configuration: edited,
     }).request.input[0].content.includes("Use short sentences."),
   );

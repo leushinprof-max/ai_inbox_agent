@@ -222,9 +222,21 @@ test("Platform prompt ownership is separate from workspace ownership; versions p
   ).configuration;
   const version = (
     await row<{ id: number }>("select public.save_ai_configuration($1) id", [
-      JSON.stringify(config),
+      JSON.stringify({
+        ...config,
+        models: { classification: "classifier", draft: "writer" },
+      }),
     ])
   ).id;
+  assert.deepEqual(
+    (
+      await row<{ models: object }>(
+        "select configuration->'models' models from public.ai_config_versions where id=$1",
+        [version],
+      )
+    ).models,
+    { classification: "classifier", draft: "writer" },
+  );
   assert.equal(
     (
       await row<{ version_id: number }>(
@@ -234,8 +246,25 @@ test("Platform prompt ownership is separate from workspace ownership; versions p
     1,
   );
   await db.query("select public.publish_ai_configuration($1,1)", [version]);
+  assert.deepEqual(
+    (
+      await row<{ models: object }>(
+        "select configuration->'models' models from public.ai_config_versions v join public.ai_config_release r on r.version_id=v.id",
+      )
+    ).models,
+    { classification: "classifier", draft: "writer" },
+  );
   await assert.rejects(db.query("select public.publish_ai_configuration(1,1)"));
   await db.query("select public.publish_ai_configuration(1,2)");
+  assert.equal(
+    (
+      await row<{ models: object | null }>(
+        "select configuration->'models' models from public.ai_config_versions v join public.ai_config_release r on r.version_id=v.id",
+      )
+    ).models,
+    null,
+    "Rolling back to the original version restores server-default model selection",
+  );
   assert.equal(
     (await db.query("select * from public.ai_config_publications")).rows.length,
     2,
