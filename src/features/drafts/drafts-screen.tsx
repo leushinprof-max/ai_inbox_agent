@@ -183,32 +183,32 @@ export function DraftsScreen() {
                 return (
                   <button
                     key={draft.id}
-                    className={`queue-item ${selected?.id === draft.id ? "selected" : ""}`}
+                    className={`queue-item draft-lead-card ${selected?.id === draft.id ? "selected" : ""}`}
                     onClick={() => {
                       setSelected(draft.id);
                       setAwaitingSelection(false);
                       setMobileThread(true);
                     }}
                   >
-                    <span className="row">
-                      <Avatar
-                        photoUrl={c.contact.photoUrl}
-                        initials={c.contact.initials}
-                        color={c.contact.color}
-                      />
-                      <span className="grow">
-                        <span className="name">{c.contact.name}</span>
-                      </span>
-                      <span className="time">
-                        {displayDate(
-                          leadMessage?.createdAt ??
-                            c.messages.at(-1)?.createdAt,
-                          workspace.timezone,
-                        )}
+                    <Avatar
+                      photoUrl={c.contact.photoUrl}
+                      initials={c.contact.initials}
+                      color={c.contact.color}
+                    />
+                    <span className="draft-lead-content">
+                      <span className="name">{c.contact.name}</span>
+                      <span className="snippet">{leadMessage?.body}</span>
+                      <span className="draft-lead-footer">
+                        <ConversationLabel conversation={c} />
+                        <span className="time">
+                          {displayDate(
+                            leadMessage?.createdAt ??
+                              c.messages.at(-1)?.createdAt,
+                            workspace.timezone,
+                          )}
+                        </span>
                       </span>
                     </span>
-                    <span className="snippet">{leadMessage?.body}</span>
-                    <ConversationLabel conversation={c} />
                   </button>
                 );
               })}

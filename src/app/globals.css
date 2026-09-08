@@ -607,6 +607,48 @@ h3 {
   font-size: 11px;
   color: var(--accent-text);
 }
+.queue-item.draft-lead-card {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.draft-lead-card > .avatar {
+  width: 40px;
+  height: 40px;
+}
+.draft-lead-content {
+  display: block;
+  min-width: 0;
+}
+.draft-lead-card .name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 20px;
+}
+.draft-lead-card .snippet {
+  display: block;
+  padding: 0;
+  margin: 4px 0 8px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.draft-lead-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.draft-lead-footer > .pill {
+  min-width: 0;
+  white-space: normal;
+  text-align: left;
+}
+.draft-lead-footer .time {
+  align-self: center;
+}
 .queue-item .queue-status.warning {
   color: var(--amber);
 }
