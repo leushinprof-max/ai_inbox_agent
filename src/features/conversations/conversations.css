@@ -402,10 +402,23 @@
 .kimi-thread .thread-header > .icon-only:not(.thread-back),
 .kimi-thread .thread-header .thread-refresh,
 .kimi-thread .thread-header .read-button {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line-strong);
-  border-radius: 11px;
+  border-radius: 8px;
+  background: var(--raised);
+}
+.kimi-thread .thread-header > .icon-only:not(.thread-back):hover,
+.kimi-thread .thread-header .thread-refresh:hover,
+.kimi-thread .thread-header .read-button:hover {
+  background: var(--hover);
+}
+@media (min-width: 681px) {
+  .kimi-thread .thread-header > .thread-refresh-control + .read-control,
+  .kimi-thread .thread-header > .read-control + .icon-only,
+  .kimi-thread .thread-header > .thread-refresh-control + .icon-only {
+    margin-left: -8px;
+  }
 }
 .kimi-thread .thread-scroll {
   padding: 24px;
@@ -503,7 +516,7 @@
   line-height: 1.65;
   background: var(--raised);
   border: 1px solid #ffffff08;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 .kimi-thread .message.outbound .bubble {
   margin-left: auto;
@@ -523,7 +536,7 @@
 .kimi-thread .composer {
   background: var(--raised);
   border: 1px solid #ffffff14;
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 16px;
 }
 .kimi-thread .composer-title {
@@ -787,7 +800,7 @@
 /* A single writing surface, with actions inside its lower edge. */
 .kimi-thread .composer-reply {
   padding: 14px 16px 10px;
-  border-radius: 12px;
+  border-radius: 8px;
   transition: border-color 150ms ease;
 }
 .kimi-thread .composer-reply:focus-within {
