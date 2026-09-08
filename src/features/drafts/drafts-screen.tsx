@@ -177,6 +177,9 @@ export function DraftsScreen() {
                 const c = state.conversations.find(
                   (c) => c.id === draft.conversationId,
                 )!;
+                const leadMessage = c.messages.findLast(
+                  (message) => message.direction === "inbound",
+                );
                 return (
                   <button
                     key={draft.id}
@@ -195,37 +198,17 @@ export function DraftsScreen() {
                       />
                       <span className="grow">
                         <span className="name">{c.contact.name}</span>
-                        <span className="company" style={{ display: "block" }}>
-                          {c.contact.company}
-                        </span>
                       </span>
                       <span className="time">
                         {displayDate(
-                          c.messages.at(-1)?.createdAt,
+                          leadMessage?.createdAt ??
+                            c.messages.at(-1)?.createdAt,
                           workspace.timezone,
                         )}
                       </span>
                     </span>
-                    <span className="snippet">{c.messages.at(-1)?.body}</span>
+                    <span className="snippet">{leadMessage?.body}</span>
                     <ConversationLabel conversation={c} />
-                    <span
-                      className={`queue-status ${draft.status === "needs_input" ? "warning" : ""}`}
-                    >
-                      <Icon
-                        name={
-                          draft.status === "needs_input"
-                            ? "book"
-                            : draft.status === "snoozed"
-                              ? "clock"
-                              : "spark"
-                        }
-                      />
-                      {draft.status === "needs_input"
-                        ? "Needs your input"
-                        : draft.status === "snoozed"
-                          ? "Snoozed"
-                          : "Draft ready"}
-                    </span>
                   </button>
                 );
               })}

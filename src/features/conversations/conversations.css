@@ -728,6 +728,7 @@
 
 /* Labels retain the live catalog colors, with the filled chips from the reference. */
 .conversations-page .conv-preview .pill,
+.queue-item .pill,
 .kimi-context .pill {
   border: 0;
   border-radius: 6px;
@@ -740,30 +741,37 @@
   width: fit-content;
 }
 .conversations-page .pill.green,
+.queue-item .pill.green,
 .kimi-context .pill.green {
   background: #34d399;
 }
 .conversations-page .pill.blue,
+.queue-item .pill.blue,
 .kimi-context .pill.blue {
   background: #6aa6ff;
 }
 .conversations-page .pill.purple,
+.queue-item .pill.purple,
 .kimi-context .pill.purple {
   background: #a79bff;
 }
 .conversations-page .pill.teal,
+.queue-item .pill.teal,
 .kimi-context .pill.teal {
   background: #5bd6c2;
 }
 .conversations-page .pill.amber,
+.queue-item .pill.amber,
 .kimi-context .pill.amber {
   background: #fbbf24;
 }
 .conversations-page .pill.pink,
+.queue-item .pill.pink,
 .kimi-context .pill.pink {
   background: #ef9fce;
 }
 .conversations-page .pill.red,
+.queue-item .pill.red,
 .kimi-context .pill.red {
   background: #f87171;
 }
