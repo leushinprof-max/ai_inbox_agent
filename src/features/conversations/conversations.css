@@ -567,6 +567,9 @@
 .kimi-context {
   font-size: 12px;
 }
+.draft-layout > .kimi-context {
+  background: var(--bg);
+}
 .kimi-context .context-profile {
   padding: 20px;
 }
