@@ -89,12 +89,6 @@ export function ConversationThread({
         deliveryStatus: m.status,
       })),
   ];
-  const latestInboundId = messages.findLast(
-    (message) => message.direction === "inbound",
-  )?.id;
-  const latestOutboundId = messages.findLast(
-    (message) => message.direction === "outbound",
-  )?.id;
   const scroll = useRef<HTMLDivElement>(null);
   const keepBottom = useRef(false);
   useLayoutEffect(() => {
@@ -224,8 +218,7 @@ export function ConversationThread({
                 className={`message ${message.direction === "outbound" ? "outbound" : ""}`}
               >
                 <div className="message-meta">
-                  {message.id === latestInboundId ||
-                  message.id === latestOutboundId ? (
+                  {message.direction !== messages[index + 1]?.direction ? (
                     <Avatar
                       photoUrl={
                         message.direction === "inbound"
