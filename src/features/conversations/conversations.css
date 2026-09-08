@@ -945,17 +945,21 @@
   color: var(--accent-text);
   text-decoration: underline;
 }
-.reference-context .conversation-classification {
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-}
-.reference-context .classification-control {
+.reference-context .context-section-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
-  min-width: 0;
+  min-height: 44px;
+  padding: 6px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.reference-context .context-section-header > .eyebrow {
+  margin: 0;
+}
+.reference-context .classification-error {
+  padding: 6px 14px;
 }
 .reference-context .classification-label {
   min-width: 0;
@@ -963,6 +967,7 @@
   overflow-wrap: anywhere;
 }
 .reference-context .classification-label .pill {
+  max-width: 100%;
   border-radius: 6px;
   padding: 1px 6px;
   line-height: 18px;
@@ -974,7 +979,7 @@
   height: 32px;
   min-height: 32px;
   padding: 0;
-  border: 1px solid var(--line-strong);
+  border: 1px solid transparent;
   border-radius: 7px;
   color: var(--muted);
 }

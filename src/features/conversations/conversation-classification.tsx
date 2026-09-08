@@ -49,15 +49,9 @@ export function ConversationClassification({
       ? "Retry classification"
       : "Reclassify";
   return (
-    <div className="conversation-classification" aria-busy={processing}>
-      <div className="classification-control">
-        <span className="classification-label" role="status">
-          {processing ? (
-            <span className="muted">Classifying…</span>
-          ) : (
-            <ConversationLabel conversation={conversation} />
-          )}
-        </span>
+    <>
+      <div className="context-section-header">
+        <p className="eyebrow">Automation</p>
         {writable && conversation.revision > 0 && (
           <Button
             variant="ghost"
@@ -70,7 +64,21 @@ export function ConversationClassification({
           />
         )}
       </div>
-      {error && <Notice variant="error">{error}</Notice>}
-    </div>
+      <div className="details-row" aria-busy={processing}>
+        <p className="context-field-label">Label</p>
+        <span className="classification-label" role="status">
+          {processing ? (
+            <span className="muted">Classifying…</span>
+          ) : (
+            <ConversationLabel conversation={conversation} />
+          )}
+        </span>
+      </div>
+      {error && (
+        <div className="classification-error">
+          <Notice variant="error">{error}</Notice>
+        </div>
+      )}
+    </>
   );
 }
