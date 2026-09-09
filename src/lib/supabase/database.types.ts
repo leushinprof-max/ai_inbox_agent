@@ -1058,6 +1058,61 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      conversation_page_v3: {
+        Args: {
+          p_filters?: Json;
+          p_before?: string;
+          p_before_id?: string;
+          p_label?: string;
+          p_limit?: number;
+          p_query?: string;
+          p_read?: string;
+          p_workspace: string;
+        };
+        Returns: {
+          archived: boolean;
+          campaign: string;
+          classified_revision: number | null;
+          contact_company: string;
+          contact_name: string;
+          contact_photo_url: string | null;
+          contact_position: string;
+          contact_profile_url: string | null;
+          contact_stopped: boolean;
+          created_at: string;
+          evidence_message_id: string | null;
+          evidence_quote: string;
+          id: string;
+          inbound_revision: number;
+          label_assignment_revision: number;
+          label_id: string | null;
+          label_source: string | null;
+          label_state: string;
+          labels: string[];
+          last_message_at: string | null;
+          no_reply_reason: string;
+          notes: string;
+          notes_revision: number;
+          provider_conversation_id: string;
+          read_state_revision: number;
+          reply_agent_id: string | null;
+          reply_agent_version: number | null;
+          reply_catalog_revision: number | null;
+          reply_config_version: number | null;
+          reply_decision_revision: number | null;
+          sender_id: number;
+          sender_name: string;
+          sender_photo_url: string | null;
+          unread: boolean;
+          workspace_id: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "conversations";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       conversation_previews: {
         Args: { p_ids: string[]; p_workspace: string };
         Returns: {

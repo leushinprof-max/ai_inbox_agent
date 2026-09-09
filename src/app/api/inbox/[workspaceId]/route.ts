@@ -1,3 +1,4 @@
+import { conversationFilters } from "@/domain/conversation-filters";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticatedClient } from "@/server/session";
@@ -77,6 +78,7 @@ export async function GET(
           q.get("label") ?? "all",
           before,
           z.enum(["all", "unread", "read"]).parse(q.get("read") ?? "all"),
+          conversationFilters.parse(JSON.parse(q.get("filters") ?? "[]")),
         );
         return NextResponse.json(
           {

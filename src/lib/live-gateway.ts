@@ -1,3 +1,4 @@
+import type { ConversationFilter } from "@/domain/conversation-filters";
 import type {
   Agent,
   Conversation,
@@ -22,6 +23,7 @@ export class LiveGateway implements InboxGateway {
     query: string;
     label: string;
     read: "all" | "unread" | "read";
+    filters?: ConversationFilter[];
   } = { query: "", label: "all", read: "all" };
   private searchVersion = 0;
   private detailId: string | null = null;
@@ -380,6 +382,7 @@ export class LiveGateway implements InboxGateway {
           q: this.search.query,
           label: this.search.label,
           read: this.search.read,
+          filters: JSON.stringify(this.search.filters ?? []),
           ...(before ? { before: JSON.stringify(before) } : {}),
         });
       items.push(...result.items);
@@ -401,9 +404,10 @@ export class LiveGateway implements InboxGateway {
     query: string,
     label: string,
     read: "all" | "unread" | "read" = "all",
+    filters: ConversationFilter[] = [],
   ) => {
     this.searchVersion++;
-    this.search = { query, label, read };
+    this.search = { query, label, read, filters };
     this.conversationPages = 1;
     await this.reloadConversationPages(1);
   };
@@ -455,6 +459,7 @@ export class LiveGateway implements InboxGateway {
         q: this.search.query,
         label: this.search.label,
         read: this.search.read,
+        filters: JSON.stringify(this.search.filters ?? []),
         before: JSON.stringify(before),
       });
     if (version !== this.searchVersion) return;

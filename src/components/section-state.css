@@ -23,9 +23,6 @@
 .conversations-toolbar > .loading-control {
   height: 36px;
 }
-.conversation-tabs > .loading-tabs {
-  min-height: 28px;
-}
 .loading-conversation-row .skeleton {
   margin: 0;
 }
