@@ -11,6 +11,13 @@ import { ReadStateControl } from "./read-state-control";
 import { Composer } from "@/features/drafts/composer";
 import { usePreferences } from "@/lib/preferences";
 import { useContactDetails } from "@/lib/use-contact-details";
+import { FilterBuilder, PinIcon } from "./filter-builder";
+import { usePinnedViews } from "./pinned-views";
+import {
+  filterSignature,
+  matchesConversationFilters,
+  type ConversationFilter,
+} from "@/domain/conversation-filters";
 import "./conversations.css";
 
 export function ConversationsScreen({ initialId }: { initialId?: string }) {
@@ -19,8 +26,11 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const [error, setError] = useState("");
   const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
   const [query, setQuery] = useState("");
-  const [label, setLabel] = useState("all");
-  const [read, setRead] = useState<"all" | "unread" | "read">("all");
+  const [filters, setFilters] = useState<ConversationFilter[]>([]);
+  const { views, save: saveViews } = usePinnedViews(
+    scope.userId,
+    scope.workspaceId,
+  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [details, setDetails, wideDetails] = useContactDetails(
@@ -52,42 +62,23 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const catalog = (state.labelCatalog ?? []).filter(
     (l) => l.workspaceId === scope.workspaceId && !l.archived,
   );
-  const tabs = [
-    { key: "all", name: "All", label: "all", read: "all" as const },
-    { key: "unread", name: "Unread", label: "all", read: "unread" as const },
-    ...[
-      ["interested", "Interested"],
-      ["meeting_request", "Meetings"],
-      ["information_request", "Info requests"],
-    ].flatMap(([key, name]) => {
-      const item = catalog.find((l) => l.systemKey === key);
-      return item ? [{ key, name, label: item.id, read: "all" as const }] : [];
-    }),
-  ];
-  const counts =
-    state.conversationCounts ??
-    Object.fromEntries(
-      tabs.map((tab) => [
-        tab.key,
-        conversations.filter(
-          (c) =>
-            (tab.read !== "unread" || c.unread) &&
-            (tab.label === "all" || c.labelId === tab.label),
-        ).length,
-      ]),
-    );
-  const hasFilters = label !== "all" || read !== "all";
+  const hasFilters = filters.length > 0;
+  const activeSignature = filterSignature(filters);
   function clearFilters() {
     setQuery("");
-    setLabel("all");
-    setRead("all");
+    setFilters([]);
+  }
+  function applyFilters(next: ConversationFilter[]) {
+    setFilters(next);
+    setFiltersOpen(false);
+    filterWrap.current?.querySelector("button")?.focus();
   }
   useEffect(() => {
     if (!repository.searchConversations) return;
     let active = true;
     const timer = setTimeout(() => {
       setLoading(true);
-      void repository.searchConversations!(query, label, read)
+      void repository.searchConversations!(query, "all", "all", filters)
         .then(() => {
           if (active) setError("");
         })
@@ -102,7 +93,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [query, label, read, repository]);
+  }, [query, filters, repository]);
   useEffect(() => {
     if (initialId && repository.openConversation)
       void repository
@@ -120,7 +111,10 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
         event.preventDefault();
         search.current.focus();
       }
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape" &&
+        filterWrap.current?.contains(document.activeElement)
+      ) {
         setFiltersOpen(false);
         filterWrap.current?.querySelector("button")?.focus();
       }
@@ -140,24 +134,18 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
     ? state.paging.conversationIds
         .map((id) => conversations.find((c) => c.id === id))
         .filter((c) => !!c)
-        .filter(
-          (c) =>
-            c.readStatePending ||
-            read === "all" ||
-            c.unread === (read === "unread"),
+        .filter((c) =>
+          matchesConversationFilters(
+            c,
+            filters.filter((f) => f.field === "read"),
+          ),
         )
     : conversations.filter(
         (c) =>
           `${c.contact.name} ${c.contact.company} ${c.messages.at(-1)?.body ?? ""}`
             .toLowerCase()
             .includes(query.trim().toLowerCase()) &&
-          (read === "all" || c.unread === (read === "unread")) &&
-          (label === "all" ||
-            c.labelId === label ||
-            (label === "uncategorized" && c.labelState === "uncategorized") ||
-            catalog.some(
-              (l) => l.id === c.labelId && `group:${l.group}` === label,
-            )),
+          matchesConversationFilters(c, filters, undefined, state.labelCatalog),
       );
   if (selected)
     return (
@@ -213,78 +201,78 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
             </svg>
             Filters{" "}
             {hasFilters ? (
-              <span className="filter-count">
-                {Number(label !== "all") + Number(read !== "all")}
-              </span>
+              <span className="filter-count">{filters.length}</span>
             ) : null}
           </Button>
           {filtersOpen ? (
-            <div
-              className="conversation-filters"
-              id="conversation-filters"
-              role="region"
-              aria-label="Conversation filters"
-            >
-              <label>
-                Label
-                <select
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  aria-label="Filter by label"
-                >
-                  <option value="all">All labels</option>
-                  {["positive", "neutral", "negative"].map((group) => (
-                    <option value={`group:${group}`} key={group}>
-                      {group} intent
-                    </option>
-                  ))}
-                  <option value="uncategorized">Unable to categorize</option>
-                  {catalog.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Read status
-                <select
-                  value={read}
-                  onChange={(e) => setRead(e.target.value as typeof read)}
-                  aria-label="Filter by read status"
-                >
-                  <option value="all">All conversations</option>
-                  <option value="unread">Unread</option>
-                  <option value="read">Read</option>
-                </select>
-              </label>
-              <div className="row between">
-                <Button variant="ghost small" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-                <Button variant="small" onClick={() => setFiltersOpen(false)}>
-                  Done
-                </Button>
-              </div>
-            </div>
+            <FilterBuilder
+              applied={filters}
+              catalog={catalog}
+              canPin={views.length < 30}
+              onApply={applyFilters}
+              onPin={(name, next) => {
+                try {
+                  const duplicate = views.find(
+                    (view) =>
+                      filterSignature(view.filters) === filterSignature(next),
+                  );
+                  saveViews(
+                    duplicate
+                      ? views.map((view) =>
+                          view.id === duplicate.id ? { ...view, name } : view,
+                        )
+                      : [
+                          ...views,
+                          { id: crypto.randomUUID(), name, filters: next },
+                        ],
+                  );
+                  setError("");
+                  return true;
+                } catch {
+                  setError(
+                    "This view could not be saved. Check browser storage and try again.",
+                  );
+                  return false;
+                }
+              }}
+            />
           ) : null}
         </div>
       </header>
-      <nav className="conversation-tabs" aria-label="Conversation views">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            aria-pressed={label === tab.label && read === tab.read}
-            onClick={() => {
-              setLabel(tab.label);
-              setRead(tab.read);
-            }}
-          >
-            {tab.name}
-            <span>{counts[tab.key] ?? 0}</span>
+      {views.length ? (
+        <nav className="conversation-tabs" aria-label="Conversation views">
+          <button aria-pressed={!hasFilters} onClick={() => applyFilters([])}>
+            All
           </button>
-        ))}
-      </nav>
+          {views.map((view) => (
+            <div className="conversation-pinned-view" key={view.id}>
+              <button
+                aria-pressed={activeSignature === filterSignature(view.filters)}
+                onClick={() => applyFilters(view.filters)}
+              >
+                <PinIcon />
+                {view.name}
+              </button>
+              <button
+                className="conversation-unpin"
+                aria-label={`Unpin ${view.name}`}
+                title="Unpin view"
+                onClick={() => {
+                  try {
+                    saveViews(views.filter((item) => item.id !== view.id));
+                    if (activeSignature === filterSignature(view.filters))
+                      applyFilters([]);
+                  } catch {
+                    setError("This view could not be removed. Try again.");
+                  }
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </nav>
+      ) : null}
       {error ? (
         <Notice variant="error">
           {error}

@@ -1,0 +1,9 @@
+# Conversation filters
+
+The filter builder supports labels (any / none), intent (positive / neutral / negative, is / is not), last activity (within / older than 24 hours, 7, 30 or 90 days), last message direction (contact / our team), and read status. Intent comes from the assigned label's group in the workspace catalog; unlabeled conversations do not match any intent. Filter fields are fixed after adding a row; remove the row to choose a different field. Conditions use AND; selected labels within one condition use OR. Changes remain a draft until **Apply filters**. Closing the panel discards unapplied changes. **Clear all** clears the draft conditions; apply to reset the results.
+
+**Pin view** saves a named set of conditions in browser storage, scoped to user and workspace. It does not save the search text. There are no predefined views. The view strip, including the **All** reset button, only appears when at least one view is pinned. Removing the final pin hides the strip. Removing the active view also resets its conditions. Saved views persist across reloads in that browser; they do not sync between devices.
+
+Apply `20260909080708_conversation_filters.sql` before deploying the application. It adds the read-only, security-invoker `conversation_page_v3` RPC; existing clients and unfiltered queries keep using v2. All conditions are applied before the keyset cursor and page limit. The existing workspace authorization and table RLS remain in force. No data rewrite is required.
+
+Validation: `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`, and the focused integration tests in `tests/integration/conversation-filters.test.mts` and `tests/integration/conversation-cache.test.mts`. Browser acceptance covers multi-label selection, AND with unread status, explicit apply, pin/save/reload/reopen/unpin, no default view strip, and the 390px layout.

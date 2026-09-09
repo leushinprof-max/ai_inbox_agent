@@ -145,14 +145,6 @@ export function SectionSkeleton({
           <div className="loading-control grow" />
           <div className="loading-control loading-filter" />
         </div>
-        <div className="conversation-tabs">
-          <div className="loading-tabs">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-        </div>
         <div className="conversation-results">
           {Array.from({ length: 7 }, (_, i) => (
             <div className="loading-conversation-row" key={i}>

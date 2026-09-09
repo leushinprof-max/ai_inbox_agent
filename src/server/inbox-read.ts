@@ -1,3 +1,4 @@
+import type { ConversationFilter } from "@/domain/conversation-filters";
 import "server-only";
 import { agentGuidance, grammaticalForm } from "@/domain/agent-guidance";
 import { linkedinProfileUrl } from "@/lib/linkedin-profile";
@@ -163,15 +164,20 @@ export async function conversationPage(
   label = "all",
   before?: PageCursor,
   read: "all" | "unread" | "read" = "all",
+  filters: ConversationFilter[] = [],
 ) {
-  const { data, error } = await db.rpc("conversation_page_v2", {
-    p_read: read,
-    p_workspace: workspaceId,
-    p_query: query.slice(0, 200),
-    ...(label !== "all" ? { p_label: label } : {}),
-    ...(before ? { p_before: before.at, p_before_id: before.id } : {}),
-    p_limit: PAGE_SIZE + 1,
-  });
+  const { data, error } = await db.rpc(
+    filters.length ? "conversation_page_v3" : "conversation_page_v2",
+    {
+      ...(filters.length ? { p_filters: filters } : {}),
+      p_read: read,
+      p_workspace: workspaceId,
+      p_query: query.slice(0, 200),
+      ...(label !== "all" ? { p_label: label } : {}),
+      ...(before ? { p_before: before.at, p_before_id: before.id } : {}),
+      p_limit: PAGE_SIZE + 1,
+    },
+  );
   databaseError(error);
   const rows = data ?? [];
   const items = rows.slice(0, PAGE_SIZE);

@@ -1,3 +1,4 @@
+import type { ConversationFilter } from "./conversation-filters";
 import type { Agent, InboxState, Scope } from "./inbox";
 import type { SendOutcome, SendRequest } from "./send";
 
@@ -8,6 +9,7 @@ export interface InboxGateway {
     query: string,
     label: string,
     read?: "all" | "unread" | "read",
+    filters?: ConversationFilter[],
   ): Promise<void>;
   setConversationRead(
     scope: Scope,
