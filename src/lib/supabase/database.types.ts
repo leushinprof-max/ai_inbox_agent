@@ -216,6 +216,9 @@ export type Database = {
           error_code: string | null;
           id: string;
           model: string;
+          request_context: Json | null;
+          request_snapshot: Json | null;
+          result_snapshot: Json | null;
           scenario: string;
           status: string;
           workspace_id: string;
@@ -231,6 +234,9 @@ export type Database = {
           error_code?: string | null;
           id?: string;
           model: string;
+          request_context?: Json | null;
+          request_snapshot?: Json | null;
+          result_snapshot?: Json | null;
           scenario: string;
           status?: string;
           workspace_id: string;
@@ -246,6 +252,9 @@ export type Database = {
           error_code?: string | null;
           id?: string;
           model?: string;
+          request_context?: Json | null;
+          request_snapshot?: Json | null;
+          result_snapshot?: Json | null;
           scenario?: string;
           status?: string;
           workspace_id?: string;
@@ -528,6 +537,7 @@ export type Database = {
         Row: {
           agent_id: string;
           agent_version: number;
+          ai_run_id: string | null;
           body: string;
           conversation_id: string;
           created_at: string;
@@ -542,6 +552,7 @@ export type Database = {
         Insert: {
           agent_id: string;
           agent_version: number;
+          ai_run_id?: string | null;
           body?: string;
           conversation_id: string;
           created_at?: string;
@@ -556,6 +567,7 @@ export type Database = {
         Update: {
           agent_id?: string;
           agent_version?: number;
+          ai_run_id?: string | null;
           body?: string;
           conversation_id?: string;
           created_at?: string;
@@ -568,6 +580,13 @@ export type Database = {
           workspace_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "drafts_ai_run_fkey";
+            columns: ["workspace_id", "ai_run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_runs";
+            referencedColumns: ["workspace_id", "id"];
+          },
           {
             foreignKeyName: "drafts_workspace_id_agent_id_fkey";
             columns: ["workspace_id", "agent_id"];
@@ -1060,9 +1079,9 @@ export type Database = {
       };
       conversation_page_v3: {
         Args: {
-          p_filters?: Json;
           p_before?: string;
           p_before_id?: string;
+          p_filters?: Json;
           p_label?: string;
           p_limit?: number;
           p_query?: string;
@@ -1163,6 +1182,7 @@ export type Database = {
         Returns: {
           agent_id: string;
           agent_version: number;
+          ai_run_id: string | null;
           body: string;
           conversation_id: string;
           created_at: string;
@@ -1357,6 +1377,19 @@ export type Database = {
           p_reason: string;
           p_should_reply: boolean;
           p_stopped: boolean;
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
+      server_complete_generation_v3: {
+        Args: {
+          p_assignment: number;
+          p_body: string;
+          p_catalog: number;
+          p_config: number;
+          p_id: string;
+          p_missing: string;
+          p_run_id: string;
           p_workspace: string;
         };
         Returns: undefined;

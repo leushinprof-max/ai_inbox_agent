@@ -15,7 +15,7 @@ export async function requestGeneration(input: unknown) {
         draftRevision: z.number().int().positive().optional(),
         instructions: z.string().max(2000).default(""),
         answer: z.string().max(8000).default(""),
-        remember: z.boolean().default(false),
+        remember: z.literal(false).default(false),
       })
       .parse(input);
     const { db, user } = await authenticatedClient();

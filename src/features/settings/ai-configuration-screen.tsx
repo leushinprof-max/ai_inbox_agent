@@ -10,6 +10,7 @@ import { systemLabels } from "@/domain/labels";
 import {
   initialAIConfiguration,
   validateConfiguration,
+  upgradeConfiguration,
   type AIConfiguration,
 } from "@/integrations/ai/configuration";
 import {
@@ -18,14 +19,14 @@ import {
   publishAIAdmin,
 } from "@/server/ai-admin-actions";
 import "./ai-admin.css";
+import {
+  replyVariables,
+  classificationVariables,
+} from "@/integrations/ai/prompt-templates";
 
 const sections = [
   ["classification", "Classification"],
-  ["replyDecision", "When to reply"],
-  ["draft", "Draft reply"],
-  ["rewrite", "Rewrite"],
-  ["needsInput", "Missing knowledge"],
-  ["agentTemplate", "Agent template"],
+  ["reply", "Reply agent"],
 ] as const;
 const pages: { id: string; label: string; icon: IconName }[] = [
   { id: "models", label: "Models", icon: "agent" },
@@ -71,9 +72,11 @@ export function AIConfigurationScreen() {
           setData(next);
           setSelected(next.release.version_id);
           setConfig(
-            validateConfiguration(
-              next.versions.find((v) => v.id === next.release.version_id)!
-                .configuration,
+            upgradeConfiguration(
+              validateConfiguration(
+                next.versions.find((v) => v.id === next.release.version_id)!
+                  .configuration,
+              ),
             ),
           );
         }
@@ -112,7 +115,7 @@ export function AIConfigurationScreen() {
   const instructionValue =
     section === "labels"
       ? config.labels[selectedLabel.key]
-      : config[section as (typeof sections)[number][0]];
+      : (config[section as (typeof sections)[number][0]] ?? "");
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -132,8 +135,10 @@ export function AIConfigurationScreen() {
   function loadVersion(id: number) {
     setSelected(id);
     update(
-      validateConfiguration(
-        data!.versions.find((v) => v.id === id)!.configuration,
+      upgradeConfiguration(
+        validateConfiguration(
+          data!.versions.find((v) => v.id === id)!.configuration,
+        ),
       ),
     );
     setPendingVersion(null);
@@ -228,6 +233,14 @@ export function AIConfigurationScreen() {
             </div>
             {error && <Notice variant="error">{error}</Notice>}
             {notice && <Notice>{notice}</Notice>}
+            {baseline &&
+              validateConfiguration(baseline.configuration).schemaVersion !==
+                2 && (
+                <Notice>
+                  The new prompt format is ready to review. Save a new version
+                  and publish it to switch generation to the Reply agent prompt.
+                </Notice>
+              )}
             <div hidden={page !== "models"}>
               <AIModelSettings
                 configuration={config}
@@ -302,14 +315,21 @@ export function AIConfigurationScreen() {
                     <span>
                       {instructionValue.length.toLocaleString()} / 12,000
                     </span>
-                    {section === "agentTemplate" && (
+                    {section !== "labels" && (
                       <details className="admin-details">
                         <summary>Template variables</summary>
-                        <p>
-                          {
-                            "{{name}}, {{goal}}, {{language}}, {{replyGroups}}, {{knowledge}}"
-                          }
-                        </p>
+                        <dl>
+                          {Object.entries(
+                            section === "reply"
+                              ? replyVariables
+                              : classificationVariables,
+                          ).map(([name, source]) => (
+                            <div key={name}>
+                              <dt>{"{{" + name + "}}"}</dt>
+                              <dd>{source}</dd>
+                            </div>
+                          ))}
+                        </dl>
                       </details>
                     )}
                   </div>
@@ -373,6 +393,41 @@ export function AIConfigurationScreen() {
                   </section>
                 ))}
               </details>
+              {baseline && (
+                <details className="admin-details">
+                  <summary>Original saved version {selected}</summary>
+                  <pre className="request-text">
+                    {JSON.stringify(baseline.configuration, null, 2)}
+                  </pre>
+                  {validateConfiguration(baseline.configuration)
+                    .schemaVersion !== 2 &&
+                    selected !== data?.release.version_id && (
+                      <>
+                        <p className="help">
+                          Restore this original legacy configuration. The
+                          editable prompts above contain its converted version.
+                        </p>
+                        <Button
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await publishAIAdmin(
+                                selected,
+                                data!.release.revision,
+                              );
+                              setData(await readAIAdmin());
+                              setNotice(
+                                `Original version ${selected} restored.`,
+                              );
+                            })
+                          }
+                        >
+                          Restore original version {selected}
+                        </Button>
+                      </>
+                    )}
+                </details>
+              )}
               <h2 className="admin-history-title">Publications</h2>
               <div className="admin-history-list">
                 {data?.publications.map((publication) => (

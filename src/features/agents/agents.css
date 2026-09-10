@@ -1,5 +1,112 @@
 @import "../../components/kimi.css";
 
+/* Background and Communication share the existing Inbox palette and type scale. */
+.agent-editor-v2 .agent-title-input {
+  font: inherit;
+  font-size: 19px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 3px 6px;
+  margin-left: -6px;
+  max-width: 300px;
+}
+.agent-editor-v2 .agent-title-input:focus {
+  border-color: var(--accent);
+}
+.agent-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.agent-editor-v2 .agent-settings-content {
+  max-width: 850px;
+  margin: 0 auto;
+  padding-bottom: 60px;
+}
+.agent-settings-fields {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.agent-setting-section {
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+}
+.agent-setting-section h2 {
+  font-size: 18px;
+  font-weight: 550;
+  margin: 0 0 16px;
+}
+.agent-setting-section h2 small {
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 8px;
+}
+.agent-setting-section > .help {
+  margin-top: -7px;
+  max-width: 70ch;
+}
+.agent-setting-section textarea {
+  min-height: 125px;
+  width: 100%;
+}
+.agent-setting-section .agent-product {
+  min-height: 220px;
+}
+.agent-setting-section .field:last-child {
+  margin-bottom: 0;
+}
+.agent-language-field {
+  margin-top: 22px;
+  max-width: 300px;
+}
+.agent-setting-item {
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.agent-setting-item summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.agent-setting-item[open] summary {
+  margin-bottom: 16px;
+}
+.agent-setting-item textarea {
+  margin-bottom: 10px;
+}
+.agent-editor-v2 .agent-resources {
+  border-top: 0;
+  margin-top: 0;
+}
+.agent-editor-v2 .editor-tabs {
+  padding-top: 8px;
+}
+@media (max-width: 1000px) {
+  .agent-editor-v2 .agent-editor-header {
+    flex-wrap: wrap;
+  }
+  .agent-header-actions {
+    margin-left: auto;
+  }
+}
+@media (max-width: 600px) {
+  .agent-header-actions {
+    width: 100%;
+  }
+  .agent-header-actions .btn {
+    flex: 1;
+  }
+  .agent-editor-v2 .agent-title-input {
+    max-width: 200px;
+  }
+}
+
 .agent-section-heading,
 .agent-resource-heading,
 .agent-resource-actions {

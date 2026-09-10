@@ -98,7 +98,7 @@ export function AgentResources({
     >
       <div className="agent-section-heading">
         <div>
-          <h2 id="agent-resources-title">Resources</h2>
+          <h2 id="agent-resources-title">Materials</h2>
           <p className="help">Materials your agent can share with leads.</p>
         </div>
         <span className="small muted">{value.length} / 20</span>

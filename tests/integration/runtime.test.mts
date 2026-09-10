@@ -1,6 +1,7 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { retirePreviousFixtureJobs } from "./local-queue.mjs";
 import { execFileSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../../src/lib/supabase/database.types";
@@ -146,6 +147,7 @@ async function drain(selectedModel: InboxModel = model) {
   assert.fail("Queue did not drain");
 }
 before(async () => {
+  retirePreviousFixtureJobs();
   for (const [label, client] of [
     ["owner", owner],
     ["outsider", outsider],

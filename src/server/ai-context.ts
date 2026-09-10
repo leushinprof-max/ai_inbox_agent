@@ -131,6 +131,8 @@ export async function loadAIContext(
     assignmentRevision: c?.label_assignment_revision ?? 0,
     previous,
     conversation: c,
+    leadName: c?.contact_name,
+    contactStopped: c?.contact_stopped ?? false,
     sender: c
       ? {
           name: sender?.data?.name || c.sender_name,

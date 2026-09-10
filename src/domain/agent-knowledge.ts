@@ -12,6 +12,24 @@ export function readAgentKnowledge(text: string): AgentKnowledge {
     const suffix = end >= 0 ? text.slice(end + 2) : "";
     const data = JSON.parse(structured);
     if (
+      data?.format === "agent-background-v2" &&
+      typeof data.companyName === "string" &&
+      typeof data.productOffer === "string"
+    ) {
+      return {
+        companyName: data.companyName,
+        productOffer:
+          [
+            data.companyDescription ?? "",
+            data.productOffer,
+            ...(data.sellingPoints ?? []),
+          ]
+            .filter(Boolean)
+            .join("\n\n") + suffix,
+        faq: [],
+      };
+    }
+    if (
       data?.format === "agent-knowledge-v1" &&
       typeof data.companyName === "string" &&
       typeof data.productOffer === "string" &&

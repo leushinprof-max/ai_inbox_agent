@@ -203,6 +203,7 @@ export class LiveGateway implements InboxGateway {
     until?: string,
     remember?: boolean,
   ) {
+    if (remember) throw new Error("Edit permanent information in Agents.");
     return this.mutate(scope, {
       kind: "draft",
       workspaceId: this.workspaceId,
@@ -211,7 +212,7 @@ export class LiveGateway implements InboxGateway {
       action,
       body,
       until,
-      remember,
+      remember: false,
     });
   }
   editDraft = (s: Scope, id: string, r: number, body: string) =>

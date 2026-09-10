@@ -124,7 +124,7 @@ test("The demo scheduler returns due drafts to Ready exactly once", () => {
   );
 });
 
-test("Knowledge changes require an admin and are restricted to the draft’s workspace", () => {
+test("Operator answers stay in the conversation; permanent changes require the agent editor", () => {
   const state = createDemoState();
   state.memberships.push({
     workspaceId: "aster",
@@ -142,7 +142,7 @@ test("Knowledge changes require an admin and are restricted to the draft’s wor
         "Approved answer",
         true,
       ),
-    /Only admins/,
+    /Edit permanent information/,
   );
   assert.throws(
     () =>
@@ -154,10 +154,16 @@ test("Knowledge changes require an admin and are restricted to the draft’s wor
       ),
     /no longer/,
   );
-  repository.supplyAnswer(scope, "draft-priya", "Approved answer", true);
+  assert.throws(
+    () =>
+      repository.supplyAnswer(scope, "draft-priya", "Approved answer", true),
+    /Edit permanent information/,
+  );
+  const original = repository.getSnapshot().agents;
+  repository.supplyAnswer(scope, "draft-priya", "Approved answer", false);
   assert.equal(
     repository.getSnapshot().drafts.find((d) => d.id === "draft-priya")?.status,
     "ready",
   );
-  assert.match(repository.getSnapshot().agents[0].knowledge, /Approved answer/);
+  assert.deepEqual(repository.getSnapshot().agents, original);
 });

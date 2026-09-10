@@ -38,7 +38,7 @@ export const agentResource = z.discriminatedUnion("kind", [
 ]);
 export type AgentResource = z.infer<typeof agentResource>;
 export const agentGuidance = z.object({
-  customInstructions: z.string().max(8000).default(""),
+  customInstructions: z.string().max(10002).default(""),
   meetingInstructions: z.string().max(2000).default(""),
   resources: z.array(agentResource).max(20).default([]),
 });
