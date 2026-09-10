@@ -45,11 +45,12 @@ export async function runModelPipeline(
       !input.agent ||
       input.contactStopped ||
       input.messages.at(-1)?.direction !== "inbound" ||
-      !replyAllowed(
-        input.labels,
-        input.previous?.labelId ?? null,
-        input.agent.replyGroups,
-      ))
+      (!input.replyPreview &&
+        !replyAllowed(
+          input.labels,
+          input.previous?.labelId ?? null,
+          input.agent.replyGroups,
+        )))
   ) {
     return {
       labelId: input.previous?.labelId ?? null,

@@ -281,6 +281,47 @@ test("Closing reply, rewrite and operator completion each invoke one writer usin
   }
 });
 
+test("Product-admin reply preview supports an unclassified sample without weakening live eligibility", async () => {
+  let calls = 0;
+  const model = createInboxModel("test", "writer", async () => {
+    calls++;
+    return Response.json({
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          content: [
+            {
+              type: "output_text",
+              text: JSON.stringify({
+                draft: "До встречи!",
+                missingKnowledge: "",
+              }),
+            },
+          ],
+        },
+      ],
+    });
+  });
+  const sample = { ...input, previous: undefined };
+  const invoke = (stage: typeof input) => model.classify(stage);
+  const live = await runModelPipeline(sample, "writer", invoke);
+  assert.equal(live.draft, "");
+  assert.equal(calls, 0);
+  const preview = await runModelPipeline(
+    { ...sample, replyPreview: true },
+    "writer",
+    invoke,
+  );
+  assert.equal(preview.draft, "До встречи!");
+  assert.equal(preview.labelId, null);
+  assert.equal(calls, 1);
+  assert.deepEqual(
+    buildModelRequest(sample).request,
+    buildModelRequest({ ...sample, replyPreview: true }).request,
+  );
+});
+
 test("Eligibility stays in code: stopped, answered, missing-agent and disallowed groups make no writer request", async () => {
   for (const value of [
     { ...input, contactStopped: true },

@@ -202,6 +202,7 @@ async function adminInput(value: unknown, configValue: unknown) {
       messages,
       historyTruncated,
       scenario: valueParsed.scenario,
+      replyPreview: valueParsed.scenario !== "classify",
       generateDraft: valueParsed.generateDraft,
       operator: {
         instructions: valueParsed.instructions,

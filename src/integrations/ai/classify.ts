@@ -72,6 +72,8 @@ export interface ModelInput {
   sender?: { name: string; grammaticalForm: GrammaticalForm } | null;
   leadName?: string;
   contactStopped?: boolean;
+  // Product-admin writer tests can use a transcript without an assigned label.
+  replyPreview?: boolean;
   currentTime?: string;
   workspaceTimezone?: string;
   messages: { id: string; direction: "inbound" | "outbound"; body: string }[];
@@ -414,7 +416,8 @@ export function validateModelResult(
     input.messages.at(-1)?.direction !== "inbound" ||
     result.contactStopped ||
     input.contactStopped ||
-    !replyAllowed(input.labels, result.labelId, input.agent.replyGroups)
+    (!input.replyPreview &&
+      !replyAllowed(input.labels, result.labelId, input.agent.replyGroups))
   ) {
     return {
       ...result,
