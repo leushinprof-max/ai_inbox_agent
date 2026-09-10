@@ -301,18 +301,18 @@ export class DemoRepository implements SendRepository {
     });
   }
   supplyAnswer(scope: Scope, id: string, answer: string, remember: boolean) {
-    const member = assertMember(this.state, scope, true);
-    if (remember && !["owner", "admin"].includes(member.role))
-      throw new InboxError(
-        "forbidden",
-        "Only admins can change agent Knowledge.",
-      );
+    assertMember(this.state, scope, true);
     const body = requireText(answer, "Answer");
     const draft = this.state.drafts.find(
       (d) => d.id === id && d.workspaceId === scope.workspaceId,
     );
     if (!draft || draft.status !== "needs_input")
       throw new InboxError("conflict", "This draft no longer needs input.");
+    if (remember)
+      throw new InboxError(
+        "forbidden",
+        "Edit permanent information in Agents.",
+      );
     const conversation = this.state.conversations.find(
       (c) => c.id === draft.conversationId,
     )!;
@@ -330,17 +330,6 @@ export class DemoRepository implements SendRepository {
             }
           : d,
       ),
-      agents: remember
-        ? this.state.agents.map((a) =>
-            a.id === draft.agentId
-              ? {
-                  ...a,
-                  knowledge: `${a.knowledge}\n\n${draft.missingKnowledge}: ${answer}`,
-                  version: a.version + 1,
-                }
-              : a,
-          )
-        : this.state.agents,
     });
   }
   async reserve(scope: Scope, request: SendRequest) {

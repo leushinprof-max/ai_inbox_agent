@@ -38,13 +38,42 @@ export async function runModelPipeline(
   invoke: (input: ModelInput) => Promise<Classification>,
 ): Promise<Classification> {
   const plan = planModelRun(input, fallback);
+  if (
+    (input.scenario ?? "classify") !== "classify" &&
+    (input.configuration ?? initialAIConfiguration).schemaVersion === 2 &&
+    (!input.generateDraft ||
+      !input.agent ||
+      input.contactStopped ||
+      input.messages.at(-1)?.direction !== "inbound" ||
+      (!input.replyPreview &&
+        !replyAllowed(
+          input.labels,
+          input.previous?.labelId ?? null,
+          input.agent.replyGroups,
+        )))
+  ) {
+    return {
+      labelId: input.previous?.labelId ?? null,
+      evidenceMessageId: input.previous?.evidence?.id ?? null,
+      evidenceQuote: input.previous?.evidence?.body ?? "",
+      contactStopped: input.contactStopped ?? false,
+      shouldReply: false,
+      noReplyReason: "",
+      draft: "",
+      missingKnowledge: "",
+    };
+  }
   const intent = await invoke(plan.first);
   if (
     !plan.hasReplyStage ||
     intent.contactStopped ||
+    input.contactStopped ||
     !replyAllowed(input.labels, intent.labelId, input.agent!.replyGroups)
   )
-    return intent;
+    return {
+      ...intent,
+      contactStopped: intent.contactStopped || !!input.contactStopped,
+    };
 
   const replyInput: ModelInput = {
     ...input,

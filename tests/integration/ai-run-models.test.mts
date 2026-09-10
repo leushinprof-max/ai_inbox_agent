@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../src/lib/supabase/database.types";
 import { runRecordedAI } from "../../src/server/ai-run";
@@ -23,7 +24,8 @@ test("AI audit records the actual model and outcome of each stage, including a w
         assert.equal(table, "ai_runs");
         return {
           insert(value: Record<string, unknown>) {
-            const id = rows.push(value);
+            const id = randomUUID();
+            rows.push({ ...value, id });
             return {
               select() {
                 return {
@@ -36,9 +38,12 @@ test("AI audit records the actual model and outcome of each stage, including a w
           },
           update(value: Record<string, unknown>) {
             return {
-              async eq(key: string, id: number) {
+              async eq(key: string, id: string) {
                 assert.equal(key, "id");
-                Object.assign(rows[id - 1], value);
+                Object.assign(
+                  rows.find((row) => row.id === id)!,
+                  value,
+                );
                 return { error: null };
               },
             };
@@ -53,8 +58,13 @@ test("AI audit records the actual model and outcome of each stage, including a w
       async (_url, options) => {
         const request = JSON.parse(String(options?.body));
         requests.push(request.model);
-        const data = JSON.parse(request.input[1].content);
-        if (failWriter && data.scenario === "reply")
+        assert.deepEqual(
+          rows.at(-1)?.request_snapshot,
+          request,
+          "The persisted request must match the actual request body, including the time",
+        );
+        const classifying = request.text.format.name === "inbox_classification";
+        if (failWriter && !classifying)
           return new Response(null, { status: 503 });
         return Response.json({
           status: "completed",
@@ -65,7 +75,7 @@ test("AI audit records the actual model and outcome of each stage, including a w
                 {
                   type: "output_text",
                   text: JSON.stringify(
-                    data.scenario === "classify"
+                    classifying
                       ? {
                           labelId: "interested",
                           evidenceMessageId: "lead",
@@ -73,12 +83,7 @@ test("AI audit records the actual model and outcome of each stage, including a w
                           contactStopped: false,
                         }
                       : {
-                          shouldReply: data.generateDraft,
-                          noReplyReason: "",
-                          contactStopped: false,
-                          draft: data.generateDraft
-                            ? "Here is the approved reply."
-                            : "",
+                          draft: "Here is the approved reply.",
                           missingKnowledge: "",
                         },
                   ),
@@ -135,8 +140,18 @@ test("AI audit records the actual model and outcome of each stage, including a w
     );
     if (failWriter) assert.equal(rows[1].error_code, "model_unavailable");
     assert.ok(
-      rows.every((row) => !JSON.stringify(row).includes("I'm interested")),
-      "Audit metadata must not store transcripts",
+      rows.every((row) =>
+        JSON.stringify(row.request_snapshot).includes("I'm interested"),
+      ),
     );
+    assert.ok(
+      rows.every((row) => !JSON.stringify(row).includes("synthetic-key")),
+      "Authorization must not be saved",
+    );
+    if (!failWriter)
+      assert.deepEqual(rows[1].result_snapshot, {
+        draft: "Here is the approved reply.",
+        missingKnowledge: "",
+      });
   }
 });

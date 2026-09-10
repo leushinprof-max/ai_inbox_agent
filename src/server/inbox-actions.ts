@@ -24,7 +24,7 @@ const mutation = z.discriminatedUnion("kind", [
     action: z.enum(["edit", "dismiss", "snooze", "restore", "answer"]),
     body: z.string().max(8000).optional(),
     until: z.iso.datetime({ offset: true }).optional(),
-    remember: z.boolean().optional(),
+    remember: z.literal(false).optional(),
   }),
   z.object({
     kind: z.literal("note"),
@@ -43,7 +43,7 @@ const mutation = z.discriminatedUnion("kind", [
       description: z.string().max(1000),
       goal: z.string().max(8000),
       language: z.string().min(1).max(80),
-      knowledge: z.string().max(30000),
+      knowledge: z.string().max(64000),
       replyGroups: z.array(z.enum(["positive", "neutral", "negative"])).max(3),
       status: z.enum(["draft", "active", "paused"]),
     }),

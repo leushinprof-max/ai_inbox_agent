@@ -9,6 +9,7 @@ import { loadAIContext } from "./ai-context";
 import {
   defaultInboxModel,
   validateConfiguration,
+  serializeConfiguration,
 } from "@/integrations/ai/configuration";
 import { planModelRun } from "@/integrations/ai/pipeline";
 import {
@@ -24,6 +25,31 @@ async function ownerClient() {
   databaseError(result.error);
   if (!result.data) throw new Error("Platform owner access required.");
   return client;
+}
+export async function readDraftAIRequest(workspaceId: string, draftId: string) {
+  const { db, user } = await ownerClient();
+  z.uuid().parse(workspaceId);
+  z.uuid().parse(draftId);
+  await authorizeWorkspace(db, user.id, workspaceId);
+  const draft = await db
+    .from("drafts")
+    .select("ai_run_id,conversation_id")
+    .eq("workspace_id", workspaceId)
+    .eq("id", draftId)
+    .single();
+  databaseError(draft.error);
+  if (!draft.data!.ai_run_id) return null;
+  const run = await db
+    .from("ai_runs")
+    .select(
+      "id,model,scenario,configuration_version,agent_version,created_at,request_snapshot,request_context,result_snapshot",
+    )
+    .eq("workspace_id", workspaceId)
+    .eq("conversation_id", draft.data!.conversation_id)
+    .eq("id", draft.data!.ai_run_id)
+    .single();
+  databaseError(run.error);
+  return run.data;
 }
 export async function readAIAdmin() {
   const { db } = await ownerClient();
@@ -63,7 +89,7 @@ export async function saveAIAdmin(value: unknown) {
   const { db } = await ownerClient();
   const config = validateConfiguration(value);
   const result = await db.rpc("save_ai_configuration", {
-    p_configuration: config,
+    p_configuration: serializeConfiguration(config),
   });
   databaseError(result.error);
   return result.data!;
@@ -176,6 +202,7 @@ async function adminInput(value: unknown, configValue: unknown) {
       messages,
       historyTruncated,
       scenario: valueParsed.scenario,
+      replyPreview: valueParsed.scenario !== "classify",
       generateDraft: valueParsed.generateDraft,
       operator: {
         instructions: valueParsed.instructions,

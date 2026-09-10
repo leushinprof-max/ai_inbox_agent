@@ -1,6 +1,7 @@
 import { demoLabels } from "../src/domain/labels";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { legacyInitialAIConfiguration } from "../src/integrations/ai/configuration";
 import {
   createInboxModel,
   ModelError,
@@ -14,6 +15,7 @@ import {
 } from "../src/integrations/heyreach/client";
 import { safeAuthNext } from "../src/lib/auth-navigation";
 const input: ModelInput = {
+  configuration: legacyInitialAIConfiguration,
   scenario: "reply",
   previous: {
     labelId: "interested",

@@ -260,18 +260,29 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         );
         databaseError(
           (
-            await db.rpc("server_complete_generation_v2", {
-              p_workspace: job.workspace_id,
-              p_id: g.id,
-              p_body: output.draft,
-              p_missing: output.missingKnowledge,
-              p_should_reply: output.shouldReply,
-              p_config: ai.configurationVersion,
-              p_catalog: ai.catalogRevision,
-              p_assignment: ai.assignmentRevision,
-              p_reason: output.noReplyReason,
-              p_stopped: output.contactStopped,
-            })
+            await (ai.configuration.schemaVersion === 2 && output.runId
+              ? db.rpc("server_complete_generation_v3", {
+                  p_workspace: job.workspace_id,
+                  p_id: g.id,
+                  p_body: output.draft,
+                  p_missing: output.missingKnowledge,
+                  p_config: ai.configurationVersion,
+                  p_catalog: ai.catalogRevision,
+                  p_assignment: ai.assignmentRevision,
+                  p_run_id: output.runId,
+                })
+              : db.rpc("server_complete_generation_v2", {
+                  p_workspace: job.workspace_id,
+                  p_id: g.id,
+                  p_body: output.draft,
+                  p_missing: output.missingKnowledge,
+                  p_should_reply: output.shouldReply,
+                  p_config: ai.configurationVersion,
+                  p_catalog: ai.catalogRevision,
+                  p_assignment: ai.assignmentRevision,
+                  p_reason: output.noReplyReason,
+                  p_stopped: output.contactStopped,
+                }))
           ).error,
         );
       }

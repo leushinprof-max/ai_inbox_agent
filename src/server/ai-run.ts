@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import type { Json } from "@/lib/supabase/database.types";
 import {
   ModelError,
   buildModelRequest,
@@ -47,11 +48,12 @@ async function recordModelCall(
   input: ModelInput,
   context: RunContext,
 ) {
+  const prepared = buildModelRequest(
+    input,
+    model.fallbackModel ?? process.env.INBOX_MODEL,
+  );
   const call = {
-    model: buildModelRequest(
-      input,
-      model.fallbackModel ?? process.env.INBOX_MODEL,
-    ).request.model,
+    model: prepared.request.model,
     scenario: context.scenario ?? input.scenario ?? "classify",
   };
   const record = await db
@@ -63,14 +65,19 @@ async function recordModelCall(
       catalog_revision: context.catalogRevision,
       agent_id: context.agentId,
       agent_version: context.agentVersion,
+      request_snapshot: prepared.request,
+      request_context: prepared.context,
       ...call,
     })
     .select("id")
     .single();
   databaseError(record.error);
   context.onModelCall?.(call);
+  let modelOutput: Json | undefined;
   try {
-    const result = await model.classify(input);
+    const result = await model.classify(input, prepared, (value) => {
+      modelOutput = value as Json;
+    });
     databaseError(
       (
         await db
@@ -78,17 +85,19 @@ async function recordModelCall(
           .update({
             status: "completed",
             completed_at: new Date().toISOString(),
+            result_snapshot: modelOutput ?? result,
           })
           .eq("id", record.data!.id)
       ).error,
     );
-    return result;
+    return { ...result, runId: record.data!.id };
   } catch (e) {
     await db
       .from("ai_runs")
       .update({
         status: "failed",
         error_code: e instanceof ModelError ? e.code : "processing_failed",
+        ...(modelOutput !== undefined ? { result_snapshot: modelOutput } : {}),
         completed_at: new Date().toISOString(),
       })
       .eq("id", record.data!.id);

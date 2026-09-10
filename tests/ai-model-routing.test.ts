@@ -7,7 +7,7 @@ import {
   type ModelInput,
 } from "../src/integrations/ai/classify";
 import {
-  initialAIConfiguration,
+  legacyInitialAIConfiguration as initialAIConfiguration,
   resolveModels,
   validateConfiguration,
 } from "../src/integrations/ai/configuration";

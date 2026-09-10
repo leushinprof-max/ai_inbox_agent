@@ -6,6 +6,7 @@ import { useInbox } from "@/lib/inbox-context";
 import type { AIConfiguration } from "@/integrations/ai/configuration";
 import { previewAIAdmin, testAIAdmin } from "@/server/ai-admin-actions";
 import { AdminSelect } from "./admin-select";
+import { RequestBody } from "@/features/drafts/draft-request";
 
 type TestResult = Awaited<ReturnType<typeof testAIAdmin>>;
 type Preview = Awaited<ReturnType<typeof previewAIAdmin>>;
@@ -378,7 +379,16 @@ export function AIPlayground({
             <summary>
               Request preview{source === "batch" ? " (first example)" : ""}
             </summary>
-            <pre>{JSON.stringify(visiblePreview.request, null, 2)}</pre>
+            <p className="help">
+              {visiblePreview.request.model} ·{" "}
+              {visiblePreview.context.includedMessages} messages ·{" "}
+              {visiblePreview.context.bodyCharacters.toLocaleString()}{" "}
+              conversation characters
+              {visiblePreview.context.truncated
+                ? " · History was shortened"
+                : ""}
+            </p>
+            <RequestBody value={visiblePreview.request} />
             {visiblePreview.draftModel && (
               <small className="muted">
                 Reply model: {visiblePreview.draftModel}

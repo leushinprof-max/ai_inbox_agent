@@ -14,6 +14,7 @@ import {
 } from "@/server/generation-actions";
 import { outgoingStore, useOutgoing } from "@/lib/outgoing-messages";
 import { usePreferences } from "@/lib/preferences";
+import { DraftRequest } from "./draft-request";
 
 export function Composer({
   conversation,
@@ -39,7 +40,6 @@ export function Composer({
   );
   const [text, setText] = useState(draft?.body ?? "");
   const [answer, setAnswer] = useState("");
-  const [remember, setRemember] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [redrafting, setRedrafting] = useState(false);
   const [generationId, setGenerationId] = useState<string | null>(null);
@@ -79,12 +79,6 @@ export function Composer({
       m.workspaceId === scope.workspaceId &&
       m.userId === scope.userId &&
       m.role !== "viewer",
-  );
-  const canRemember = state.memberships.some(
-    (m) =>
-      m.workspaceId === scope.workspaceId &&
-      m.userId === scope.userId &&
-      ["owner", "admin"].includes(m.role),
   );
   const [status, setStatus] = useState<"idle" | "sending" | "unknown">("idle");
   const [error, setError] = useState("");
@@ -332,7 +326,7 @@ export function Composer({
           : {}),
         instructions,
         answer: approvedAnswer,
-        remember: !!approvedAnswer && remember,
+        remember: false,
       });
       if (!result.ok) throw new Error(result.error);
       setGenerationId(id);
@@ -429,6 +423,12 @@ export function Composer({
             <div className="composer-title">
               <Spark />
               Needs your input
+              {state.platformOwner && environment !== "demo" ? (
+                <DraftRequest
+                  workspaceId={scope.workspaceId}
+                  draftId={draft.id}
+                />
+              ) : null}
             </div>
             <p className="draft-text">
               The agent needs an approved answer before it can draft a reply.
@@ -445,18 +445,9 @@ export function Composer({
                 maxLength={8000}
                 placeholder="Add the approved details…"
               />
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  disabled={!canRemember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                />
-                Save this answer to the agent’s Knowledge
-              </label>
               <p className="help">
-                Save lasting product facts only. Keep meeting slots and
-                availability in this conversation.
+                Used for this conversation. Edit permanent information in
+                Agents.
               </p>
             </div>
             <div className="composer-actions">
@@ -481,7 +472,7 @@ export function Composer({
                           scope,
                           draft.id,
                           answer,
-                          remember,
+                          false,
                           reviewedDraft?.revision,
                         ),
                       )
@@ -498,6 +489,12 @@ export function Composer({
             {mode !== "manual" ? (
               <div className="composer-title">
                 <Spark /> AI draft
+                {draft && state.platformOwner && environment !== "demo" ? (
+                  <DraftRequest
+                    workspaceId={scope.workspaceId}
+                    draftId={draft.id}
+                  />
+                ) : null}
               </div>
             ) : null}
             {editable ? (

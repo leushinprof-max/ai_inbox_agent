@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { readAgentKnowledge } from "@/domain/agent-knowledge";
+import {
+  readAgentBackground,
+  communicationStyle,
+} from "@/domain/agent-background";
+import { renderTemplate } from "./prompt-templates";
 import type { AgentResource, GrammaticalForm } from "@/domain/agent-guidance";
 import { replyGuidance } from "./agent-guidance";
 import { boundedJson } from "@/integrations/heyreach/client";
@@ -27,6 +32,7 @@ export const classification = z
     contactStopped: z.boolean(),
     draft: z.string().max(8000),
     missingKnowledge: z.string().max(2000),
+    runId: z.string().uuid().optional(),
   })
   .strict();
 export type Classification = z.infer<typeof classification>;
@@ -43,6 +49,15 @@ const replyOutput = classification.pick({
   draft: true,
   missingKnowledge: true,
 });
+export const writerOutput = classification
+  .pick({ draft: true, missingKnowledge: true })
+  .superRefine((value, ctx) => {
+    if (Boolean(value.draft.trim()) === Boolean(value.missingKnowledge.trim()))
+      ctx.addIssue({
+        code: "custom",
+        message: "Fill exactly one of draft and missingKnowledge.",
+      });
+  });
 export interface ModelInput {
   agent: {
     name: string;
@@ -55,6 +70,10 @@ export interface ModelInput {
     resources?: AgentResource[];
   } | null;
   sender?: { name: string; grammaticalForm: GrammaticalForm } | null;
+  leadName?: string;
+  contactStopped?: boolean;
+  // Product-admin writer tests can use a transcript without an assigned label.
+  replyPreview?: boolean;
   currentTime?: string;
   workspaceTimezone?: string;
   messages: { id: string; direction: "inbound" | "outbound"; body: string }[];
@@ -78,7 +97,11 @@ export interface ModelInput {
 export interface InboxModel {
   fallbackModel?: string;
   // Executes exactly one stage. The pipeline coordinates classification and reply.
-  classify(input: ModelInput): Promise<Classification>;
+  classify(
+    input: ModelInput,
+    prepared?: ReturnType<typeof buildModelRequest>,
+    onOutput?: (value: unknown) => void,
+  ): Promise<Classification>;
 }
 export class ModelError extends Error {
   constructor(
@@ -103,6 +126,7 @@ export function buildModelRequest(
     input.configuration ?? initialAIConfiguration,
   );
   const scenario = input.scenario ?? "classify";
+  const v2 = config.schemaVersion === 2;
   const classifying = scenario === "classify";
   const models = resolveModels(config, model);
   const selectedModel = classifying ? models.classification : models.draft;
@@ -214,6 +238,49 @@ export function buildModelRequest(
         }
       : null,
   };
+  const background = agent ? readAgentBackground(agent.knowledge) : null;
+  const quoted = (value: unknown) => JSON.stringify(value ?? "", null, 2);
+  const renderedPrompt = !v2
+    ? null
+    : classifying
+      ? renderTemplate(config.classification, {
+          labels: quoted(labels),
+          previous_label: quoted(input.previous ?? null),
+          conversation: quoted({
+            lead: input.leadName ?? "",
+            sender: input.sender?.name ?? "",
+            messages,
+          }),
+        })
+      : renderTemplate(config.reply!, {
+          sender_name: quoted(input.sender?.name),
+          sender_grammatical_form: quoted(input.sender?.grammaticalForm),
+          agent_goal: quoted(agent?.goal),
+          company_name: quoted(background?.companyName),
+          company_description: quoted(background?.companyDescription),
+          product_offer: quoted(background?.productOffer),
+          selling_points: quoted(background?.sellingPoints ?? []),
+          resources: quoted(data.replyContext?.resources ?? []),
+          reply_language: quoted(agent?.language),
+          communication_style: quoted(agent ? communicationStyle(agent) : ""),
+          reply_examples: quoted(background?.replyExamples ?? []),
+          conversation: quoted({
+            lead: input.leadName ?? "",
+            sender: input.sender?.name ?? "",
+            messages,
+          }),
+          current_time: quoted(input.currentTime),
+          workspace_timezone: quoted(input.workspaceTimezone),
+          operator_input: quoted(
+            input.operator
+              ? {
+                  instructions: input.operator.instructions,
+                  confirmedInformation: input.operator.approvedAnswer,
+                }
+              : null,
+          ),
+          current_draft: quoted(input.operator?.currentDraft),
+        });
   const properties = classifying
     ? {
         labelId: {
@@ -238,23 +305,30 @@ export function buildModelRequest(
         },
         contactStopped: { type: "boolean" },
       }
-    : {
-        shouldReply: { type: "boolean" },
-        noReplyReason: { type: "string" },
-        contactStopped: { type: "boolean" },
-        draft: { type: "string" },
-        missingKnowledge: { type: "string" },
-      };
+    : v2
+      ? {
+          draft: { type: "string" },
+          missingKnowledge: { type: "string" },
+        }
+      : {
+          shouldReply: { type: "boolean" },
+          noReplyReason: { type: "string" },
+          contactStopped: { type: "boolean" },
+          draft: { type: "string" },
+          missingKnowledge: { type: "string" },
+        };
   return {
     request: {
       model: selectedModel,
       ...(effort !== null ? { reasoning: { effort } } : {}),
       store: false,
       max_output_tokens: 4000,
-      input: [
-        { role: "system", content: blocks.join("\n\n") },
-        { role: "user", content: JSON.stringify(data) },
-      ],
+      input: v2
+        ? [{ role: "system", content: renderedPrompt! }]
+        : [
+            { role: "system", content: blocks.join("\n\n") },
+            { role: "user", content: JSON.stringify(data) },
+          ],
       text: {
         format: {
           type: "json_schema",
@@ -284,6 +358,7 @@ export function buildModelRequest(
               .length,
         ),
       configurationVersion: input.configurationVersion ?? null,
+      promptFormat: v2 ? 2 : 1,
     },
     messages,
   };
@@ -340,7 +415,9 @@ export function validateModelResult(
     !input.agent ||
     input.messages.at(-1)?.direction !== "inbound" ||
     result.contactStopped ||
-    !replyAllowed(input.labels, result.labelId, input.agent.replyGroups)
+    input.contactStopped ||
+    (!input.replyPreview &&
+      !replyAllowed(input.labels, result.labelId, input.agent.replyGroups))
   ) {
     return {
       ...result,
@@ -370,9 +447,9 @@ export function createInboxModel(
 ): InboxModel {
   return {
     fallbackModel: model,
-    async classify(input) {
+    async classify(input, prepared, onOutput) {
       if (!apiKey) throw new ModelError("model_not_configured");
-      const { request } = buildModelRequest(input, model);
+      const { request } = prepared ?? buildModelRequest(input, model);
       let response: Response;
       try {
         response = await fetcher("https://api.openai.com/v1/responses", {
@@ -411,6 +488,7 @@ export function createInboxModel(
           .filter((c) => c.type === "output_text");
         if (texts.length !== 1 || !texts[0].text) throw new Error();
         const value: unknown = JSON.parse(texts[0].text);
+        onOutput?.(value);
         if ((input.scenario ?? "classify") === "classify") {
           return validateModelResult(
             { ...input, generateDraft: false },
@@ -422,6 +500,19 @@ export function createInboxModel(
               missingKnowledge: "",
             },
           );
+        }
+        if (
+          (input.configuration ?? initialAIConfiguration).schemaVersion === 2
+        ) {
+          return validateModelResult(input, {
+            ...writerOutput.parse(value),
+            shouldReply: true,
+            noReplyReason: "",
+            contactStopped: input.contactStopped ?? false,
+            labelId: input.previous?.labelId ?? null,
+            evidenceMessageId: input.previous?.evidence?.id ?? null,
+            evidenceQuote: input.previous?.evidence?.body ?? "",
+          });
         }
         return validateModelResult(input, {
           ...replyOutput.parse(value),

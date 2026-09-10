@@ -7,11 +7,12 @@ import {
   type ModelInput,
 } from "../src/integrations/ai/classify";
 import {
-  initialAIConfiguration,
+  legacyInitialAIConfiguration as initialAIConfiguration,
   validateConfiguration,
 } from "../src/integrations/ai/configuration";
 const labels = demoLabels("test");
 const base: ModelInput = {
+  configuration: initialAIConfiguration,
   labels,
   agent: {
     name: "Test",

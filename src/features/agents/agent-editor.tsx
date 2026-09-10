@@ -1,49 +1,68 @@
 "use client";
-
 import "./agents.css";
-import { AgentMark } from "./agent-mark";
-import { AgentResources } from "./agent-resources";
-import { agentGuidance } from "@/domain/agent-guidance";
-import {
-  readAgentKnowledge,
-  writeAgentKnowledge,
-  hasAgentKnowledge,
-  type AgentKnowledge,
-} from "@/domain/agent-knowledge";
-import { intentGroup } from "@/domain/labels";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
+import { Button, Empty, IconButton, Notice } from "@/components/ui";
+import { Dialog } from "@/components/dialog";
+import { agentGuidance } from "@/domain/agent-guidance";
+import {
+  readAgentBackground,
+  writeAgentBackground,
+  communicationStyle,
+  type AgentBackground,
+} from "@/domain/agent-background";
+import { intentGroup } from "@/domain/labels";
 import type { Agent } from "@/domain/inbox";
+import { AgentMark } from "./agent-mark";
+import { AgentResources } from "./agent-resources";
 import { AgentLaunch } from "./agent-launch";
 import { LiveAgentTest } from "./live-agent-test";
-import {
-  Badge,
-  Button,
-  Empty,
-  IconButton,
-  Notice,
-  Icon,
-} from "@/components/ui";
 
-const steps = ["Basics", "Knowledge", "Instructions", "Test", "Launch"];
+function editable(agent: Agent): Agent {
+  return {
+    ...agent,
+    knowledge: writeAgentBackground(readAgentBackground(agent.knowledge)),
+    customInstructions: communicationStyle(agent),
+    meetingInstructions: "",
+  };
+}
+function SettingItem({
+  title,
+  initiallyOpen,
+  children,
+}: {
+  title: string;
+  initiallyOpen: boolean;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(initiallyOpen);
+  return (
+    <details
+      className="agent-setting-item"
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary>{title}</summary>
+      {children}
+    </details>
+  );
+}
 
 export function AgentEditor({ id }: { id: string }) {
   const { state, scope, repository, basePath, mode, workspace } = useInbox();
   const router = useRouter();
+  const existing = state.agents.find(
+    (a) => a.id === id && a.workspaceId === scope.workspaceId,
+  );
   const canManage = state.memberships.some(
     (m) =>
       m.workspaceId === scope.workspaceId &&
       m.userId === scope.userId &&
       ["owner", "admin"].includes(m.role),
   );
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const existing = state.agents.find(
-    (a) => a.id === id && a.workspaceId === scope.workspaceId,
-  );
-  const [agent, setAgent] = useState<Agent>(
-    () =>
+  const [agent, setAgent] = useState<Agent>(() =>
+    editable(
       existing ?? {
         id: "new-agent",
         workspaceId: scope.workspaceId,
@@ -56,22 +75,18 @@ export function AgentEditor({ id }: { id: string }) {
         knowledge: "",
         version: 0,
       },
+    ),
   );
-  const [initialAgent] = useState(agent);
-  const knowledge = readAgentKnowledge(agent.knowledge);
-  const dirty =
-    JSON.stringify(agent) !== JSON.stringify(existing ?? initialAgent);
-  const [customGoal, setCustomGoal] = useState(
-    agent.goal !== "Book a discovery call",
-  );
-  function updateKnowledge(value: AgentKnowledge) {
-    field("knowledge", writeAgentKnowledge(value));
-  }
-  const [step, setStep] = useState(0);
-  const [error, setError] = useState("");
+  const [baseline, setBaseline] = useState(agent);
+  const [tab, setTab] = useState("background");
+  const [panel, setPanel] = useState<"test" | "senders" | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [test, setTest] = useState("");
-  const [testResult, setTestResult] = useState(false);
+  const [error, setError] = useState("");
+  const background = readAgentBackground(agent.knowledge);
+  const dirty = JSON.stringify(agent) !== JSON.stringify(baseline);
+  const disabled = !canManage || saving || uploading;
   if (id !== "new" && !existing)
     return (
       <Empty title="Agent not found">
@@ -79,72 +94,63 @@ export function AgentEditor({ id }: { id: string }) {
       </Empty>
     );
   function field<K extends keyof Agent>(key: K, value: Agent[K]) {
-    setAgent((a) => ({ ...a, [key]: value }));
+    setAgent((current) => ({ ...current, [key]: value }));
     setSaved(false);
+  }
+  function information(value: AgentBackground) {
+    field("knowledge", writeAgentBackground(value));
+  }
+  function adopt(value: Agent) {
+    const next = editable(value);
+    setAgent(next);
+    setBaseline(next);
+    setSaved(true);
   }
   async function save(
     status: Agent["status"] = agent.status,
     navigate = true,
   ): Promise<Agent | undefined> {
-    if (saving || uploading) return;
+    if (saving || uploading || !canManage) return;
     setSaving(true);
+    setError("");
     try {
-      setError("");
-      const guidance = agentGuidance.safeParse(agent);
-      if (!guidance.success)
+      agentGuidance.parse(agent);
+      if (!agent.name.trim()) throw new Error("Give the agent a name.");
+      if (agent.knowledge.length > 64000)
         throw new Error(
-          "Give each resource a name, a valid link and instructions for when to use it. Keep custom instructions under 8,000 characters.",
-        );
-      if (agent.knowledge.length > 30000)
-        throw new Error(
-          "Knowledge is too long. Keep the combined content under 30,000 characters.",
-        );
-      if (status === "active" && !hasAgentKnowledge(agent.knowledge))
-        throw new Error(
-          "Add your Product & Offer before activating the agent.",
+          "Background and examples must fit within 64,000 characters.",
         );
       if (
         status === "active" &&
-        knowledge.faq.some(
-          (item) =>
-            Boolean(item.question.trim()) !== Boolean(item.answer.trim()),
-        )
+        (!background.companyName.trim() ||
+          !background.productOffer.trim() ||
+          !agent.goal.trim())
       )
         throw new Error(
-          "Add both a question and an approved answer to each FAQ, or clear both fields.",
+          "Add a company name, product & offer and conversation goal before activating.",
         );
-      if (
-        status === "active" &&
-        agent.knowledge.includes('"format": "agent-knowledge-v1"') &&
-        !knowledge.companyName.trim()
-      )
-        throw new Error("Add the Company Name before activating the agent.");
       const next = {
         ...agent,
-        id:
-          id === "new"
-            ? agent.id === "new-agent"
-              ? crypto.randomUUID()
-              : agent.id
-            : id,
+        id: agent.id === "new-agent" ? crypto.randomUUID() : agent.id,
         status,
       };
       await repository.saveAgent(scope, next);
-      const savedAgent =
+      const persisted =
         repository.getSnapshot().agents.find((a) => a.id === next.id) ?? next;
-      setAgent(savedAgent);
-      setSaved(true);
+      adopt(persisted);
       if (id === "new" && navigate)
-        router.replace(`${basePath}/agents/${next.id}`);
-      return savedAgent;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Agent could not be saved.");
+        router.replace(basePath + "/agents/" + next.id);
+      return persisted;
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Could not save the agent.",
+      );
     } finally {
       setSaving(false);
     }
   }
   return (
-    <div className="agent-editor">
+    <div className="agent-editor agent-editor-v2">
       <header className="agent-editor-header">
         <IconButton
           label="Back to agents"
@@ -153,442 +159,418 @@ export function AgentEditor({ id }: { id: string }) {
         />
         <AgentMark name={agent.name} />
         <div className="agent-editor-identity">
-          <strong>{agent.name || "Untitled Agent"}</strong>
+          <input
+            className="agent-title-input"
+            aria-label="Agent name"
+            placeholder="Untitled agent"
+            value={agent.name}
+            maxLength={100}
+            disabled={disabled}
+            onChange={(e) => field("name", e.target.value)}
+          />
           <p>
-            {agent.status === "draft"
-              ? "Draft · setup not finished"
-              : agent.status === "active"
-                ? "Active"
-                : "Paused"}
-            {dirty ? (
-              <span className="agent-unsaved"> · Unsaved changes</span>
-            ) : saved ? (
-              <span> · Saved</span>
-            ) : null}
+            {agent.status === "active"
+              ? "Active"
+              : agent.status === "paused"
+                ? "Paused"
+                : "Draft"}
+            {dirty ? " · Unsaved changes" : saved ? " · Saved" : ""}
           </p>
         </div>
-        <Button
-          disabled={!canManage || saving || uploading}
-          onClick={() => save()}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </Button>
+        <div className="agent-header-actions">
+          <Button
+            icon="spark"
+            disabled={saving || uploading}
+            onClick={() => setPanel("test")}
+          >
+            Test agent
+          </Button>
+          <Button
+            icon="users"
+            disabled={saving || uploading}
+            onClick={() => setPanel("senders")}
+          >
+            Assign senders
+          </Button>
+          <Button
+            variant="primary"
+            disabled={disabled}
+            onClick={() => void save()}
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
       </header>
       <div className="editor-tabs">
-        <div className="agents-segments agent-steps" aria-label="Agent setup">
-          {steps.map((title, i) => (
+        <div className="agents-segments" aria-label="Agent settings">
+          {["background", "communication"].map((value) => (
             <button
-              key={title}
-              disabled={uploading || saving}
-              aria-pressed={step === i}
-              className={`tab ${step === i ? "active" : ""}`}
-              onClick={() => setStep(i)}
+              key={value}
+              className={"tab " + (tab === value ? "active" : "")}
+              aria-pressed={tab === value}
+              onClick={() => setTab(value)}
             >
-              <span>{String(i + 1).padStart(2, "0")}</span> {title}
+              {value === "background" ? "Background" : "Communication"}
             </button>
           ))}
         </div>
       </div>
       <div className="content-scroll">
-        <div className="editor-content">
-          <h1 className="agents-sr-only">{steps[step]}</h1>
-          <p className="page-description">
-            {
-              [
-                "Define what your agent should do and how it should reply.",
-                "Give your agent approved information it can use in conversations.",
-                "Set how your agent should handle your conversations.",
-                "Check how your agent uses its instructions.",
-                "Choose which LinkedIn senders this agent should handle.",
-              ][step]
-            }
-          </p>
-          {error ? (
-            <div className="form-error">
-              <Notice variant="error">{error}</Notice>
-            </div>
-          ) : null}
-          {step === 0 ? (
-            <div className="card">
-              <div className="field">
-                <label htmlFor="agent-name">
-                  Inbox Agent Name{" "}
-                  <small className="agent-required">Required</small>
-                </label>
-                <input
-                  id="agent-name"
-                  value={agent.name}
-                  onChange={(e) => field("name", e.target.value)}
-                  placeholder="Untitled Agent"
-                  maxLength={100}
-                />
-              </div>
-              <div className="field">
-                <label>
-                  Main Objective{" "}
-                  <small className="agent-required">Required</small>
-                </label>
-                <div className="agent-objectives">
-                  <button
-                    aria-pressed={!customGoal}
-                    onClick={() => {
-                      setCustomGoal(false);
-                      field("goal", "Book a discovery call");
-                    }}
-                  >
-                    <Icon name="chat" />
-                    Book a call
-                  </button>
-                  <button
-                    aria-pressed={customGoal}
-                    onClick={() => {
-                      setCustomGoal(true);
-                      if (!customGoal) field("goal", "");
-                    }}
-                  >
-                    <Icon name="edit" />
-                    Custom
-                  </button>
-                </div>
-              </div>
-              {customGoal ? (
-                <div className="field">
-                  <label htmlFor="agent-goal">
-                    Custom Objective{" "}
-                    <small className="agent-required">Required</small>
-                  </label>
-                  <textarea
-                    id="agent-goal"
-                    value={agent.goal}
-                    onChange={(e) => field("goal", e.target.value)}
-                    placeholder="Qualify the lead and route enterprise inquiries to sales…"
-                    maxLength={2000}
-                  />
-                </div>
-              ) : null}
-              <div className="agent-response-options">
-                <div className="field">
-                  <label htmlFor="agent-language">
-                    Reply Language{" "}
-                    <small className="agent-required">Required</small>
-                  </label>
-                  <select
-                    id="agent-language"
-                    value={agent.language}
-                    onChange={(e) => field("language", e.target.value)}
-                  >
-                    {Array.from(
-                      new Set([
-                        "English",
-                        "Russian",
-                        "German",
-                        "Dutch",
-                        "Match the conversation",
-                        agent.language,
-                      ]),
-                    ).map((language) => (
-                      <option key={language}>{language}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <fieldset className="agent-reply-groups">
-                    <legend>Reply Logic</legend>
-                    <div className="agent-reply-checkboxes">
-                      {intentGroup.options.map((group) => (
-                        <label key={group}>
-                          <input
-                            type="checkbox"
-                            checked={agent.replyGroups.includes(group)}
-                            onChange={(event) =>
-                              field(
-                                "replyGroups",
-                                event.target.checked
-                                  ? intentGroup.options.filter(
-                                      (value) =>
-                                        value === group ||
-                                        agent.replyGroups.includes(value),
-                                    )
-                                  : agent.replyGroups.filter(
-                                      (value) => value !== group,
-                                    ),
-                              )
-                            }
-                          />
-                          {group[0].toUpperCase() + group.slice(1)}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  {!agent.replyGroups.length ? (
-                    <p className="help">
-                      No groups selected. This agent will not prepare replies.
-                    </p>
-                  ) : null}
-                  <p className="help">
-                    AI prepares a draft when the conversation needs a reply.
-                    Every draft is reviewed before sending.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {step === 1 ? (
-            <>
-              <div className="field">
-                <label htmlFor="knowledge-company">
-                  Company Name{" "}
-                  <small className="agent-required">Required</small>
-                </label>
-                <input
-                  id="knowledge-company"
-                  value={knowledge.companyName}
-                  placeholder={workspace.name}
-                  maxLength={200}
-                  onChange={(e) =>
-                    updateKnowledge({
-                      ...knowledge,
-                      companyName: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="knowledge-product">
-                  Product &amp; Offer{" "}
-                  <small className="agent-required">Required</small>
-                </label>
-                <textarea
-                  id="knowledge-product"
-                  className="agent-product"
-                  value={knowledge.productOffer}
-                  maxLength={28000}
-                  placeholder="What you sell, to whom, and on what terms — the basis of every reply."
-                  onChange={(e) =>
-                    updateKnowledge({
-                      ...knowledge,
-                      productOffer: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="field">
-                <label>
-                  FAQ{" "}
-                  <small className="muted">
-                    Optional · approved answers to common questions
-                  </small>
-                </label>
-                {knowledge.faq.map((item, index) => (
-                  <div className="agent-faq" key={index}>
-                    <div className="row between">
-                      <span className="small muted">Q&amp;A {index + 1}</span>
-                      <IconButton
-                        label={"Remove Q&A " + (index + 1)}
-                        icon="close"
-                        onClick={() =>
-                          updateKnowledge({
-                            ...knowledge,
-                            faq: knowledge.faq.filter((_, i) => i !== index),
-                          })
-                        }
-                      />
-                    </div>
+        <div className="editor-content agent-settings-content">
+          {error ? <Notice variant="error">{error}</Notice> : null}
+          <fieldset disabled={disabled} className="agent-settings-fields">
+            {tab === "background" ? (
+              <>
+                <p className="page-description">
+                  The company, offer and information your agent can use in
+                  conversations.
+                </p>
+                <section className="agent-setting-section">
+                  <h2>About company</h2>
+                  <div className="field">
+                    <label htmlFor="company-name">Company name</label>
                     <input
-                      aria-label={"Question " + (index + 1)}
-                      placeholder="Question"
-                      value={item.question}
-                      maxLength={2000}
+                      id="company-name"
+                      placeholder={workspace.name}
+                      value={background.companyName}
+                      maxLength={200}
                       onChange={(e) =>
-                        updateKnowledge({
-                          ...knowledge,
-                          faq: knowledge.faq.map((q, i) =>
-                            i === index
-                              ? { ...q, question: e.target.value }
-                              : q,
-                          ),
-                        })
-                      }
-                    />
-                    <textarea
-                      aria-label={"Approved answer " + (index + 1)}
-                      placeholder="Approved answer"
-                      value={item.answer}
-                      maxLength={8000}
-                      onChange={(e) =>
-                        updateKnowledge({
-                          ...knowledge,
-                          faq: knowledge.faq.map((q, i) =>
-                            i === index ? { ...q, answer: e.target.value } : q,
-                          ),
+                        information({
+                          ...background,
+                          companyName: e.target.value,
                         })
                       }
                     />
                   </div>
-                ))}
-                <Button
-                  className="agent-add-faq"
-                  icon="plus"
-                  onClick={() =>
-                    updateKnowledge({
-                      ...knowledge,
-                      faq: [...knowledge.faq, { question: "", answer: "" }],
-                    })
-                  }
-                >
-                  Add Q&amp;A
-                </Button>
-              </div>
-              <Notice>
-                If approved Knowledge is missing an answer, the agent asks your
-                team for input.
-              </Notice>
-              <AgentResources
-                workspaceId={scope.workspaceId}
-                value={agent.resources ?? []}
-                onChange={(resources) => field("resources", resources)}
-                onBusy={setUploading}
-                disabled={!canManage || saving}
-                demo={mode === "demo"}
-              />
-            </>
-          ) : null}
-          {step === 2 ? (
-            <div className="agent-instructions">
-              <div className="field">
-                <label htmlFor="agent-custom-instructions">
-                  Custom instructions <small className="muted">Optional</small>
-                </label>
-                <p className="help">
-                  Describe how to respond in situations specific to your
-                  outreach.
-                </p>
-                <textarea
-                  id="agent-custom-instructions"
-                  className="agent-custom-instructions"
-                  value={agent.customInstructions ?? ""}
-                  maxLength={8000}
-                  disabled={!canManage}
-                  placeholder="If the lead confirms they work with international contractors, briefly explain how we can help before suggesting a call."
-                  onChange={(e) => field("customInstructions", e.target.value)}
-                />
-              </div>
-              <section
-                className="agent-meeting-settings"
-                aria-labelledby="agent-meeting-title"
-              >
-                <div className="agent-section-heading">
-                  <h2 id="agent-meeting-title">Meeting coordination</h2>
-                  <Badge>Manual</Badge>
-                </div>
-                <p className="help">
-                  When a lead wants to find a time, the draft moves to Needs
-                  input. Add available dates, times and a time zone, and the
-                  agent prepares the reply.
-                </p>
-                <div className="field">
-                  <label htmlFor="agent-meeting-instructions">
-                    Meeting instructions{" "}
-                    <small className="muted">Optional</small>
-                  </label>
+                  <div className="field">
+                    <label htmlFor="company-about">
+                      What your company does{" "}
+                      <small className="muted">Optional</small>
+                    </label>
+                    <textarea
+                      id="company-about"
+                      value={background.companyDescription}
+                      maxLength={28000}
+                      placeholder="A short introduction to your company and who you work with."
+                      onChange={(e) =>
+                        information({
+                          ...background,
+                          companyDescription: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </section>
+                <section className="agent-setting-section">
+                  <h2>
+                    <label htmlFor="product-offer">Product &amp; offer</label>
+                  </h2>
+                  <p className="help">
+                    What you offer, who it helps, how it works, and any
+                    important terms or limitations.
+                  </p>
                   <textarea
-                    id="agent-meeting-instructions"
-                    value={agent.meetingInstructions ?? ""}
-                    maxLength={2000}
-                    disabled={!canManage}
-                    placeholder="Before arranging a call, ask which payout setup the lead currently uses."
+                    id="product-offer"
+                    className="agent-product"
+                    value={background.productOffer}
+                    maxLength={30000}
+                    placeholder="Describe the offer your agent will discuss with leads."
                     onChange={(e) =>
-                      field("meetingInstructions", e.target.value)
+                      information({
+                        ...background,
+                        productOffer: e.target.value,
+                      })
                     }
                   />
-                </div>
-                <p className="help">
-                  Provide available slots in the conversation&apos;s Needs input
-                  request. They are not saved as permanent instructions.
-                </p>
-              </section>
-            </div>
-          ) : null}
-          {step === 3 ? (
-            mode !== "demo" ? (
-              <LiveAgentTest
-                agent={agent}
-                dirty={JSON.stringify(agent) !== JSON.stringify(existing)}
-              />
-            ) : (
-              <>
-                <Notice title="Demo test">
-                  This checks the form and Knowledge setup. It does not call an
-                  AI model.
-                </Notice>
-                <div className="test-chat">
-                  {testResult ? (
-                    <>
-                      <Badge
-                        color={
-                          hasAgentKnowledge(agent.knowledge) ? "green" : "amber"
+                </section>
+                <section className="agent-setting-section">
+                  <div className="agent-section-heading">
+                    <h2>
+                      Selling points <small className="muted">Optional</small>
+                    </h2>
+                    <span className="small muted">
+                      {background.sellingPoints.length} / 40
+                    </span>
+                  </div>
+                  <p className="help">
+                    Specific benefits, capabilities or proof your agent can
+                    bring up when relevant.
+                  </p>
+                  {background.sellingPoints.map((point, index) => (
+                    <SettingItem
+                      key={index}
+                      initiallyOpen={!point}
+                      title={point.split("\n")[0] || "New selling point"}
+                    >
+                      <textarea
+                        aria-label={"Selling point " + (index + 1)}
+                        value={point}
+                        maxLength={8000}
+                        onChange={(e) =>
+                          information({
+                            ...background,
+                            sellingPoints: background.sellingPoints.map(
+                              (value, i) =>
+                                i === index ? e.target.value : value,
+                            ),
+                          })
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          information({
+                            ...background,
+                            sellingPoints: background.sellingPoints.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
                         }
                       >
-                        {hasAgentKnowledge(agent.knowledge)
-                          ? "Knowledge is available"
-                          : "Needs input"}
-                      </Badge>
-                      <p className="page-description">
-                        {hasAgentKnowledge(agent.knowledge)
-                          ? "The demo agent has approved information. Open your workspace to run an AI test."
-                          : "Add approved product information before generating a reply."}
-                      </p>
-                    </>
-                  ) : (
-                    <Empty title="Try a sample reply">
-                      Check the information your agent will have available.
-                    </Empty>
-                  )}
-                </div>
-                <div className="field">
-                  <label htmlFor="test-message">Incoming message</label>
-                  <textarea
-                    id="test-message"
-                    value={test}
-                    onChange={(e) => {
-                      setTest(e.target.value);
-                      setTestResult(false);
-                    }}
-                    placeholder="Sounds interesting. How does pricing work?"
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  disabled={!test.trim()}
-                  onClick={() => setTestResult(true)}
-                >
-                  Check setup
-                </Button>
+                        Remove selling point
+                      </Button>
+                    </SettingItem>
+                  ))}
+                  <Button
+                    icon="plus"
+                    disabled={background.sellingPoints.length >= 40}
+                    onClick={() =>
+                      information({
+                        ...background,
+                        sellingPoints: [...background.sellingPoints, ""],
+                      })
+                    }
+                  >
+                    Add selling point
+                  </Button>
+                </section>
+                <AgentResources
+                  workspaceId={scope.workspaceId}
+                  value={agent.resources ?? []}
+                  onChange={(resources) => field("resources", resources)}
+                  onBusy={setUploading}
+                  disabled={disabled}
+                  demo={mode === "demo"}
+                />
               </>
-            )
-          ) : null}
-          <div hidden={step !== 4}>
-            <AgentLaunch
-              onSenderSaved={setAgent}
-              agent={agent}
-              canManage={canManage}
-              onSave={(status) => save(status, false)}
-            />
-          </div>
-          {step !== 4 ? (
-            <div className="editor-next agent-next-step">
-              <Button
-                variant="primary"
-                icon="arrow"
-                disabled={uploading || saving}
-                onClick={() => setStep(step + 1)}
-              >
-                Next: {steps[step + 1]}
-              </Button>
-            </div>
-          ) : null}
+            ) : (
+              <>
+                <p className="page-description">
+                  Set the direction and voice of your conversations.
+                </p>
+                <section className="agent-setting-section">
+                  <h2>
+                    <label htmlFor="conversation-goal">Conversation goal</label>
+                  </h2>
+                  <p className="help">
+                    The outcome your agent should help the conversation move
+                    toward.
+                  </p>
+                  <textarea
+                    id="conversation-goal"
+                    value={agent.goal}
+                    maxLength={8000}
+                    onChange={(e) => field("goal", e.target.value)}
+                  />
+                  <div className="field agent-language-field">
+                    <label htmlFor="agent-language">Reply language</label>
+                    <select
+                      id="agent-language"
+                      value={agent.language}
+                      onChange={(e) => field("language", e.target.value)}
+                    >
+                      {Array.from(
+                        new Set([
+                          "English",
+                          "Russian",
+                          "German",
+                          "Dutch",
+                          "Match the conversation",
+                          agent.language,
+                        ]),
+                      ).map((language) => (
+                        <option key={language}>{language}</option>
+                      ))}
+                    </select>
+                  </div>
+                </section>
+                <section className="agent-setting-section">
+                  <h2>
+                    <label htmlFor="tone-style">Tone &amp; style</label>
+                  </h2>
+                  <p className="help">
+                    How direct, informal or sales-oriented to be. Include
+                    preferences for length, wording and punctuation.
+                  </p>
+                  <textarea
+                    id="tone-style"
+                    value={agent.customInstructions ?? ""}
+                    maxLength={10002}
+                    placeholder="Calm and conversational. Short messages, plain language and a low-pressure approach."
+                    onChange={(e) =>
+                      field("customInstructions", e.target.value)
+                    }
+                  />
+                </section>
+                <section className="agent-setting-section">
+                  <div className="agent-section-heading">
+                    <h2>
+                      Reply examples <small className="muted">Optional</small>
+                    </h2>
+                    <span className="small muted">
+                      {background.replyExamples.length} / 40
+                    </span>
+                  </div>
+                  <p className="help">
+                    Show a situation and a reply you like. The agent adapts the
+                    example to the current conversation.
+                  </p>
+                  {background.replyExamples.map((example, index) => (
+                    <SettingItem
+                      key={index}
+                      initiallyOpen={!example.context}
+                      title={
+                        example.context.split("\n")[0] || "New reply example"
+                      }
+                    >
+                      <div className="field">
+                        <label htmlFor={"example-context-" + index}>
+                          Situation
+                        </label>
+                        <textarea
+                          id={"example-context-" + index}
+                          value={example.context}
+                          maxLength={8000}
+                          onChange={(e) =>
+                            information({
+                              ...background,
+                              replyExamples: background.replyExamples.map(
+                                (value, i) =>
+                                  i === index
+                                    ? { ...value, context: e.target.value }
+                                    : value,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={"example-reply-" + index}>Reply</label>
+                        <textarea
+                          id={"example-reply-" + index}
+                          value={example.reply}
+                          maxLength={8000}
+                          onChange={(e) =>
+                            information({
+                              ...background,
+                              replyExamples: background.replyExamples.map(
+                                (value, i) =>
+                                  i === index
+                                    ? { ...value, reply: e.target.value }
+                                    : value,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          information({
+                            ...background,
+                            replyExamples: background.replyExamples.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
+                        }
+                      >
+                        Remove example
+                      </Button>
+                    </SettingItem>
+                  ))}
+                  <Button
+                    icon="plus"
+                    disabled={background.replyExamples.length >= 40}
+                    onClick={() =>
+                      information({
+                        ...background,
+                        replyExamples: [
+                          ...background.replyExamples,
+                          { context: "", reply: "" },
+                        ],
+                      })
+                    }
+                  >
+                    Add reply example
+                  </Button>
+                </section>
+              </>
+            )}
+          </fieldset>
         </div>
       </div>
+      {panel ? (
+        <Dialog
+          title={panel === "test" ? "Test agent" : "Assign senders"}
+          onClose={() => {
+            if (!saving && !uploading) setPanel(null);
+          }}
+        >
+          {error ? <Notice variant="error">{error}</Notice> : null}
+          {panel === "test" ? (
+            mode === "demo" ? (
+              <Notice>
+                Open your workspace to test this agent on a real conversation.
+                Demo mode does not call a model.
+              </Notice>
+            ) : (
+              <LiveAgentTest agent={agent} dirty={dirty} />
+            )
+          ) : (
+            <>
+              <fieldset className="agent-reply-groups" disabled={disabled}>
+                <legend>Prepare replies for</legend>
+                <div className="agent-reply-checkboxes">
+                  {intentGroup.options.map((group) => (
+                    <label key={group}>
+                      <input
+                        type="checkbox"
+                        checked={agent.replyGroups.includes(group)}
+                        onChange={(e) =>
+                          field(
+                            "replyGroups",
+                            e.target.checked
+                              ? intentGroup.options.filter(
+                                  (value) =>
+                                    value === group ||
+                                    agent.replyGroups.includes(value),
+                                )
+                              : agent.replyGroups.filter(
+                                  (value) => value !== group,
+                                ),
+                          )
+                        }
+                      />
+                      {group[0].toUpperCase() + group.slice(1)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {!agent.replyGroups.length ? (
+                <p className="help">
+                  No groups selected. This agent will not prepare replies.
+                </p>
+              ) : null}
+              <AgentLaunch
+                agent={agent}
+                canManage={canManage && !saving}
+                onSave={(status) => save(status, false)}
+                onSenderSaved={adopt}
+              />
+            </>
+          )}
+        </Dialog>
+      ) : null}
     </div>
   );
 }

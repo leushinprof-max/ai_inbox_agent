@@ -1,8 +1,16 @@
 import { z } from "zod";
 import { intentGroup, systemLabels } from "@/domain/labels";
 import { assertReasoningSupported, reasoningEfforts } from "./model-catalog";
+import {
+  defaultReplyPrompt,
+  migrateClassificationPrompt,
+  validateTemplate,
+  replyVariables,
+  classificationVariables,
+} from "./prompt-templates";
 
 const instruction = z.string().trim().min(1).max(12000);
+const legacyInstruction = z.string().trim().max(12000).default("");
 const modelId = z
   .string()
   .trim()
@@ -26,12 +34,14 @@ export const aiConfiguration = z
       })
       .strict()
       .default({ classification: null, draft: null }),
+    schemaVersion: z.literal(2).optional(),
     classification: instruction,
-    replyDecision: instruction,
-    draft: instruction,
-    rewrite: instruction,
-    needsInput: instruction,
-    agentTemplate: instruction,
+    reply: instruction.optional(),
+    replyDecision: legacyInstruction,
+    draft: legacyInstruction,
+    rewrite: legacyInstruction,
+    needsInput: legacyInstruction,
+    agentTemplate: legacyInstruction,
     labels: z
       .object(
         Object.fromEntries(
@@ -51,7 +61,7 @@ export const aiConfiguration = z
   })
   .strict();
 export type AIConfiguration = z.infer<typeof aiConfiguration>;
-export const initialAIConfiguration: AIConfiguration = {
+export const legacyInitialAIConfiguration: AIConfiguration = {
   models: { classification: null, draft: null },
   reasoning: { classification: null, draft: null },
   classification:
@@ -71,12 +81,63 @@ export const initialAIConfiguration: AIConfiguration = {
   ) as AIConfiguration["labels"],
   defaults: { goal: "", language: "English", replyGroups: ["positive"] },
 };
+export function upgradeConfiguration(config: AIConfiguration): AIConfiguration {
+  if (config.schemaVersion === 2) return config;
+  return {
+    ...config,
+    schemaVersion: 2,
+    classification: migrateClassificationPrompt(config.classification),
+    reply: defaultReplyPrompt,
+    replyDecision: "",
+    draft: "",
+    rewrite: "",
+    needsInput: "",
+    agentTemplate: "",
+  };
+}
+export const initialAIConfiguration = upgradeConfiguration(
+  legacyInitialAIConfiguration,
+);
+
+/** v2 persists only editable prompts; legacy fields exist in memory for rollback readers. */
+export function serializeConfiguration(config: AIConfiguration) {
+  if (config.schemaVersion !== 2) return config;
+  const { models, reasoning, classification, reply, labels, defaults } = config;
+  return {
+    schemaVersion: 2,
+    models,
+    reasoning,
+    classification,
+    reply,
+    labels,
+    defaults,
+  };
+}
+
 export function validateConfiguration(value: unknown) {
   const config = aiConfiguration.parse(value);
   for (const task of ["classification", "draft"] as const) {
     const model = config.models[task];
     if (model !== null) assertReasoningSupported(model, config.reasoning[task]);
   }
+  if (config.schemaVersion === 2) {
+    if (!config.reply) throw new Error("Reply agent prompt is required.");
+    validateTemplate(config.reply, replyVariables);
+    validateTemplate(config.classification, classificationVariables);
+    return config;
+  }
+  if (config.reply)
+    throw new Error("A reply prompt requires configuration format v2.");
+  if (
+    [
+      config.replyDecision,
+      config.draft,
+      config.rewrite,
+      config.needsInput,
+      config.agentTemplate,
+    ].some((value) => !value)
+  )
+    throw new Error("Legacy instruction fields must not be empty.");
   const variables = [...config.agentTemplate.matchAll(/\{\{([^{}]+)\}\}/g)].map(
     (m) => m[1],
   );

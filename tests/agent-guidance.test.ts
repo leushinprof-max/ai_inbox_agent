@@ -9,6 +9,7 @@ import {
 } from "../src/domain/agent-guidance";
 import { writeAgentKnowledge } from "../src/domain/agent-knowledge";
 import { demoLabels } from "../src/domain/labels";
+import { legacyInitialAIConfiguration } from "../src/integrations/ai/configuration";
 import {
   buildModelRequest,
   type ModelInput,
@@ -73,6 +74,7 @@ test("All writer scenarios receive sender, company and resources; classification
   const storagePath = resourceFilePath(randomUUID(), randomUUID());
   const url = publicResourceUrl("https://example.test", storagePath);
   const input: ModelInput = {
+    configuration: legacyInitialAIConfiguration,
     labels: demoLabels("test"),
     messages: [
       { id: "lead", direction: "inbound", body: "Please share a deck" },

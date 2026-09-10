@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { retirePreviousFixtureJobs } from "./local-queue.mjs";
 import { execFileSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 // @ts-expect-error Validates the isolated local project before reading local-only keys.
@@ -60,6 +61,7 @@ function sql(query: string) {
 }
 
 test("PDF sharing and manual scheduling survive Needs input, operator completion and Rewrite", async () => {
+  retirePreviousFixtureJobs();
   const run = randomUUID(),
     password = `Local-${run}!`,
     email = `guidance-${run}@inbox.example`;

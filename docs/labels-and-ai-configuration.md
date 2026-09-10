@@ -1,5 +1,7 @@
 # Single intent labels and product AI configuration
 
+The [Reply agent v2 redesign](reply-agent.md) supersedes the legacy reply-decision editors and metadata-only audit described below. Classification remains separate; the v2 writer uses one complete editable template and saves exact requests for inspection.
+
 Implemented in PR #4 and deployed to the independent `ai-inbox-dev` on 2026-09-06. The migration and compatible web/worker shipped together.
 
 ## Operator behavior
