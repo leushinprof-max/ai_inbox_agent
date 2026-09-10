@@ -83,6 +83,9 @@
   position: relative;
   flex-shrink: 0;
 }
+.conversation-export {
+  flex-shrink: 0;
+}
 .filter-count {
   display: grid;
   place-items: center;
@@ -630,6 +633,10 @@
 @media (max-width: 680px) {
   .conversations-toolbar {
     padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .conversation-search {
+    flex-basis: 100%;
   }
   .conversation-tabs {
     padding: 8px 16px;
