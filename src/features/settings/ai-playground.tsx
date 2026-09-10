@@ -48,7 +48,8 @@ export function AIPlayground({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [testedKey, setTestedKey] = useState("");
   const [previewKey, setPreviewKey] = useState("");
-  const fixedLabel = mode !== "classify" && mode !== "full";
+  const fixedLabel =
+    configuration.schemaVersion !== 2 && mode !== "classify" && mode !== "full";
   const conversation = state.conversations.find((c) => c.id === conversationId);
   const sample = {
     workspaceId: scope.workspaceId,
@@ -127,7 +128,11 @@ export function AIPlayground({
               disabled={disabled}
               onChange={(value) => {
                 setMode(value as Mode);
-                if (value !== "full" && value !== "classify")
+                if (
+                  configuration.schemaVersion !== 2 &&
+                  value !== "full" &&
+                  value !== "classify"
+                )
                   setSource("saved");
                 setError("");
               }}
