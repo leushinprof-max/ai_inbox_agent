@@ -13,6 +13,7 @@ import { usePreferences } from "@/lib/preferences";
 import { useContactDetails } from "@/lib/use-contact-details";
 import { FilterBuilder, PinIcon } from "./filter-builder";
 import { usePinnedViews } from "./pinned-views";
+import { ExportButton } from "./export-button";
 import {
   filterSignature,
   matchesConversationFilters,
@@ -238,6 +239,13 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
             />
           ) : null}
         </div>
+        <ExportButton
+          key={scope.workspaceId}
+          query={query}
+          filters={filters}
+          conversations={filtered}
+          onError={setError}
+        />
       </header>
       {views.length ? (
         <nav className="conversation-tabs" aria-label="Conversation views">
