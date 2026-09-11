@@ -25,6 +25,7 @@ export function ConversationThread({
   conversation,
   children,
   onBack,
+  onMarkedUnread,
   onToggleDetails,
   mobileOpen = false,
   active = true,
@@ -33,6 +34,7 @@ export function ConversationThread({
   conversation: Conversation;
   children: ReactNode;
   onBack: () => void;
+  onMarkedUnread?: () => void;
   onToggleDetails: () => void;
   mobileOpen?: boolean;
   active?: boolean;
@@ -171,6 +173,7 @@ export function ConversationThread({
               repository.hasConversationHistory(conversation.id))
           }
           visibilityKey={mobileOpen}
+          onMarkedUnread={onMarkedUnread}
         />
         <IconButton
           label="Show lead details"

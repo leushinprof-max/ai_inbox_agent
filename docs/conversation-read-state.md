@@ -10,6 +10,8 @@ Read marks update optimistically in the browser, including the unread dot and co
 
 Auto-read runs after messages load into a visible, focused conversation panel. Fetching/preloading data does not mark anything read. A separate `loadedRevision` in the client distinguishes loaded messages from list previews. A manual unread remains until reopening or explicit marking as read; refreshing the same inbound revision does not clear another member's manual mark. Sessions refresh every 30 seconds while visible and on window focus.
 
+In Conversations, marking an open thread as unread returns to the conversation list after the save succeeds. The list retains the unread mark and current search and filters. A failed save keeps the thread open with the retry control; marking as read does not close it.
+
 `conversation_page_v2` extends the existing paginated query with an optional read filter. Search matches contact name, company and the latest message. `conversation_counts` returns workspace-wide counts independent of search or the loaded page. Both functions run with the caller's RLS permissions. The original page RPC remains available for the previous app version.
 
 ## Release and verification
