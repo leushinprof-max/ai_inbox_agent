@@ -4,16 +4,20 @@ Product admin → Instructions has three editors: **Classification**, **Reply ag
 
 Agents has two tabs:
 
-| Tab           | Fields                                                                                         |
-| ------------- | ---------------------------------------------------------------------------------------------- |
-| Background    | Company & offer (company name and one description), optional Selling points, Materials         |
-| Communication | Conversation goal, Reply language, Tone & style, optional Reply examples (situation and reply) |
+| Tab           | Fields                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| Background    | Company & offer (company name and one description), optional Selling points, Materials                 |
+| Communication | Conversation goal, Reply language, Tone & style, optional Custom instructions, optional Reply examples |
 
 **Test agent** and **Assign senders** are header actions. Assign senders also contains allowed intent groups, workspace default and activation/pause controls. Sender name and grammatical form remain properties of the actual LinkedIn sender.
 
 The `agent-background-v2` document is stored in the existing versioned `knowledge` field. Reading older agents maps their product offer and FAQs into Company & offer without changing their wording or order. If a separate company description exists, the editor places it before the offer, separated by a blank line. Saving stores the combined text in `productOffer` and clears the legacy `companyDescription`. The combined field retains the capacity of both former fields. Company name, resource URLs and file metadata are preserved; Selling points and examples start empty. Old custom instructions and meeting instructions are combined, in that order, into Tone & style. Reading does not write a new version; saving does. Historical snapshots remain immutable.
 
 The Reply agent template uses `{{company_offer}}` for the combined description. Older `{{company_description}}` and `{{product_offer}}` placeholders remain supported for saved versions; they appear in the variable list only when the current template uses them.
+
+**Custom instructions** is one optional text area (up to 8,000 characters), stored as `conversationInstructions` in the same versioned document. Old agents default to an empty value. The existing Tone & style text is not moved or repurposed. These instructions describe how to handle particular situations; company facts and materials remain in Background. Only manual edits in Agents change this field.
+
+The template inserts `{{custom_instructions}}` in a separate section between communication style and examples. The `{{#custom_instructions}}...{{/custom_instructions}}` wrapper includes that section only when the field has non-whitespace text. Optional sections are checked for balanced names and resolved before inserting data, so instructions or conversation text containing template tokens are never reinterpreted. The same behavior applies to generation, rewrite and operator completion; classification receives no agent instructions.
 
 ## Reply flow
 

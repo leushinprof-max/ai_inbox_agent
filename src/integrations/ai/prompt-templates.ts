@@ -11,6 +11,7 @@ export const replyVariables = {
   resources: "Background: materials",
   reply_language: "Communication: reply language",
   communication_style: "Communication: tone & style",
+  custom_instructions: "Communication: custom instructions (optional)",
   reply_examples: "Communication: reply examples",
   conversation: "Conversation: messages and participants",
   current_time: "Current request: date and time",
@@ -37,33 +38,66 @@ export function migrateClassificationPrompt(instructions: string) {
   return `${rules}\n\n${defaultClassificationPrompt}`;
 }
 
+function templateTokens(template: string, variables: Record<string, string>) {
+  const tokens = [...template.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) => {
+    const token = match[1].trim();
+    const kind = token.startsWith("#")
+      ? "open"
+      : token.startsWith("/")
+        ? "close"
+        : "value";
+    return {
+      index: match.index!,
+      length: match[0].length,
+      kind,
+      name: kind === "value" ? token : token.slice(1).trim(),
+    };
+  });
+  const sections: string[] = [];
+  for (const token of tokens) {
+    if (!Object.hasOwn(variables, token.name))
+      throw new Error(`Unknown template variable: ${token.name}`);
+    if (token.kind === "open") sections.push(token.name);
+    if (token.kind === "close" && sections.pop() !== token.name)
+      throw new Error(`Mismatched optional section: ${token.name}`);
+  }
+  if (sections.length)
+    throw new Error(`Unclosed optional section: ${sections.at(-1)}`);
+  return tokens;
+}
+
 export function validateTemplate(
   template: string,
   variables: Record<string, string>,
 ) {
-  const names = [...template.matchAll(/\{\{([^{}]+)\}\}/g)].map((match) =>
-    match[1].trim(),
-  );
-  const unknown = names.filter((name) => !Object.hasOwn(variables, name));
-  if (unknown.length)
-    throw new Error(
-      `Unknown template variables: ${[...new Set(unknown)].join(", ")}`,
-    );
-  if (!names.includes("conversation"))
+  const tokens = templateTokens(template, variables);
+  if (
+    !tokens.some(
+      (token) => token.kind === "value" && token.name === "conversation",
+    )
+  )
     throw new Error("Include {{conversation}} in the prompt.");
 }
 
-/** Replace template tokens once; tokens inside supplied data stay literal. */
+/** Optional sections and values are evaluated only in the original template. */
 export function renderTemplate(
   template: string,
   values: Record<string, string>,
 ): string {
-  return template.replace(/\{\{([^{}]+)\}\}/g, (_, name: string) => {
-    const key = name.trim();
-    if (!Object.hasOwn(values, key))
-      throw new Error(`Unknown template variable: ${key}`);
-    return values[key];
-  });
+  const tokens = templateTokens(template, values);
+  const visible = [true];
+  const output: string[] = [];
+  let cursor = 0;
+  for (const token of tokens) {
+    if (visible.at(-1)) output.push(template.slice(cursor, token.index));
+    if (token.kind === "open")
+      visible.push(!!visible.at(-1) && !!values[token.name].trim());
+    else if (token.kind === "close") visible.pop();
+    else if (visible.at(-1)) output.push(values[token.name]);
+    cursor = token.index + token.length;
+  }
+  if (visible.at(-1)) output.push(template.slice(cursor));
+  return output.join("");
 }
 
 export const defaultReplyPrompt = `You handle LinkedIn conversations with leads on behalf of the sender
@@ -113,7 +147,15 @@ Follow these settings. Continue the existing conversation rather than
 writing a new cold message. Keep the reply concise while fully
 addressing the lead's message.
 
-## Examples of good replies
+{{#custom_instructions}}## Custom instructions
+
+{{custom_instructions}}
+
+Follow these instructions when the situation applies. They guide how
+you handle the conversation; use the approved information above and
+confirmed operator input for facts, terms and commitments.
+
+{{/custom_instructions}}## Examples of good replies
 
 {{reply_examples}}
 
