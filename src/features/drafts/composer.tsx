@@ -547,29 +547,33 @@ export function Composer({
       >
         {generating ? (
           <>
-            <div className="composer-title">
+            <div className="composer-title" role="status">
               <Spark />
-              Preparing a draft
+              Writing a new draft…
             </div>
-            {text ? (
-              <textarea
-                ref={messageInput}
-                className="reply-input"
-                aria-label="Current draft"
-                value={text}
-                readOnly
-                disabled
-              />
-            ) : (
-              <div role="status" aria-label="Preparing a draft">
-                <div className="skeleton wide" />
-                <div className="skeleton wide" />
-                <div className="skeleton medium" />
+            <div className="composer-loading-body" aria-hidden="true">
+              {/* Keep the existing text's responsive dimensions while hiding it. */}
+              {text ? (
+                <textarea
+                  ref={messageInput}
+                  className="reply-input composer-loading-measure"
+                  value={text}
+                  readOnly
+                  disabled
+                  tabIndex={-1}
+                />
+              ) : null}
+              <div className="composer-loading-lines">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
               </div>
-            )}
+            </div>
             <div className="composer-actions">
               <span className="small muted">
-                Your current draft is preserved.
+                {text ? "Your previous draft is saved." : "Preparing your reply…"}
               </span>
               <Button
                 disabled={!generation || environment === "demo"}
