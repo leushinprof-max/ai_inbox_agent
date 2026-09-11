@@ -7,6 +7,7 @@ export const agentBackground = z.object({
   companyDescription: z.string().max(28000),
   productOffer: z.string().max(58002),
   sellingPoints: z.array(z.string().max(8000)).max(40),
+  conversationInstructions: z.string().max(8000).default(""),
   replyExamples: z
     .array(
       z.object({ context: z.string().max(8000), reply: z.string().max(8000) }),
@@ -48,6 +49,7 @@ export function readAgentBackground(text: string): AgentBackground {
       .filter(Boolean)
       .join("\n\n"),
     sellingPoints: [],
+    conversationInstructions: "",
     replyExamples: [],
   };
 }

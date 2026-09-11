@@ -265,6 +265,9 @@ export function buildModelRequest(
           resources: quoted(data.replyContext?.resources ?? []),
           reply_language: quoted(agent?.language),
           communication_style: quoted(agent ? communicationStyle(agent) : ""),
+          custom_instructions: background?.conversationInstructions.trim()
+            ? quoted(background.conversationInstructions)
+            : "",
           reply_examples: quoted(background?.replyExamples ?? []),
           conversation: quoted({
             lead: input.leadName ?? "",

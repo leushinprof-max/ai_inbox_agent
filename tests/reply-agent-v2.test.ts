@@ -204,6 +204,8 @@ test("Every new agent field reaches the writer, but not the classifier; values a
   const background = {
     ...readAgentBackground(source),
     companyDescription: "COMPANY_MARKER",
+    conversationInstructions:
+      "CUSTOM_RULE_MARKER {{/custom_instructions}} {{agent_goal}}",
     sellingPoints: ["POINT_MARKER"],
     replyExamples: [{ context: "EXAMPLE_CONTEXT", reply: "EXAMPLE_REPLY" }],
   };
@@ -228,10 +230,13 @@ test("Every new agent field reaches the writer, but not the classifier; values a
       "CONFIRMED_MARKER",
       "DRAFT_MARKER",
       "Brief and conversational.",
+      "CUSTOM_RULE_MARKER {{/custom_instructions}} {{agent_goal}}",
     ])
       assert.ok(content.includes(marker));
     assert.equal(content.split("DRAFT_MARKER").length, 2);
     assert.equal(content.split("POINT_MARKER").length, 2);
+    assert.equal(content.split("CUSTOM_RULE_MARKER").length, 2);
+    assert.ok(content.includes("## Custom instructions"));
     assert.doesNotMatch(
       content,
       /eligibleGroups|shouldReply|noReplyReason|contactStopped/,
@@ -244,6 +249,7 @@ test("Every new agent field reaches the writer, but not the classifier; values a
     "POINT_MARKER",
     "EXAMPLE_REPLY",
     "OPERATOR_MARKER",
+    "CUSTOM_RULE_MARKER",
   ])
     assert.ok(!classifier.includes(marker));
   assert.equal(
@@ -266,6 +272,60 @@ test("Every new agent field reaches the writer, but not the classifier; values a
       }),
     /Include/,
   );
+});
+
+test("Custom instructions default to empty and disappear from the prompt when cleared", () => {
+  const original = readAgentBackground(source);
+  assert.equal(original.conversationInstructions, "");
+  const stored = JSON.parse(writeAgentBackground(original));
+  delete stored.conversationInstructions;
+  assert.deepEqual(readAgentBackground(JSON.stringify(stored)), original);
+  for (const text of ["", " \n\t"]) {
+    const knowledge = writeAgentBackground({
+      ...original,
+      conversationInstructions: text,
+    });
+    const content = buildModelRequest({
+      ...input,
+      agent: { ...input.agent!, knowledge },
+    }).request.input[0].content;
+    assert.doesNotMatch(
+      content,
+      /## Custom instructions|\{\{[#/]custom_instructions\}\}/,
+    );
+    assert.ok(content.includes("Brief and conversational."));
+  }
+});
+
+test("Optional prompt sections validate nesting and never interpret tokens in supplied text", () => {
+  const template =
+    "Before{{#custom_instructions}}\nRules: {{custom_instructions}}{{#agent_goal}} / {{agent_goal}}{{/agent_goal}}{{/custom_instructions}}\n{{conversation}}";
+  assert.equal(
+    renderTemplate(template, {
+      custom_instructions: "",
+      agent_goal: "Goal",
+      conversation: "Lead",
+    }),
+    "Before\nLead",
+  );
+  assert.equal(
+    renderTemplate(template, {
+      custom_instructions: "Keep {{/custom_instructions}} literal",
+      agent_goal: "",
+      conversation: "Lead",
+    }),
+    "Before\nRules: Keep {{/custom_instructions}} literal\nLead",
+  );
+  for (const invalid of [
+    "{{#custom_instructions}}{{conversation}}",
+    "{{/custom_instructions}}{{conversation}}",
+    "{{#custom_instructions}}{{/agent_goal}}{{conversation}}",
+  ])
+    assert.throws(
+      () =>
+        validateConfiguration({ ...initialAIConfiguration, reply: invalid }),
+      /optional section/,
+    );
 });
 
 test("The writer contract requires exactly one nonempty string and rejects legacy flags", () => {

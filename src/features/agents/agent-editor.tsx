@@ -401,6 +401,30 @@ export function AgentEditor({ id }: { id: string }) {
                   />
                 </section>
                 <section className="agent-setting-section">
+                  <h2>
+                    <label htmlFor="custom-instructions">
+                      Custom instructions
+                    </label>{" "}
+                    <small className="muted">Optional</small>
+                  </h2>
+                  <p className="help">
+                    Additional rules for specific situations in your
+                    conversations.
+                  </p>
+                  <textarea
+                    id="custom-instructions"
+                    value={background.conversationInstructions}
+                    maxLength={8000}
+                    placeholder="For example: When a lead asks for contact details, offer our team email first."
+                    onChange={(e) =>
+                      information({
+                        ...background,
+                        conversationInstructions: e.target.value,
+                      })
+                    }
+                  />
+                </section>
+                <section className="agent-setting-section">
                   <div className="agent-section-heading">
                     <h2>
                       Reply examples <small className="muted">Optional</small>

@@ -341,6 +341,14 @@ export function AIConfigurationScreen() {
                               </div>
                             ))}
                         </dl>
+                        {section === "reply" && (
+                          <p className="help">
+                            Wrap the optional instructions section in{" "}
+                            <code>{"{{#custom_instructions}}"}</code> and{" "}
+                            <code>{"{{/custom_instructions}}"}</code> to omit it
+                            when the agent has no custom instructions.
+                          </p>
+                        )}
                       </details>
                     )}
                   </div>
