@@ -9,6 +9,7 @@ import { localConfig } from "../../tools/local-config.mjs";
 import type { Database } from "../../src/lib/supabase/database.types";
 import { runNextJob } from "../../src/server/runtime";
 import { validateResourceFiles } from "../../src/server/resource-validation";
+import { localSplitConfiguration } from "./split-config.mjs";
 import {
   type ModelInput,
   type InboxModel,
@@ -60,13 +61,17 @@ function sql(query: string) {
   );
 }
 
-test("PDF sharing and manual scheduling survive Needs input, operator completion and Rewrite", async () => {
+async function checkGuidance(split: boolean) {
   retirePreviousFixtureJobs();
   const run = randomUUID(),
     password = `Local-${run}!`,
     email = `guidance-${run}@inbox.example`;
   must(
-    await admin.auth.admin.createUser({ email, password, email_confirm: true }),
+    await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    }),
   );
   must(await owner.auth.signInWithPassword({ email, password }));
   const workspace = must(
@@ -79,6 +84,7 @@ test("PDF sharing and manual scheduling survive Needs input, operator completion
   const pdf = new Blob(["%PDF-1.4\n% Synthetic integration fixture\n%%EOF"], {
     type: "application/pdf",
   });
+  const restore = split ? await localSplitConfiguration(admin) : null;
   try {
     // Upload tokens are scoped to a single file; direct anonymous uploads remain denied.
     const denied = await anonymous.storage
@@ -101,6 +107,9 @@ test("PDF sharing and manual scheduling survive Needs input, operator completion
       id: randomUUID(),
       kind: "pdf" as const,
       name: "Presentation",
+      ...(split
+        ? { description: "Synthetic service overview and scheduling options" }
+        : {}),
       whenToUse: "When requested",
       fileName: "presentation.pdf",
       storagePath: path,
@@ -168,11 +177,11 @@ test("PDF sharing and manual scheduling survive Needs input, operator completion
     sql(`insert into public.conversations(id,workspace_id,provider_conversation_id,sender_id,sender_name,contact_name,inbound_revision,classified_revision,label_id,label_state,label_source,evidence_message_id,evidence_quote)
       values('${conversation}','${workspace}','guidance',98,'Old provider name','Lead',1,1,'${label}','classified','ai',null,'');
       insert into public.messages(id,workspace_id,conversation_id,ingestion_key,body,direction,source,occurred_at)
-      values('${message}','${workspace}','${conversation}','guidance','Find a time next week.','inbound','provider',now());
+      values('${message}','${workspace}','${conversation}','guidance','Find a time next week.','inbound','provider','2026-09-09T11:00:00+03:00');
       update public.conversations set evidence_message_id='${message}',evidence_quote='Find a time next week.' where id='${conversation}';`);
     const observed: ModelInput[] = [];
     const model: InboxModel = {
-      async classify(input) {
+      async classify(input, prepared) {
         observed.push(input);
         assert.equal(input.sender?.name, "Natalya");
         assert.equal(input.sender?.grammaticalForm, "feminine");
@@ -181,6 +190,25 @@ test("PDF sharing and manual scheduling survive Needs input, operator completion
           configuration.customInstructions,
         );
         assert.equal(input.agent?.resources?.[0].url, resource.url);
+        assert.equal(
+          new Date(input.messages[0].createdAt!).toISOString(),
+          "2026-09-09T08:00:00.000Z",
+        );
+        if (split) {
+          assert.deepEqual(
+            prepared!.request.input.map((m) => m.role),
+            ["developer", "user"],
+          );
+          assert.equal(
+            JSON.parse(prepared!.request.input[1].content).conversation
+              .messages[0].createdAt,
+            "2026-09-09T08:00:00.000Z",
+          );
+          assert.ok(
+            prepared!.request.input[0].content.includes(resource.description!),
+          );
+          assert.ok(prepared!.request.input[0].content.includes(resource.url));
+        }
         const enough = !!input.operator?.approvedAnswer;
         return {
           labelId: label,
@@ -268,7 +296,11 @@ test("PDF sharing and manual scheduling survive Needs input, operator completion
     assert.equal((await request("", "", 2)).status, "needs_input");
     assert.equal(observed.at(-1)?.operator?.approvedAnswer, "");
   } finally {
+    await restore?.();
     await admin.storage.from(resourceBucket).remove([path]);
     await owner.auth.signOut();
   }
-});
+}
+for (const split of [false, true])
+  test(`PDF sharing and manual scheduling survive Needs input, operator completion and Rewrite (${split ? "split" : "existing"} format)`, () =>
+    checkGuidance(split));

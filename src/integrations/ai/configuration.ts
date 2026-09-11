@@ -3,9 +3,11 @@ import { intentGroup, systemLabels } from "@/domain/labels";
 import { assertReasoningSupported, reasoningEfforts } from "./model-catalog";
 import {
   defaultReplyPrompt,
+  defaultSplitReplyPrompt,
   migrateClassificationPrompt,
   validateTemplate,
   replyVariables,
+  splitReplyVariables,
   classificationVariables,
 } from "./prompt-templates";
 
@@ -35,6 +37,7 @@ export const aiConfiguration = z
       .strict()
       .default({ classification: null, draft: null }),
     schemaVersion: z.literal(2).optional(),
+    replyPromptFormat: z.literal("split_v1").optional(),
     classification: instruction,
     reply: instruction.optional(),
     replyDecision: legacyInstruction,
@@ -99,12 +102,31 @@ export const initialAIConfiguration = upgradeConfiguration(
   legacyInitialAIConfiguration,
 );
 
+/** Explicit editor action only: never upgrade an existing publication on read. */
+export function createSplitReplyConfiguration(
+  config: AIConfiguration,
+): AIConfiguration {
+  const current = validateConfiguration(config);
+  if (current.schemaVersion !== 2)
+    throw new Error(
+      "Upgrade to configuration v2 before selecting a split reply prompt.",
+    );
+  return {
+    ...current,
+    replyPromptFormat: "split_v1",
+    reply: defaultSplitReplyPrompt,
+  };
+}
+
 /** v2 persists only editable prompts; legacy fields exist in memory for rollback readers. */
 export function serializeConfiguration(config: AIConfiguration) {
   if (config.schemaVersion !== 2) return config;
   const { models, reasoning, classification, reply, labels, defaults } = config;
   return {
     schemaVersion: 2,
+    ...(config.replyPromptFormat
+      ? { replyPromptFormat: config.replyPromptFormat }
+      : {}),
     models,
     reasoning,
     classification,
@@ -122,11 +144,13 @@ export function validateConfiguration(value: unknown) {
   }
   if (config.schemaVersion === 2) {
     if (!config.reply) throw new Error("Reply agent prompt is required.");
-    validateTemplate(config.reply, replyVariables);
+    if (config.replyPromptFormat === "split_v1")
+      validateTemplate(config.reply, splitReplyVariables, ["runtime_context"]);
+    else validateTemplate(config.reply, replyVariables);
     validateTemplate(config.classification, classificationVariables);
     return config;
   }
-  if (config.reply)
+  if (config.reply || config.replyPromptFormat)
     throw new Error("A reply prompt requires configuration format v2.");
   if (
     [

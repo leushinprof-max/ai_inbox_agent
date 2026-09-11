@@ -647,3 +647,17 @@
     width: 100%;
   }
 }
+
+.admin-reply-format {
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-reply-format .help {
+  margin: 0;
+}
+.admin-reply-format button {
+  margin-top: 10px;
+}
+.admin-split-review .request-text {
+  max-height: 45vh;
+}

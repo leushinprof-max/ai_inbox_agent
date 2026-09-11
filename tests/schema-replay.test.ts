@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import {
   initialAIConfiguration,
   serializeConfiguration,
+  createSplitReplyConfiguration,
+  legacyInitialAIConfiguration,
 } from "../src/integrations/ai/configuration";
 import {
   readAgentBackground,
@@ -24,6 +26,187 @@ grant usage on schema public,auth to authenticated,anon;`);
     await db.exec(readFileSync(new URL(file, directory), "utf8"));
 });
 after(() => db.close());
+
+test("Split configuration publication is explicit and reversible; resource descriptions version without altering history", async () => {
+  const owner = randomUUID(),
+    agent = randomUUID();
+  await db.query(
+    "insert into auth.users(id,email) values($1,'split-owner@example.test')",
+    [owner],
+  );
+  await db.query(
+    "insert into app_private.platform_owners(user_id) values($1)",
+    [owner],
+  );
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+    owner,
+  ]);
+  const workspace = (
+    await db.query<{ id: string }>(
+      "select public.create_workspace('Split fixture') id",
+    )
+  ).rows[0].id;
+  const live = async () =>
+    (
+      await db.query<{ version_id: number; revision: number }>(
+        "select version_id,revision from public.ai_config_release",
+      )
+    ).rows[0];
+  const before = await live();
+  const histories = (
+    await db.query(
+      "select id,configuration from public.ai_config_versions order by id",
+    )
+  ).rows;
+  const candidate = serializeConfiguration(
+    createSplitReplyConfiguration(initialAIConfiguration),
+  );
+  const saved = (
+    await db.query<{ id: number }>(
+      "select public.save_ai_configuration($1) id",
+      [JSON.stringify(candidate)],
+    )
+  ).rows[0].id;
+  assert.deepEqual(
+    await live(),
+    before,
+    "Saving an unpublished version must not activate it",
+  );
+  assert.deepEqual(
+    (
+      await db.query<{ configuration: unknown }>(
+        "select configuration from public.ai_config_versions where id=$1",
+        [saved],
+      )
+    ).rows[0].configuration,
+    candidate,
+  );
+  for (const invalid of [null, "single", 2])
+    await assert.rejects(
+      db.query("select public.save_ai_configuration($1)", [
+        JSON.stringify({ ...candidate, replyPromptFormat: invalid }),
+      ]),
+      /Invalid reply prompt format/,
+    );
+  await assert.rejects(
+    db.query("select public.save_ai_configuration($1)", [
+      JSON.stringify({
+        ...legacyInitialAIConfiguration,
+        replyPromptFormat: "split_v1",
+      }),
+    ]),
+    /Invalid reply prompt format/,
+  );
+  await db.query("select public.publish_ai_configuration($1,$2)", [
+    saved,
+    before.revision,
+  ]);
+  assert.equal((await live()).version_id, saved);
+  await db.query("select public.publish_ai_configuration($1,$2)", [
+    before.version_id,
+    (await live()).revision,
+  ]);
+  assert.equal((await live()).version_id, before.version_id);
+  assert.deepEqual(
+    (
+      await db.query(
+        "select id,configuration from public.ai_config_versions where id<>$1 order by id",
+        [saved],
+      )
+    ).rows,
+    histories,
+  );
+  const old = {
+    kind: "link",
+    id: randomUUID(),
+    name: "Overview",
+    whenToUse: "When requested",
+    url: "https://example.test/doc?a=1&b=2",
+  };
+  const config = {
+    name: "Example agent",
+    status: "active",
+    goal: "Help",
+    language: "English",
+    replyGroups: ["positive"],
+    knowledge: "Approved offer",
+    resources: [old],
+  };
+  await db.query("select public.save_agent($1,$2,0,$3)", [
+    workspace,
+    agent,
+    JSON.stringify(config),
+  ]);
+  const latest = async () =>
+    (
+      await db.query<{ version: number; resources: unknown }>(
+        "select version,resources from public.agents where id=$1",
+        [agent],
+      )
+    ).rows[0];
+  const originalVersion = (await latest()).version;
+  const oldSnapshot = (
+    await db.query<{ configuration: unknown }>(
+      "select configuration from public.agent_versions where agent_id=$1 and version=$2",
+      [agent, originalVersion],
+    )
+  ).rows[0].configuration;
+  const resources = [
+    { ...old, description: "Collection and export overview" },
+    {
+      ...old,
+      id: randomUUID(),
+      kind: "pdf",
+      description: "A PDF overview",
+      fileName: "overview.pdf",
+      storagePath: `${workspace}/${randomUUID()}/presentation.pdf`,
+    },
+  ];
+  await db.query("select public.save_agent($1,$2,$3,$4)", [
+    workspace,
+    agent,
+    originalVersion,
+    JSON.stringify({ ...config, resources }),
+  ]);
+  assert.deepEqual((await latest()).resources, resources);
+  assert.deepEqual(
+    (
+      await db.query<{ configuration: { resources: unknown } }>(
+        "select configuration from public.agent_versions where agent_id=$1 order by version desc limit 1",
+        [agent],
+      )
+    ).rows[0].configuration.resources,
+    resources,
+  );
+  assert.deepEqual(
+    (
+      await db.query<{ configuration: unknown }>(
+        "select configuration from public.agent_versions where agent_id=$1 and version=$2",
+        [agent, originalVersion],
+      )
+    ).rows[0].configuration,
+    oldSnapshot,
+  );
+  for (const resource of resources)
+    for (const description of [null, 5, {}, "x".repeat(2001)]) {
+      const valid = (
+        await db.query<{ valid: boolean }>(
+          "select app_private.valid_agent_resources($1,$2) valid",
+          [JSON.stringify([{ ...resource, description }]), workspace],
+        )
+      ).rows[0].valid;
+      assert.equal(valid, false);
+    }
+  await assert.rejects(
+    db.query("select public.save_agent($1,$2,$3,$4)", [
+      workspace,
+      agent,
+      (await latest()).version,
+      JSON.stringify({ ...config, resources: [{ ...old, description: 5 }] }),
+    ]),
+    /Invalid resources/,
+  );
+});
 
 test("Reply v2 saves and publishes, completes needs-input and rewrite with exact run links, and never learns operator answers", async () => {
   const owner = randomUUID(),

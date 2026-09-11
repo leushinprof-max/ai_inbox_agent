@@ -4,7 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { Json } from "@/lib/supabase/database.types";
 import {
   ModelError,
-  buildModelRequest,
+  prepareModelRequest,
   type InboxModel,
   type ModelInput,
 } from "@/integrations/ai/classify";
@@ -48,7 +48,7 @@ async function recordModelCall(
   input: ModelInput,
   context: RunContext,
 ) {
-  const prepared = buildModelRequest(
+  const { input: stage, prepared } = prepareModelRequest(
     input,
     model.fallbackModel ?? process.env.INBOX_MODEL,
   );
@@ -75,7 +75,7 @@ async function recordModelCall(
   context.onModelCall?.(call);
   let modelOutput: Json | undefined;
   try {
-    const result = await model.classify(input, prepared, (value) => {
+    const result = await model.classify(stage, prepared, (value) => {
       modelOutput = value as Json;
     });
     databaseError(

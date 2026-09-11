@@ -21,6 +21,7 @@ const resourceFields = {
   id: z.uuid(),
   name: z.string().trim().min(1).max(200),
   whenToUse: z.string().trim().min(1).max(2000),
+  description: z.string().max(2000).optional(),
   url: resourceUrl,
 };
 export const agentResource = z.discriminatedUnion("kind", [

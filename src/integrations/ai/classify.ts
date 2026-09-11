@@ -77,7 +77,12 @@ export interface ModelInput {
   replyPreview?: boolean;
   currentTime?: string;
   workspaceTimezone?: string;
-  messages: { id: string; direction: "inbound" | "outbound"; body: string }[];
+  messages: {
+    id: string;
+    direction: "inbound" | "outbound";
+    body: string;
+    createdAt?: string | null;
+  }[];
   labels: LabelDefinition[];
   previous?: {
     labelId: string | null;
@@ -129,6 +134,7 @@ export function buildModelRequest(
   const scenario = input.scenario ?? "classify";
   const v2 = config.schemaVersion === 2;
   const classifying = scenario === "classify";
+  const split = v2 && !classifying && config.replyPromptFormat === "split_v1";
   const models = resolveModels(config, model);
   const selectedModel = classifying ? models.classification : models.draft;
   const effort = config.reasoning[classifying ? "classification" : "draft"];
@@ -148,7 +154,13 @@ export function buildModelRequest(
   for (const m of transcript.slice(-50).reverse()) {
     if (budget <= 0) break;
     const body = m.body.slice(0, Math.min(8000, budget));
-    messages.unshift({ ...m, body });
+    // Event times are writer data. Preserve old classification/legacy wire formats.
+    const { createdAt, ...message } = m;
+    messages.unshift({
+      ...message,
+      ...(split ? { createdAt: normalizeMessageTime(createdAt) } : {}),
+      body,
+    });
     budget -= body.length;
   }
   const labels = input.labels
@@ -210,11 +222,12 @@ export function buildModelRequest(
             customInstructions: agent?.customInstructions ?? "",
             meetingInstructions: agent?.meetingInstructions ?? "",
             resources: (agent?.resources ?? []).map(
-              ({ name, url, whenToUse, kind }) => ({
+              ({ name, url, whenToUse, kind, description }) => ({
                 name,
                 url,
                 whenToUse,
                 kind,
+                ...(split ? { description: description ?? "" } : {}),
               }),
             ),
             scheduling: "manual",
@@ -269,22 +282,38 @@ export function buildModelRequest(
             ? quoted(background.conversationInstructions)
             : "",
           reply_examples: quoted(background?.replyExamples ?? []),
-          conversation: quoted({
-            lead: input.leadName ?? "",
-            sender: input.sender?.name ?? "",
-            messages,
-          }),
+          ...(split
+            ? {
+                runtime_context: quoted({
+                  currentDateTime: normalizeMessageTime(input.currentTime),
+                  workspaceTimeZone: input.workspaceTimezone ?? null,
+                  senderTimeZone: null,
+                  leadTimeZone: null,
+                }),
+              }
+            : {
+                conversation: quoted({
+                  lead: input.leadName ?? "",
+                  sender: input.sender?.name ?? "",
+                  messages,
+                }),
+                current_draft: quoted(input.operator?.currentDraft),
+              }),
           current_time: quoted(input.currentTime),
           workspace_timezone: quoted(input.workspaceTimezone),
           operator_input: quoted(
-            input.operator
+            split
               ? {
-                  instructions: input.operator.instructions,
-                  confirmedInformation: input.operator.approvedAnswer,
+                  instructions: input.operator?.instructions ?? "",
+                  confirmedInformation: input.operator?.approvedAnswer ?? "",
                 }
-              : null,
+              : input.operator
+                ? {
+                    instructions: input.operator.instructions,
+                    confirmedInformation: input.operator.approvedAnswer,
+                  }
+                : null,
           ),
-          current_draft: quoted(input.operator?.currentDraft),
         });
   const properties = classifying
     ? {
@@ -328,12 +357,31 @@ export function buildModelRequest(
       ...(effort !== null ? { reasoning: { effort } } : {}),
       store: false,
       max_output_tokens: 4000,
-      input: v2
-        ? [{ role: "system", content: renderedPrompt! }]
-        : [
-            { role: "system", content: blocks.join("\n\n") },
-            { role: "user", content: JSON.stringify(data) },
-          ],
+      input: split
+        ? [
+            { role: "developer", content: renderedPrompt! },
+            {
+              role: "user",
+              content: JSON.stringify(
+                {
+                  conversation: {
+                    lead: input.leadName ?? "",
+                    sender: input.sender?.name ?? "",
+                    messages,
+                  },
+                  currentDraft: input.operator?.currentDraft ?? "",
+                },
+                null,
+                2,
+              ),
+            },
+          ]
+        : v2
+          ? [{ role: "system", content: renderedPrompt! }]
+          : [
+              { role: "system", content: blocks.join("\n\n") },
+              { role: "user", content: JSON.stringify(data) },
+            ],
       text: {
         format: {
           type: "json_schema",
@@ -364,9 +412,48 @@ export function buildModelRequest(
         ),
       configurationVersion: input.configurationVersion ?? null,
       promptFormat: v2 ? 2 : 1,
+      ...(!classifying
+        ? {
+            replyPromptFormat: split
+              ? "split_v1"
+              : v2
+                ? "single_system_v2"
+                : "legacy_v1",
+          }
+        : {}),
+      ...(split
+        ? {
+            unknownMessageTimes: messages.filter((m) => m.createdAt === null)
+              .length,
+          }
+        : {}),
     },
     messages,
   };
+}
+
+/** Only timestamps with an explicit offset identify an unambiguous event. */
+export function normalizeMessageTime(
+  value: string | null | undefined,
+): string | null {
+  if (!value || !z.iso.datetime({ offset: true }).safeParse(value).success)
+    return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : null;
+}
+
+/** Freeze the clock once per split writer stage, shared by preview and recorded calls. */
+export function prepareModelRequest(
+  input: ModelInput,
+  model?: string,
+  clock: () => string = () => new Date().toISOString(),
+) {
+  const stage =
+    input.configuration?.replyPromptFormat === "split_v1" &&
+    (input.scenario ?? "classify") !== "classify"
+      ? { ...input, currentTime: clock() }
+      : input;
+  return { input: stage, prepared: buildModelRequest(stage, model) };
 }
 export function validateModelResult(
   input: ModelInput,

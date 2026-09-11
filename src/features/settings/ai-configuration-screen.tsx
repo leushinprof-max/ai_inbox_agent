@@ -11,6 +11,7 @@ import {
   initialAIConfiguration,
   validateConfiguration,
   upgradeConfiguration,
+  createSplitReplyConfiguration,
   type AIConfiguration,
 } from "@/integrations/ai/configuration";
 import {
@@ -21,6 +22,8 @@ import {
 import "./ai-admin.css";
 import {
   replyVariables,
+  splitReplyVariables,
+  defaultSplitReplyPrompt,
   classificationVariables,
 } from "@/integrations/ai/prompt-templates";
 
@@ -36,6 +39,7 @@ const pages: { id: string; label: string; icon: IconName }[] = [
 ];
 type AdminData = Awaited<ReturnType<typeof readAIAdmin>>;
 function displayValue(value: unknown) {
+  if (value === undefined) return "Not set";
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 function blockName(key: string) {
@@ -46,6 +50,7 @@ function blockName(key: string) {
         models: "Models",
         reasoning: "Reasoning",
         labels: "System labels",
+        replyPromptFormat: "Reply request format",
       } as Record<string, string>
     )[key] ??
     key
@@ -64,6 +69,7 @@ export function AIConfigurationScreen() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pendingVersion, setPendingVersion] = useState<number | null>(null);
+  const [reviewSplit, setReviewSplit] = useState(false);
   useEffect(() => {
     let active = true;
     readAIAdmin()
@@ -100,7 +106,9 @@ export function AIConfigurationScreen() {
       JSON.stringify(validateConfiguration(baseline.configuration))
     : false;
   const changed = publishedConfig
-    ? Object.keys(config).filter(
+    ? [
+        ...new Set([...Object.keys(config), ...Object.keys(publishedConfig)]),
+      ].filter(
         (key) =>
           key !== "defaults" &&
           JSON.stringify(config[key as keyof AIConfiguration]) !==
@@ -291,6 +299,27 @@ export function AIConfigurationScreen() {
                       />
                     )}
                   </div>
+                  {section === "reply" && (
+                    <div className="admin-reply-format">
+                      {config.replyPromptFormat === "split_v1" ? (
+                        <p className="help">
+                          Developer instructions. Conversation messages, event
+                          times and the current draft are added automatically as
+                          user data. View both messages in Preview &amp; test.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="help">
+                            This version uses one system message for
+                            instructions and conversation data.
+                          </p>
+                          <Button onClick={() => setReviewSplit(true)}>
+                            Review developer + user format
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <textarea
                     id="prompt-editor"
                     aria-label={instructionTitle}
@@ -321,7 +350,9 @@ export function AIConfigurationScreen() {
                         <dl>
                           {Object.entries(
                             section === "reply"
-                              ? replyVariables
+                              ? config.replyPromptFormat === "split_v1"
+                                ? splitReplyVariables
+                                : replyVariables
                               : classificationVariables,
                           )
                             .filter(
@@ -329,6 +360,8 @@ export function AIConfigurationScreen() {
                                 ![
                                   "company_description",
                                   "product_offer",
+                                  "current_time",
+                                  "workspace_timezone",
                                 ].includes(name) ||
                                 new RegExp(`\\{\\{\\s*${name}\\s*\\}\\}`).test(
                                   instructionValue,
@@ -463,6 +496,46 @@ export function AIConfigurationScreen() {
           </section>
         </div>
       </div>
+      {reviewSplit && (
+        <Dialog
+          title="Review the new reply format"
+          onClose={() => setReviewSplit(false)}
+        >
+          <p>
+            The new template replaces the current Reply agent instructions.
+            Models, reasoning, classification, labels and agent settings stay as
+            configured. Conversation data will be supplied separately. Review
+            the change, then save a new version and publish it when ready.
+          </p>
+          <div className="admin-diff-columns admin-split-review">
+            <div>
+              <h3>Current template</h3>
+              <pre className="request-text">{config.reply}</pre>
+            </div>
+            <div>
+              <h3>New developer template</h3>
+              <pre className="request-text">{defaultSplitReplyPrompt}</pre>
+            </div>
+          </div>
+          <div className="row end">
+            <Button onClick={() => setReviewSplit(false)}>
+              Keep current template
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                update(createSplitReplyConfiguration(config));
+                setReviewSplit(false);
+                setNotice(
+                  "New reply format selected. Review or test your edits, then save a new version. Publish remains a separate action.",
+                );
+              }}
+            >
+              Use new template
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {pendingVersion !== null && (
         <Dialog
           title="Discard unsaved changes?"

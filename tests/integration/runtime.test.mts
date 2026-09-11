@@ -12,6 +12,7 @@ import {
   decryptConnection,
 } from "../../src/server/credentials";
 import { loadAIContext } from "../../src/server/ai-context";
+import { localSplitConfiguration } from "./split-config.mjs";
 import { runNextJob } from "../../src/server/runtime";
 import { readConversation, readWorkspace } from "../../src/server/inbox-read";
 import { durableSendRepository } from "../../src/server/delivery";
@@ -22,6 +23,7 @@ import {
 } from "../../src/integrations/heyreach/client";
 import {
   ModelError,
+  createInboxModel,
   type InboxModel,
 } from "../../src/integrations/ai/classify";
 
@@ -201,6 +203,144 @@ before(async () => {
       p_senders: [{ id: 42, name: "Local sender", authValid: true }],
     }),
   );
+});
+
+test("The live classification-to-writer worker preserves provider event times in split snapshots", async () => {
+  const restore = await localSplitConfiguration(admin);
+  try {
+    const target = must(
+      await owner.rpc("create_workspace", {
+        p_name: `Runtime ${randomUUID()}`,
+      }),
+    );
+    const agent = randomUUID(),
+      conversation = randomUUID(),
+      inbound = randomUUID(),
+      outbound = randomUUID();
+    must(
+      await owner.rpc("save_agent", {
+        p_workspace: target,
+        p_id: agent,
+        p_revision: 0,
+        p_config: {
+          name: "Synthetic split agent",
+          goal: "Help",
+          language: "English",
+          knowledge: "Approved information",
+          status: "active",
+          replyGroups: ["positive"],
+        },
+      }),
+    );
+    must(
+      await owner.rpc("set_default_agent", {
+        p_workspace: target,
+        p_agent: agent,
+      }),
+    );
+    sql(`insert into public.senders(workspace_id,provider_id,name,auth_valid) values('${target}',55,'Test sender',true);
+      insert into public.conversations(id,workspace_id,provider_conversation_id,sender_id,sender_name,contact_name,inbound_revision) values('${conversation}','${target}','split-fixture',55,'Test sender','Test lead',1);
+      insert into public.messages(id,workspace_id,conversation_id,ingestion_key,body,direction,source,occurred_at) values
+      ('${outbound}','${target}','${conversation}','split-out','Can I send an overview?','outbound','provider','2026-09-09T11:00:00+03:00'),
+      ('${inbound}','${target}','${conversation}','split-in','Yes, please send it.','inbound','provider','2026-09-10T04:00:00-04:00');`);
+    const label = must(
+      await admin
+        .from("workspace_labels")
+        .select("id")
+        .eq("workspace_id", target)
+        .eq("system_key", "interested")
+        .single(),
+    ).id;
+    const requests: Record<string, unknown>[] = [];
+    const writer = createInboxModel(
+      "synthetic-key",
+      undefined,
+      async (_url, options) => {
+        const request = JSON.parse(String(options?.body));
+        requests.push(request);
+        const classifying = request.text.format.name === "inbox_classification";
+        if (!classifying) {
+          const data = JSON.parse(request.input[1].content);
+          assert.deepEqual(
+            data.conversation.messages.map(
+              (m: { createdAt: string }) => m.createdAt,
+            ),
+            ["2026-09-09T08:00:00.000Z", "2026-09-10T08:00:00.000Z"],
+          );
+          assert.deepEqual(
+            request.input.map((m: { role: string }) => m.role),
+            ["developer", "user"],
+          );
+        } else
+          assert.equal(request.input[0].content.includes("createdAt"), false);
+        return Response.json({
+          status: "completed",
+          output: [
+            {
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify(
+                    classifying
+                      ? {
+                          labelId: label,
+                          evidenceMessageId: inbound,
+                          evidenceQuote: "Yes, please send it.",
+                          contactStopped: false,
+                        }
+                      : {
+                          draft: "Here is the overview.",
+                          missingKnowledge: "",
+                        },
+                  ),
+                },
+              ],
+            },
+          ],
+        });
+      },
+    );
+    must(
+      await admin.rpc("server_enqueue", {
+        p_workspace: target,
+        p_kind: "classify",
+        p_key: `split-${randomUUID()}`,
+        p_payload: {
+          conversationId: conversation,
+          revision: 1,
+          generateDraft: true,
+        },
+      }),
+    );
+    for (let i = 0; i < 20 && requests.length < 2; i++)
+      await runNextJob({ db: admin, model: writer });
+    assert.equal(requests.length, 2);
+    const runs = must(
+      await admin
+        .from("ai_runs")
+        .select("request_snapshot")
+        .eq("workspace_id", target)
+        .order("created_at"),
+    );
+    assert.deepEqual(
+      runs.map((r) => r.request_snapshot),
+      requests,
+    );
+    assert.equal(
+      must(
+        await admin
+          .from("drafts")
+          .select("status")
+          .eq("workspace_id", target)
+          .eq("conversation_id", conversation)
+          .single(),
+      ).status,
+      "ready",
+    );
+  } finally {
+    await restore();
+  }
 });
 
 test("Explicit reclassification evaluates afresh, updates the label and never generates a draft", async () => {

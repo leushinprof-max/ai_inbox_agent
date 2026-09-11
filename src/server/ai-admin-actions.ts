@@ -13,7 +13,7 @@ import {
 } from "@/integrations/ai/configuration";
 import { planModelRun } from "@/integrations/ai/pipeline";
 import {
-  buildModelRequest,
+  prepareModelRequest,
   createInboxModel,
   type ModelInput,
 } from "@/integrations/ai/classify";
@@ -163,7 +163,7 @@ async function adminInput(value: unknown, configValue: unknown) {
   if (conversationId) {
     const result = await db
       .from("messages")
-      .select("id,direction,body")
+      .select("id,direction,body,occurred_at")
       .eq("workspace_id", workspaceId)
       .eq("conversation_id", conversationId)
       .order("occurred_at", { ascending: false })
@@ -175,8 +175,10 @@ async function adminInput(value: unknown, configValue: unknown) {
       .slice(0, 50)
       .reverse()
       .map((m) => ({
-        ...m,
+        id: m.id,
         direction: z.enum(["inbound", "outbound"]).parse(m.direction),
+        body: m.body,
+        createdAt: m.occurred_at,
       }));
   } else {
     if (!valueParsed.transcript.trim())
@@ -185,6 +187,7 @@ async function adminInput(value: unknown, configValue: unknown) {
       .split(/\n(?=(?:Lead|Team):)/)
       .map((body, i) => ({
         id: `sample-${i}`,
+        createdAt: null,
         direction: body.startsWith("Team:") ? "outbound" : "inbound",
         body: body.replace(/^(?:Lead|Team):\s*/, ""),
       }));
@@ -217,7 +220,7 @@ export async function previewAIAdmin(value: unknown, config: unknown) {
   const { input } = await adminInput(value, config);
   const plan = planModelRun(input, process.env.INBOX_MODEL);
   return {
-    ...buildModelRequest(plan.first, process.env.INBOX_MODEL),
+    ...prepareModelRequest(plan.first, process.env.INBOX_MODEL).prepared,
     draftModel: plan.hasReplyStage ? plan.models.draft : null,
   };
 }
