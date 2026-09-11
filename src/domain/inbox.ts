@@ -157,6 +157,7 @@ export interface InboxState {
     draftIds?: string[];
     draftNext: PageCursor | null;
     conversationTotal: number;
+    conversationFilteredTotal?: number;
     draftCounts: Record<string, number>;
     messageNext: Record<string, PageCursor | null>;
   };

@@ -31,6 +31,43 @@
   display: grid;
   gap: 8px;
 }
+.filter-date-period {
+  min-width: 0;
+}
+.conversation-filter-total {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 12px 0;
+}
+.filter-date-period small {
+  display: block;
+  color: var(--faint);
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.filter-date-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.filter-date-range label {
+  flex: 1 1 110px;
+  min-width: 0;
+  color: var(--faint);
+}
+.filter-date-range input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
 .filter-condition {
   display: grid;
   grid-template-columns: 146px 116px minmax(0, 1fr) 22px;
