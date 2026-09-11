@@ -823,6 +823,54 @@
 .kimi-thread .reply-input:focus-visible {
   outline: none;
 }
+.composer-loading-body {
+  position: relative;
+}
+.composer-loading-body:not(:has(textarea)) {
+  height: 112px;
+}
+.composer-loading-measure {
+  visibility: hidden;
+}
+.composer-loading-lines {
+  position: absolute;
+  inset: 0;
+  max-height: 128px;
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+}
+.composer-loading-lines > span {
+  align-self: center;
+  height: 60%;
+  max-height: 12px;
+  width: 96%;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+.composer-loading-lines > span:nth-child(2) { width: 100%; }
+.composer-loading-lines > span:nth-child(3) { width: 77%; }
+.composer-loading-lines > span:nth-child(4) { width: 84%; grid-row: 5; }
+.composer-loading-lines > span:nth-child(5) { width: 53%; grid-row: 6; }
+.composer-loading-lines > span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: composer-draft-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes composer-draft-shimmer {
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-loading-lines > span::after {
+    animation: none;
+    transform: none;
+    opacity: 0;
+  }
+}
 .kimi-thread .composer-reply .composer-title {
   font-size: 11px;
   font-weight: 500;
