@@ -46,7 +46,9 @@ export const conversationFilter = z
             z.iso.date().safeParse(end).success &&
             start <= end
           : filter.values.length === 1 &&
-            ["this_week", "this_month", "7", "30", "90"].includes(period);
+            ["today", "this_week", "this_month", "7", "30", "90"].includes(
+              period,
+            );
       if (!valid)
         ctx.addIssue({
           code: "custom",
@@ -97,6 +99,7 @@ export function matchesFirstReply(
   if (period === "custom") return day >= start && day <= end;
   if (at > now) return false;
   const today = calendarDate(now, timezone);
+  if (period === "today") return day === today;
   if (period === "this_month") return day >= `${today.slice(0, 7)}-01`;
   if (period === "this_week") {
     const monday = new Date(`${today}T00:00:00Z`);

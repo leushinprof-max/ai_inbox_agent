@@ -60,6 +60,7 @@ export function FilterSelect({
   placeholder = "Select…",
   add = false,
   disabled = false,
+  fallbackName = "Unavailable label",
 }: {
   id: string;
   label: string;
@@ -72,6 +73,7 @@ export function FilterSelect({
   placeholder?: string;
   add?: boolean;
   disabled?: boolean;
+  fallbackName?: string;
 }) {
   const listId = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -138,8 +140,7 @@ export function FilterSelect({
         <span className="filter-select-text">
           {add
             ? "Add filter"
-            : (selected?.name ??
-              (values.length ? "Unavailable label" : placeholder))}
+            : (selected?.name ?? (values.length ? fallbackName : placeholder))}
         </span>
         {multiple && values.length > 1 ? (
           <span className="filter-selection-count">+{values.length - 1}</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { displayDate } from "@/lib/display-date";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar, Empty, Icon, Button, Notice } from "@/components/ui";
@@ -27,7 +27,16 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const [error, setError] = useState("");
   const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<ConversationFilter[]>([]);
+  const [storedFilters, setFilters] = useState<ConversationFilter[]>([]);
+  const filters = useMemo(
+    () =>
+      storedFilters.map((filter) =>
+        filter.field === "first_reply"
+          ? { ...filter, timezone: workspace.timezone }
+          : filter,
+      ),
+    [storedFilters, workspace.timezone],
+  );
   const { views, save: saveViews } = usePinnedViews(
     scope.userId,
     scope.workspaceId,
