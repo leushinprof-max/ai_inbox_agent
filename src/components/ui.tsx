@@ -30,6 +30,7 @@ const paths = {
   link: "m10 7 2-2a5 5 0 0 1 7 7l-2 2m-3 3-2 2a5 5 0 0 1-7-7l2-2m1 6 8-8",
   inbox: "M5 3h14l3 12v6H2v-6L5 3ZM2 15h6l2 3h4l2-3h6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  undo: "M3 10h11a6 6 0 0 1 0 12M3 10l5-5M3 10l5 5",
 };
 export type IconName = keyof typeof paths;
 export function Icon({ name }: { name: IconName }) {

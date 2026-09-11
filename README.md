@@ -8,7 +8,7 @@ Standalone Aster Inbox, rebuilt around the [owner-approved design](https://aster
 
 - Authenticated workspaces, password authentication/recovery, roles and email-bound invitation links.
 - Conversations with at least one lead reply, search, labels, paginated history, notes and manual replies. Outbound-only outreach stays outside the inbox and classification.
-- Draft triage: Ready, Needs input and Later; edit, dismiss, snooze, redraft, cancel generation and send-and-next.
+- Draft review with an editable message, fresh Redraft, Redraft with instructions, cancellation and send-and-next. Restore the previous draft or mark No reply needed from the actions menu. See [draft composer behavior and rollout](docs/draft-redraft.md).
 - Versioned agents with Knowledge, workspace agent selection, pause/activation and model-backed Test.
 - One current intent label, three intent groups, custom rules and manual corrections; platform-owner prompt editing with versioned publication and full-request preview. See the [feature and rollout notes](docs/labels-and-ai-configuration.md) for the coordinated database/worker update.
 - HeyReach workspace-key verification, encrypted credentials, provider sender discovery and durable webhook ingestion.

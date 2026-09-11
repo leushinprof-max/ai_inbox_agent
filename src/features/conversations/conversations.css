@@ -810,7 +810,7 @@
 .kimi-thread .composer textarea.reply-input {
   display: block;
   min-height: 44px;
-  max-height: 180px;
+  max-height: 240px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -827,7 +827,7 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
-  margin-bottom: 8px;
+  margin-bottom: 14px;
   gap: 6px;
 }
 .kimi-thread .composer-reply .composer-title .sparkbox {
@@ -836,9 +836,20 @@
   background: transparent;
   border: 0;
 }
-.kimi-thread .composer-reply .composer-actions {
-  margin-top: 8px;
+.kimi-thread .composer > .composer-actions {
+  margin-top: auto;
+  padding-top: 16px;
   gap: 8px;
+}
+.kimi-thread .composer-reply .composer-actions > .row:first-child {
+  flex-wrap: wrap;
+}
+.kimi-thread .composer > .modal-actions {
+  margin-top: auto;
+  padding-top: 22px;
+}
+.kimi-thread .composer > .field {
+  margin-bottom: 0;
 }
 .kimi-thread .composer-reply .composer-actions > .row:empty {
   display: none;

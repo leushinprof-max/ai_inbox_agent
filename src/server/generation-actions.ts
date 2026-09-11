@@ -16,13 +16,15 @@ export async function requestGeneration(input: unknown) {
         instructions: z.string().max(2000).default(""),
         answer: z.string().max(8000).default(""),
         remember: z.literal(false).default(false),
+        mode: z.enum(["reply", "rewrite"]).default("reply"),
+        currentDraft: z.string().max(8000).optional(),
       })
       .parse(input);
     const { db, user } = await authenticatedClient();
     await authorizeWorkspace(db, user.id, p.workspaceId);
     databaseError(
       (
-        await db.rpc("request_draft_generation", {
+        await db.rpc("request_draft_generation_v2", {
           p_workspace: p.workspaceId,
           p_id: p.id,
           p_conversation: p.conversationId,
@@ -32,7 +34,10 @@ export async function requestGeneration(input: unknown) {
             : {}),
           p_instructions: p.instructions,
           p_answer: p.answer,
-          p_remember: p.remember,
+          p_mode: p.mode,
+          ...(p.currentDraft !== undefined
+            ? { p_current_draft: p.currentDraft }
+            : {}),
         })
       ).error,
     );
@@ -44,6 +49,37 @@ export async function requestGeneration(input: unknown) {
         e instanceof InboxError
           ? e.message
           : "A draft could not be requested. Select an active agent in this workspace first.",
+    };
+  }
+}
+export async function restorePreviousDraft(
+  workspaceId: string,
+  id: string,
+  revision: number,
+) {
+  try {
+    z.uuid().parse(workspaceId);
+    z.uuid().parse(id);
+    z.number().int().positive().parse(revision);
+    const { db, user } = await authenticatedClient();
+    await authorizeWorkspace(db, user.id, workspaceId);
+    databaseError(
+      (
+        await db.rpc("restore_previous_draft", {
+          p_workspace: workspaceId,
+          p_id: id,
+          p_revision: revision,
+        })
+      ).error,
+    );
+    return { ok: true as const };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error:
+        e instanceof InboxError
+          ? e.message
+          : "The previous draft could not be restored. Refresh and try again.",
     };
   }
 }

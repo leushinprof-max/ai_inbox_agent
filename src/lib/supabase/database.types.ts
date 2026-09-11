@@ -454,9 +454,11 @@ export type Database = {
           approved_answer: string;
           conversation_id: string;
           created_at: string;
+          current_draft: string | null;
           error_code: string | null;
           expected_draft_id: string | null;
           expected_draft_revision: number | null;
+          generation_mode: string | null;
           id: string;
           instructions: string;
           result_draft_id: string | null;
@@ -472,9 +474,11 @@ export type Database = {
           approved_answer?: string;
           conversation_id: string;
           created_at?: string;
+          current_draft?: string | null;
           error_code?: string | null;
           expected_draft_id?: string | null;
           expected_draft_revision?: number | null;
+          generation_mode?: string | null;
           id: string;
           instructions?: string;
           result_draft_id?: string | null;
@@ -490,9 +494,11 @@ export type Database = {
           approved_answer?: string;
           conversation_id?: string;
           created_at?: string;
+          current_draft?: string | null;
           error_code?: string | null;
           expected_draft_id?: string | null;
           expected_draft_revision?: number | null;
+          generation_mode?: string | null;
           id?: string;
           instructions?: string;
           result_draft_id?: string | null;
@@ -543,6 +549,7 @@ export type Database = {
           created_at: string;
           id: string;
           missing_knowledge: string | null;
+          previous_version: Json | null;
           revision: number;
           snoozed_until: string | null;
           source_revision: number;
@@ -558,6 +565,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           missing_knowledge?: string | null;
+          previous_version?: Json | null;
           revision?: number;
           snoozed_until?: string | null;
           source_revision: number;
@@ -573,6 +581,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           missing_knowledge?: string | null;
+          previous_version?: Json | null;
           revision?: number;
           snoozed_until?: string | null;
           source_revision?: number;
@@ -1188,6 +1197,7 @@ export type Database = {
           created_at: string;
           id: string;
           missing_knowledge: string | null;
+          previous_version: Json | null;
           revision: number;
           snoozed_until: string | null;
           source_revision: number;
@@ -1239,6 +1249,21 @@ export type Database = {
         };
         Returns: string;
       };
+      request_draft_generation_v2: {
+        Args: {
+          p_answer?: string;
+          p_conversation: string;
+          p_current_draft?: string;
+          p_draft?: string;
+          p_id: string;
+          p_instructions?: string;
+          p_mode?: string;
+          p_revision?: number;
+          p_source_revision: number;
+          p_workspace: string;
+        };
+        Returns: string;
+      };
       request_send_check: {
         Args: { p_id: string; p_workspace: string };
         Returns: undefined;
@@ -1260,6 +1285,10 @@ export type Database = {
       resolve_unconfirmed_send: {
         Args: { p_id: string; p_workspace: string };
         Returns: undefined;
+      };
+      restore_previous_draft: {
+        Args: { p_id: string; p_revision: number; p_workspace: string };
+        Returns: number;
       };
       retry_classification: {
         Args: { p_conversation: string; p_workspace: string };
