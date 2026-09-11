@@ -830,6 +830,8 @@ h3 {
   background: var(--bg);
 }
 .composer {
+  display: flex;
+  flex-direction: column;
   max-width: 740px;
   margin: 0 auto;
   border: 1px solid var(--line-strong);
@@ -863,6 +865,58 @@ h3 {
   font-size: 10px;
   font-weight: 400;
   color: var(--faint);
+}
+.composer-menu {
+  margin-left: auto;
+  position: relative;
+  flex-shrink: 0;
+}
+.composer-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.composer-menu summary {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+}
+.composer-menu summary::-webkit-details-marker {
+  display: none;
+}
+.composer-menu summary:hover,
+.composer-menu[open] summary {
+  background: var(--hover);
+}
+.composer-menu summary[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+.composer-menu-items {
+  position: absolute;
+  z-index: 10;
+  top: 38px;
+  right: 0;
+  width: max-content;
+  min-width: 210px;
+  max-width: 260px;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--raised);
+  box-shadow: 0 8px 24px #0003;
+}
+.composer-menu-items .btn {
+  width: 100%;
+  justify-content: flex-start;
 }
 .draft-text {
   font-size: 13px;

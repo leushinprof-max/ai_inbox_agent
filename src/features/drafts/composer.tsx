@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation, Draft } from "@/domain/inbox";
-import { Button, IconButton, Notice, Spark } from "@/components/ui";
+import { Button, Icon, Notice, Spark } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { resolveSenderAgent } from "@/domain/sender-agent";
 import { replyAllowed } from "@/domain/labels";
@@ -11,10 +11,12 @@ import { inspectSend } from "@/server/send-actions";
 import {
   requestGeneration,
   cancelGeneration,
+  restorePreviousDraft,
 } from "@/server/generation-actions";
 import { outgoingStore, useOutgoing } from "@/lib/outgoing-messages";
 import { usePreferences } from "@/lib/preferences";
 import { DraftRequest } from "./draft-request";
+import { composerBuffers } from "@/lib/composer-buffer";
 
 export function Composer({
   conversation,
@@ -34,16 +36,38 @@ export function Composer({
         d.conversationId === conversation.id &&
         ["ready", "needs_input", "snoozed"].includes(d.status),
     );
-  const [reviewedDraft, setReviewedDraft] = useState(draft);
-  const [mode, setMode] = useState<"draft" | "edit" | "manual">(
-    draft ? "draft" : "manual",
+  const buffers = composerBuffers(repository);
+  const [initialBuffer] = useState(() => buffers.get(scope, conversation.id));
+  const [reviewedDraft, setReviewedDraft] = useState(
+    initialBuffer?.reviewedDraft ?? draft,
   );
-  const [text, setText] = useState(draft?.body ?? "");
+  const [mode, setMode] = useState<"draft" | "manual">(
+    initialBuffer
+      ? initialBuffer.manual
+        ? "manual"
+        : "draft"
+      : draft
+        ? "draft"
+        : "manual",
+  );
+  const [text, setText] = useState(initialBuffer?.text ?? draft?.body ?? "");
   const [answer, setAnswer] = useState("");
   const [instructions, setInstructions] = useState("");
   const [redrafting, setRedrafting] = useState(false);
-  const [generationId, setGenerationId] = useState<string | null>(null);
+  const [generationId, setGenerationId] = useState<string | null>(
+    initialBuffer?.generationId ??
+      state.generations?.find(
+        (g) => g.conversationId === conversation.id && g.status === "queued",
+      )?.id ??
+      null,
+  );
   const [requesting, setRequesting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const composerElement = useRef<HTMLDivElement>(null);
+  const menuElement = useRef<HTMLDetailsElement>(null);
+  const [composerHeight, setComposerHeight] = useState<number>();
+  const retainedInputHeight = useRef(0);
   const generation =
     state.generations?.find((g) => g.id === generationId) ??
     state.generations?.find(
@@ -83,9 +107,7 @@ export function Composer({
   const [status, setStatus] = useState<"idle" | "sending" | "unknown">("idle");
   const [error, setError] = useState("");
   const [sendRejected, setSendRejected] = useState(false);
-  const [modal, setModal] = useState<
-    "snooze" | "dismiss" | "send-absent" | null
-  >(null);
+  const [modal, setModal] = useState<"send-absent" | null>(null);
   const outgoing = useOutgoing(repository);
   const durableUnresolved = state.unresolvedSends?.find(
     (o) => o.conversationId === conversation.id,
@@ -98,7 +120,38 @@ export function Composer({
   const pendingSend = outgoing.some(
     (m) => m.conversationId === conversation.id && m.status === "sending",
   );
-  const locked = status !== "idle" || !!unresolved || pendingSend;
+  const locked = status !== "idle" || !!unresolved || pendingSend || restoring;
+  useEffect(() => {
+    if (status !== "idle" || unresolved || pendingSend) return;
+    buffers.put(
+      { userId: scope.userId, workspaceId: scope.workspaceId },
+      conversation.id,
+      { text, reviewedDraft, manual: mode === "manual", generationId },
+    );
+  }, [
+    buffers,
+    scope.userId,
+    scope.workspaceId,
+    conversation.id,
+    text,
+    reviewedDraft,
+    mode,
+    generationId,
+    status,
+    unresolved,
+    pendingSend,
+  ]);
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (
+        menuElement.current &&
+        !menuElement.current.contains(event.target as Node)
+      )
+        menuElement.current.open = false;
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
   // A first incoming draft can arrive while this conversation is already open.
   // Adopt it only into an untouched empty composer; never replace typed text.
   if (
@@ -157,6 +210,8 @@ export function Composer({
       setMode("draft");
       setRedrafting(false);
       setAnswer("");
+      setInstructions("");
+      setAnnouncement("New draft ready");
       setError("");
     }
     if (generation.status === "failed") {
@@ -191,14 +246,13 @@ export function Composer({
       state.connections.some(
         (c) => c.workspaceId === scope.workspaceId && c.status === "connected",
       ));
-  const editable = mode !== "draft";
   const messageInput = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const input = messageInput.current;
     if (!input) return;
     const resize = () => {
       input.style.height = "0px";
-      input.style.height = `${Math.min(180, Math.max(44, input.scrollHeight))}px`;
+      input.style.height = `${Math.min(240, Math.max(mode === "manual" ? 44 : 112, retainedInputHeight.current, input.scrollHeight))}px`;
     };
     resize();
     // Opening lead details changes the available width without a window resize.
@@ -206,26 +260,26 @@ export function Composer({
     const observer = new ResizeObserver(() => {
       if (input.clientWidth === width) return;
       width = input.clientWidth;
+      retainedInputHeight.current = 0;
+      setComposerHeight(undefined);
       resize();
     });
     observer.observe(input);
     return () => observer.disconnect();
-  }, [text, editable, generating, redrafting, draft?.status]);
+  }, [text, mode, generating, redrafting, draft?.status]);
+
+  function preserveSize() {
+    if (composerElement.current)
+      setComposerHeight(composerElement.current.getBoundingClientRect().height);
+    if (messageInput.current)
+      retainedInputHeight.current =
+        messageInput.current.getBoundingClientRect().height;
+  }
 
   async function run(action: () => void | Promise<void>) {
     try {
       setError("");
       await action();
-      if (draft) {
-        const latest = repository
-          .getSnapshot()
-          .drafts.find((d) => d.id === draft.id);
-        if (latest) {
-          setReviewedDraft(latest);
-          if (draft.status === "needs_input" && latest.status === "ready")
-            setText(latest.body);
-        }
-      }
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "The change could not be saved.",
@@ -283,6 +337,8 @@ export function Composer({
           : {}),
       });
       if (outcome.status === "sent") {
+        buffers.clear(scope, conversation.id);
+        setReviewedDraft(undefined);
         outbox.put({ ...pending, status: "sent" });
         setStatus("idle");
         onDone?.();
@@ -307,8 +363,25 @@ export function Composer({
       lock.current = false;
     }
   }
-  async function generate(approvedAnswer = "") {
-    if (requesting || generation?.status === "queued") return;
+  async function generate(
+    generationMode: "reply" | "rewrite" = "reply",
+    approvedAnswer = "",
+  ) {
+    if (
+      requesting ||
+      generation?.status === "queued" ||
+      lock.current ||
+      locked ||
+      !writable
+    )
+      return;
+    if (
+      generationMode === "rewrite" &&
+      (!instructions.trim() || !text.trim() || stale)
+    )
+      return;
+    preserveSize();
+    lock.current = true;
     setRequesting(true);
     setError("");
     const id = crypto.randomUUID();
@@ -324,12 +397,20 @@ export function Composer({
               draftRevision: reviewedDraft?.revision ?? draft.revision,
             }
           : {}),
-        instructions,
+        mode: generationMode,
+        currentDraft: reviewedDraft ? text : undefined,
+        instructions: generationMode === "rewrite" ? instructions : "",
         answer: approvedAnswer,
         remember: false,
       });
       if (!result.ok) throw new Error(result.error);
       setGenerationId(id);
+      buffers.put(scope, conversation.id, {
+        text,
+        reviewedDraft,
+        manual: mode === "manual",
+        generationId: id,
+      });
       await repository.refresh?.();
     } catch (e) {
       setError(
@@ -337,8 +418,112 @@ export function Composer({
       );
     } finally {
       setRequesting(false);
+      lock.current = false;
     }
   }
+
+  async function restorePrevious() {
+    if (!draft || locked || generating || stale || !writable || lock.current)
+      return;
+    lock.current = true;
+    setRestoring(true);
+    if (menuElement.current) menuElement.current.open = false;
+    preserveSize();
+    try {
+      const result = await restorePreviousDraft(
+        scope.workspaceId,
+        draft.id,
+        reviewedDraft?.revision ?? draft.revision,
+      );
+      if (!result.ok) throw new Error(result.error);
+      await repository.refresh?.();
+      const restored = repository
+        .getSnapshot()
+        .drafts.find((d) => d.id === draft.id);
+      if (restored) {
+        setReviewedDraft(restored);
+        setText(restored.body);
+        setMode("draft");
+      }
+      setError("");
+      setAnnouncement("Previous draft restored");
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "The previous draft could not be restored.",
+      );
+    } finally {
+      setRestoring(false);
+      lock.current = false;
+    }
+  }
+
+  const draftMenu = draft ? (
+    <details
+      className="composer-menu"
+      ref={menuElement}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector("summary")?.focus();
+        }
+      }}
+    >
+      <summary
+        aria-label="More draft actions"
+        aria-disabled={locked || generating}
+        onClick={(event) => {
+          if (locked || generating) event.preventDefault();
+        }}
+      >
+        <Icon name="more" />
+      </summary>
+      <div className="composer-menu-items">
+        {draft.previousSourceRevision === conversation.revision ? (
+          <Button
+            variant="ghost small"
+            icon="undo"
+            disabled={locked || generating || stale || !writable}
+            onClick={() => void restorePrevious()}
+          >
+            Restore previous draft
+          </Button>
+        ) : null}
+        <Button
+          variant="ghost small"
+          icon="check"
+          disabled={locked || generating || stale || !writable}
+          onClick={() => {
+            if (menuElement.current) menuElement.current.open = false;
+            void run(async () => {
+              if (lock.current) return;
+              lock.current = true;
+              setRestoring(true);
+              try {
+                await repository.dismiss(
+                  scope,
+                  draft.id,
+                  reviewedDraft?.revision ?? draft.revision,
+                );
+                buffers.clear(scope, conversation.id);
+                setReviewedDraft(undefined);
+                setText("");
+                setMode("manual");
+                onDone?.();
+              } finally {
+                lock.current = false;
+                setRestoring(false);
+              }
+            });
+          }}
+        >
+          No reply needed
+        </Button>
+      </div>
+    </details>
+  ) : null;
 
   const needsInput = draft?.status === "needs_input" && mode !== "manual";
   return (
@@ -356,6 +541,8 @@ export function Composer({
       }}
     >
       <div
+        ref={composerElement}
+        style={composerHeight ? { minHeight: composerHeight } : undefined}
         className={`composer ${!generating && !redrafting && !needsInput ? "composer-reply" : ""}`}
       >
         {generating ? (
@@ -364,11 +551,22 @@ export function Composer({
               <Spark />
               Preparing a draft
             </div>
-            <div role="status" aria-label="Preparing a draft">
-              <div className="skeleton wide" />
-              <div className="skeleton wide" />
-              <div className="skeleton medium" />
-            </div>
+            {text ? (
+              <textarea
+                ref={messageInput}
+                className="reply-input"
+                aria-label="Current draft"
+                value={text}
+                readOnly
+                disabled
+              />
+            ) : (
+              <div role="status" aria-label="Preparing a draft">
+                <div className="skeleton wide" />
+                <div className="skeleton wide" />
+                <div className="skeleton medium" />
+              </div>
+            )}
             <div className="composer-actions">
               <span className="small muted">
                 Your current draft is preserved.
@@ -408,11 +606,24 @@ export function Composer({
               />
             </div>
             <div className="modal-actions">
-              <Button onClick={() => setRedrafting(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  setRedrafting(false);
+                  setInstructions("");
+                }}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="primary"
-                disabled={!instructions.trim() || !writable}
-                onClick={() => void generate()}
+                disabled={
+                  !instructions.trim() ||
+                  !text.trim() ||
+                  !writable ||
+                  locked ||
+                  stale
+                }
+                onClick={() => void generate("rewrite")}
               >
                 Generate draft
               </Button>
@@ -423,6 +634,7 @@ export function Composer({
             <div className="composer-title">
               <Spark />
               Needs your input
+              {draftMenu}
               {state.platformOwner && environment !== "demo" ? (
                 <DraftRequest
                   workspaceId={scope.workspaceId}
@@ -451,6 +663,16 @@ export function Composer({
               </p>
             </div>
             <div className="composer-actions">
+              {environment !== "demo" ? (
+                <Button
+                  variant="ghost"
+                  icon="refresh"
+                  disabled={!writable || locked}
+                  onClick={() => void generate("reply")}
+                >
+                  Redraft
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -466,16 +688,23 @@ export function Composer({
                 disabled={!answer.trim() || !writable}
                 onClick={() =>
                   environment !== "demo"
-                    ? void generate(answer)
-                    : run(() =>
-                        repository.supplyAnswer(
+                    ? void generate("reply", answer)
+                    : run(async () => {
+                        await repository.supplyAnswer(
                           scope,
                           draft.id,
                           answer,
                           false,
                           reviewedDraft?.revision,
-                        ),
-                      )
+                        );
+                        const completed = repository
+                          .getSnapshot()
+                          .drafts.find((d) => d.id === draft.id);
+                        if (completed) {
+                          setReviewedDraft(completed);
+                          setText(completed.body);
+                        }
+                      })
                 }
               >
                 {environment === "demo"
@@ -495,23 +724,20 @@ export function Composer({
                     draftId={draft.id}
                   />
                 ) : null}
+                {draftMenu}
               </div>
             ) : null}
-            {editable ? (
-              <textarea
-                ref={messageInput}
-                className="reply-input"
-                rows={2}
-                aria-label="Message"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={8000}
-                disabled={locked}
-                placeholder="Write a message…"
-              />
-            ) : (
-              <p className="draft-text">{text}</p>
-            )}
+            <textarea
+              ref={messageInput}
+              className="reply-input"
+              rows={2}
+              aria-label="Message"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={8000}
+              disabled={locked || !writable}
+              placeholder="Write a message…"
+            />
             {error ? (
               <Notice
                 variant="error"
@@ -610,52 +836,33 @@ export function Composer({
               <div className="row">
                 {mode === "draft" ? (
                   <>
-                    <Button
-                      variant="ghost small"
-                      icon="edit"
-                      onClick={() => setMode("edit")}
-                      disabled={locked}
-                    >
-                      Edit
-                    </Button>
                     {environment !== "demo" ? (
-                      <Button
-                        variant="ghost small"
-                        disabled={locked || !writable}
-                        onClick={() => setRedrafting(true)}
-                      >
-                        Redraft
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost small"
+                          icon="refresh"
+                          disabled={locked || !writable}
+                          onClick={() => void generate("reply")}
+                        >
+                          Redraft
+                        </Button>
+                        <Button
+                          variant="ghost small"
+                          icon="chat"
+                          disabled={
+                            locked || !writable || !text.trim() || stale
+                          }
+                          onClick={() => {
+                            preserveSize();
+                            setRedrafting(true);
+                            setError("");
+                          }}
+                        >
+                          Redraft with instructions
+                        </Button>
+                      </>
                     ) : null}
-                    <Button
-                      variant="ghost small"
-                      onClick={() => {
-                        setMode("manual");
-                        setText("");
-                      }}
-                      disabled={locked}
-                    >
-                      Reply manually
-                    </Button>
                   </>
-                ) : draft && mode === "edit" ? (
-                  <Button
-                    variant="ghost small"
-                    onClick={() =>
-                      run(async () => {
-                        await repository.editDraft(
-                          scope,
-                          draft.id,
-                          reviewedDraft?.revision ?? draft.revision,
-                          text,
-                        );
-                        setMode("draft");
-                      })
-                    }
-                    disabled={locked}
-                  >
-                    Save draft
-                  </Button>
                 ) : null}
                 {mode === "manual" &&
                 environment !== "demo" &&
@@ -673,22 +880,6 @@ export function Composer({
                 ) : null}
               </div>
               <div className="row">
-                {draft && mode !== "manual" ? (
-                  <>
-                    <IconButton
-                      label="Dismiss draft"
-                      icon="close"
-                      disabled={locked}
-                      onClick={() => setModal("dismiss")}
-                    />
-                    <IconButton
-                      label="Snooze draft"
-                      icon="clock"
-                      disabled={locked}
-                      onClick={() => setModal("snooze")}
-                    />
-                  </>
-                ) : null}
                 <Button
                   variant="primary"
                   icon="send"
@@ -698,6 +889,7 @@ export function Composer({
                     !canSend ||
                     !!unresolved ||
                     status !== "idle" ||
+                    locked ||
                     (stale && mode !== "manual")
                   }
                 >
@@ -721,6 +913,9 @@ export function Composer({
           </div>
         ) : null}
       </div>
+      <span className="composer-announcement" role="status">
+        {announcement}
+      </span>
       {modal === "send-absent" && unresolved ? (
         <Dialog
           title="Confirm the message is absent"
@@ -753,69 +948,6 @@ export function Composer({
               Message is absent
             </Button>
           </div>
-        </Dialog>
-      ) : null}
-
-      {modal && modal !== "send-absent" && draft ? (
-        <Dialog
-          title={modal === "dismiss" ? "Dismiss this draft?" : "Snooze draft"}
-          onClose={() => setModal(null)}
-        >
-          {modal === "dismiss" ? (
-            <>
-              <p>
-                The conversation stays in Conversations. This draft will leave
-                the review queue.
-              </p>
-              <div className="modal-actions">
-                <Button onClick={() => setModal(null)}>Keep draft</Button>
-                <Button
-                  variant="danger"
-                  onClick={() =>
-                    run(async () => {
-                      await repository.dismiss(
-                        scope,
-                        draft.id,
-                        reviewedDraft?.revision ?? draft.revision,
-                      );
-                      setModal(null);
-                      onDone?.();
-                    })
-                  }
-                >
-                  Dismiss draft
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="stack">
-              {[
-                ["In one hour", 1],
-                ["Tomorrow", 24],
-                ["In one week", 168],
-              ].map(([label, hours]) => (
-                <Button
-                  key={label}
-                  onClick={() =>
-                    run(async () => {
-                      await repository.snooze(
-                        scope,
-                        draft.id,
-                        reviewedDraft?.revision ?? draft.revision,
-                        new Date(
-                          Date.now() + Number(hours) * 3_600_000,
-                        ).toISOString(),
-                      );
-                      setModal(null);
-                      onDone?.();
-                    })
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-          )}
         </Dialog>
       ) : null}
     </div>

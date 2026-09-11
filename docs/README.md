@@ -3,6 +3,7 @@
 - [Product contract](product.md): approved navigation, workflows and scope.
 - [Labels and AI configuration](labels-and-ai-configuration.md): single intent, custom rules, platform prompt versions, validation and coordinated rollout.
 - [Agent reply context](agent-reply-context.md): sender identity, custom instructions, PDF/link resources and manual meeting coordination through Needs input.
+- [Draft composer](draft-redraft.md): fresh generation, rewriting visible text, previous-version restoration and rollout.
 - [Architecture](architecture.md): boundaries, persistence, provider transport and concurrency.
 - [Implementation status](implementation.md): delivered behavior, checks and remaining acceptance.
 - [Development and operations](operations.md): isolated setup, worker, configuration and release procedure.

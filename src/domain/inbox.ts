@@ -103,6 +103,7 @@ export interface Draft {
   revision: number;
   missingKnowledge: string | null;
   snoozedUntil: string | null;
+  previousSourceRevision?: number | null;
 }
 export interface InboxState {
   labelCatalog?: LabelDefinition[];

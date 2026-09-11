@@ -257,7 +257,7 @@ export function DraftsScreen() {
                 icon="check"
               >
                 {awaitingSelection
-                  ? "Your reply was sent. Select a conversation when you’re ready."
+                  ? "Select a conversation when you’re ready."
                   : "Come back when new drafts arrive."}
               </Empty>
             </div>

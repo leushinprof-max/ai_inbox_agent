@@ -12,6 +12,7 @@ import { loadAIContext } from "./ai-context";
 import { decryptConnection } from "./credentials";
 import { databaseError } from "./session";
 import { agentModelConfig as agentConfig } from "@/domain/agent-guidance";
+import { generationTask } from "@/domain/draft-generation";
 
 const jobSchema = z.object({
   id: z.uuid(),
@@ -223,16 +224,24 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             ]
               .join("\n\n")
               .slice(-16000);
+        const task = generationTask(
+          {
+            mode: z
+              .enum(["reply", "rewrite"])
+              .nullable()
+              .parse(g.generation_mode),
+            instructions: g.instructions,
+            approvedAnswer: g.approved_answer,
+            currentDraft: g.current_draft,
+          },
+          draft.data?.body,
+        );
         const output = await runRecordedAI(
           db,
           deps.model,
           {
             ...ai,
-            scenario: g.approved_answer
-              ? "needs_input"
-              : draft.data
-                ? "rewrite"
-                : "reply",
+            scenario: task.scenario,
             agent: agentConfig.parse(version.data?.configuration),
             historyTruncated: (messages.data?.length ?? 0) > 50,
             messages: (messages.data ?? [])
@@ -246,9 +255,8 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
               })),
             generateDraft: true,
             operator: {
-              instructions: g.instructions,
+              ...task.operator,
               approvedAnswer,
-              currentDraft: draft.data?.body ?? "",
             },
           },
           {
@@ -261,7 +269,11 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         );
         databaseError(
           (
-            await (ai.configuration.schemaVersion === 2 && output.runId
+            await ((ai.configuration.schemaVersion === 2 ||
+              (g.generation_mode !== null &&
+                output.shouldReply &&
+                !output.contactStopped)) &&
+            output.runId
               ? db.rpc("server_complete_generation_v3", {
                   p_workspace: job.workspace_id,
                   p_id: g.id,

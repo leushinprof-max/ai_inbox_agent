@@ -135,6 +135,10 @@ export function draftDto(d: Tables<"drafts">): Draft {
     revision: d.revision,
     missingKnowledge: d.missing_knowledge,
     snoozedUntil: d.snoozed_until,
+    previousSourceRevision:
+      z
+        .object({ source_revision: z.number().int() })
+        .safeParse(d.previous_version).data?.source_revision ?? null,
   };
 }
 export async function authorizeWorkspace(
