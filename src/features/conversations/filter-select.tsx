@@ -10,6 +10,7 @@ export type FilterOption = {
   icon?: FilterField;
 };
 const paths: Record<FilterField, string> = {
+  first_reply: "M4 5h16v15H4V5Z M8 3v4 M16 3v4 M4 10h16 M8 14h3",
   labels: "M3 4h7l10 10-6 6L3 9V4Z M7 7h.01",
   intent: "M4 17h4v3H4v-3Z M10 10h4v10h-4V10Z M16 4h4v16h-4V4Z",
   activity: "M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",

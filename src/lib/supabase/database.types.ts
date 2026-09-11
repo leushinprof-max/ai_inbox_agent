@@ -1086,6 +1086,19 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      conversation_count_v3: {
+        Args: {
+          p_before?: string;
+          p_before_id?: string;
+          p_filters?: Json;
+          p_label?: string;
+          p_limit?: number;
+          p_query?: string;
+          p_read?: string;
+          p_workspace: string;
+        };
+        Returns: number;
+      };
       conversation_page_v3: {
         Args: {
           p_before?: string;

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import type { LabelDefinition } from "@/domain/labels";
 import {
   conversationFilters,
+  calendarDate,
   filterFields,
   type ConversationFilter,
   type FilterField,
@@ -23,6 +24,14 @@ const colors: Record<string, string> = {
   gray: "#9a9aa6",
 };
 const options = {
+  first_reply: [
+    { id: "this_week", name: "This week" },
+    { id: "this_month", name: "This month" },
+    { id: "7", name: "Last 7 days" },
+    { id: "30", name: "Last 30 days" },
+    { id: "90", name: "Last 90 days" },
+    { id: "custom", name: "Custom dates" },
+  ],
   intent: [
     { id: "positive", name: "Positive", color: colors.green },
     { id: "neutral", name: "Neutral", color: colors.gray },
@@ -63,12 +72,14 @@ export function FilterBuilder({
   onApply,
   onPin,
   canPin,
+  timezone = "UTC",
 }: {
   applied: ConversationFilter[];
   catalog: LabelDefinition[];
   onApply: (filters: ConversationFilter[]) => void;
   onPin: (name: string, filters: ConversationFilter[]) => boolean;
   canPin: boolean;
+  timezone?: string;
 }) {
   const [rows, setRows] = useState(() =>
     applied.length ? applied : [newFilter("labels")],
@@ -114,7 +125,7 @@ export function FilterBuilder({
                   name:
                     row.field === "labels"
                       ? "has any of"
-                      : row.field === "activity"
+                      : row.field === "activity" || row.field === "first_reply"
                         ? "within"
                         : "is",
                 },
@@ -123,9 +134,11 @@ export function FilterBuilder({
                   name:
                     row.field === "labels"
                       ? "has none of"
-                      : row.field === "activity"
-                        ? "older than"
-                        : "is not",
+                      : row.field === "first_reply"
+                        ? "outside"
+                        : row.field === "activity"
+                          ? "older than"
+                          : "is not",
                 },
               ]}
               values={[row.operator]}
@@ -153,6 +166,81 @@ export function FilterBuilder({
                 placeholder="Select labels…"
                 onChange={(values) => update(index, { ...row, values })}
               />
+            ) : row.field === "first_reply" ? (
+              <div className="filter-date-period">
+                <FilterSelect
+                  id={`${index}-value`}
+                  label={`Filter ${index + 1} first reply period`}
+                  options={options.first_reply}
+                  values={[row.values[0]]}
+                  open={menu}
+                  setOpen={setMenu}
+                  onChange={([period]) =>
+                    update(index, {
+                      ...row,
+                      values:
+                        period === "custom"
+                          ? [
+                              period,
+                              calendarDate(
+                                Date.now(),
+                                row.timezone ?? timezone,
+                              ),
+                              calendarDate(
+                                Date.now(),
+                                row.timezone ?? timezone,
+                              ),
+                            ]
+                          : [period],
+                    })
+                  }
+                />
+                {row.values[0] === "custom" ? (
+                  <div className="filter-date-range">
+                    <label>
+                      From
+                      <input
+                        type="date"
+                        aria-label={`Filter ${index + 1} first reply from`}
+                        value={row.values[1] ?? ""}
+                        max={row.values[2]}
+                        onChange={(event) =>
+                          update(index, {
+                            ...row,
+                            values: [
+                              "custom",
+                              event.target.value,
+                              row.values[2] ?? "",
+                            ],
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Through
+                      <input
+                        type="date"
+                        aria-label={`Filter ${index + 1} first reply through`}
+                        value={row.values[2] ?? ""}
+                        min={row.values[1]}
+                        onChange={(event) =>
+                          update(index, {
+                            ...row,
+                            values: [
+                              "custom",
+                              row.values[1] ?? "",
+                              event.target.value,
+                            ],
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                ) : null}
+                <small>
+                  First incoming message · {row.timezone ?? timezone}
+                </small>
+              </div>
             ) : (
               <FilterSelect
                 id={`${index}-value`}
@@ -191,7 +279,13 @@ export function FilterBuilder({
         setOpen={setMenu}
         disabled={rows.length >= 10}
         onChange={([field]) =>
-          setRows([...rows, newFilter(field as FilterField)])
+          setRows([
+            ...rows,
+            {
+              ...newFilter(field as FilterField),
+              ...(field === "first_reply" ? { timezone } : {}),
+            },
+          ])
         }
       />
       {pinning ? (

@@ -19,6 +19,12 @@ test("Advanced filters and search survive loading more and refreshing loaded pag
   const filters: ConversationFilter[] = [
     { field: "labels", operator: "is_not", values: ["label-a", "label-b"] },
     { field: "sender", operator: "is", values: ["inbound"] },
+    {
+      field: "first_reply",
+      operator: "is",
+      values: ["this_week"],
+      timezone: "Europe/Moscow",
+    },
   ];
   const original = globalThis.fetch;
   const calls: URL[] = [];
@@ -32,6 +38,7 @@ test("Advanced filters and search survive loading more and refreshing loaded pag
     const more = url.searchParams.has("before");
     return Response.json({
       items: [state.conversations[more ? 1 : 0]],
+      ...(!more ? { total: 73 } : {}),
       next: more
         ? null
         : { at: "2026-09-05T00:00:00Z", id: state.conversations[0].id },
@@ -47,6 +54,7 @@ test("Advanced filters and search survive loading more and refreshing loaded pag
       assert.deepEqual(JSON.parse(url.searchParams.get("filters")!), filters);
     }
     assert.equal(gateway.getSnapshot().paging!.conversationIds.length, 2);
+    assert.equal(gateway.getSnapshot().paging!.conversationFilteredTotal, 73);
   } finally {
     globalThis.fetch = original;
   }

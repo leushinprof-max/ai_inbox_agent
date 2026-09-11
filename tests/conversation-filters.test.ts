@@ -7,6 +7,7 @@ import {
   conversationFilters,
   filterSignature,
   matchesConversationFilters,
+  matchesFirstReply,
   type ConversationFilter,
 } from "../src/domain/conversation-filters";
 import { createDemoState } from "../src/demo/data";
@@ -16,6 +17,112 @@ const condition = (
   values: string[],
   operator: ConversationFilter["operator"] = "is",
 ): ConversationFilter => ({ field, values, operator });
+
+test("First reply uses earliest inbound, calendar timezone boundaries, inclusive dates and valid ordered ranges", () => {
+  const now = Date.parse("2026-09-11T12:00:00Z");
+  const c = createDemoState().conversations[0];
+  const message = c.messages[0];
+  const messages = [
+    {
+      ...message,
+      direction: "inbound" as const,
+      createdAt: "2026-09-10T12:00:00Z",
+    },
+    {
+      ...message,
+      direction: "outbound" as const,
+      createdAt: "2026-07-01T12:00:00Z",
+    },
+    {
+      ...message,
+      direction: "inbound" as const,
+      createdAt: "2026-08-01T12:00:00Z",
+    },
+  ];
+  assert.equal(
+    matchesConversationFilters(
+      { ...c, messages },
+      [condition("first_reply", ["7"])],
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    matchesConversationFilters(
+      { ...c, messages: messages.slice(0, 2) },
+      [condition("first_reply", ["this_week"])],
+      now,
+    ),
+    true,
+  );
+  assert.equal(
+    matchesConversationFilters(
+      { ...c, messages: [messages[1]] },
+      [condition("first_reply", ["7"], "is_not")],
+      now,
+    ),
+    false,
+  );
+  for (const [at, expected] of [
+    ["2026-09-06T20:59:59Z", false],
+    ["2026-09-06T21:00:00Z", true],
+  ] as const) {
+    assert.equal(
+      matchesFirstReply(Date.parse(at), ["this_week"], now, "Europe/Moscow"),
+      expected,
+    );
+  }
+  assert.equal(
+    matchesFirstReply(
+      Date.parse("2026-08-31T21:00:00Z"),
+      ["this_month"],
+      now,
+      "Europe/Moscow",
+    ),
+    true,
+  );
+  assert.equal(
+    matchesFirstReply(
+      Date.parse("2026-09-07T20:59:59.999Z"),
+      ["custom", "2026-09-07", "2026-09-07"],
+      now,
+      "Europe/Moscow",
+    ),
+    true,
+  );
+  assert.equal(
+    matchesFirstReply(
+      Date.parse("2026-09-07T21:00:00Z"),
+      ["custom", "2026-09-07", "2026-09-07"],
+      now,
+      "Europe/Moscow",
+    ),
+    false,
+  );
+  for (const values of [
+    ["custom", "2026-09-08", "2026-09-07"],
+    ["custom", "2026-02-30", "2026-03-01"],
+    ["custom"],
+    ["unknown"],
+  ]) {
+    assert.equal(
+      conversationFilters.safeParse([condition("first_reply", values)]).success,
+      false,
+    );
+  }
+  assert.equal(
+    conversationFilters.safeParse([
+      { ...condition("first_reply", ["this_week"]), timezone: "invalid/zone" },
+    ]).success,
+    false,
+  );
+  assert.equal(
+    conversationFilters.safeParse([
+      condition("first_reply", ["custom", "2026-09-07", "2026-09-07"]),
+    ]).success,
+    true,
+  );
+});
 
 test("Filter validation and matching: combinations, exclusions, rolling dates and stable signatures", () => {
   const c = createDemoState().conversations[0];
@@ -191,6 +298,46 @@ test("SQL filters apply before pagination, match intent groups, latest sender, a
         labels.slice(0, 2).map((l) => l.id),
       ),
     ];
+    const recent = [condition("first_reply", ["7"])];
+    assert.equal((await page(recent)).length, 50);
+    const count = async (filters: ConversationFilter[]) =>
+      (
+        await db.query<{ total: number }>(
+          "select public.conversation_count_v3(p_workspace=>$1,p_filters=>$2::jsonb) total",
+          [workspace, JSON.stringify(filters)],
+        )
+      ).rows[0].total;
+    assert.equal(Number(await count(recent)), 120);
+    assert.equal(
+      Number(await count([...recent, condition("intent", ["positive"])])),
+      30,
+    );
+    await db.exec("reset role");
+    await db.query(
+      `insert into public.messages(workspace_id,conversation_id,ingestion_key,body,direction,source,occurred_at)
+      select workspace_id,id,'old-in','Earlier reply','inbound','provider',now()-interval '60 days'
+      from public.conversations where workspace_id=$1 and provider_conversation_id='filter-1'`,
+      [workspace],
+    );
+    await db.exec("set role authenticated");
+    assert.equal(Number(await count(recent)), 119);
+    assert.equal(
+      (await page(recent)).some(
+        (c) => c.provider_conversation_id === "filter-1",
+      ),
+      false,
+    );
+    assert.equal(
+      (await page([condition("first_reply", ["7"], "is_not")]))[0]
+        .provider_conversation_id,
+      "filter-1",
+    );
+    const dateRange = condition("first_reply", [
+      "custom",
+      "2000-01-01",
+      "2100-01-01",
+    ]);
+    assert.equal(Number(await count([dateRange])), 120);
     const first = await page(both);
     assert.equal(first.length, 50);
     const last = first.at(-1)!;
@@ -240,6 +387,7 @@ test("SQL filters apply before pagination, match intent groups, latest sender, a
       outsider,
     ]);
     assert.equal((await page([])).length, 0);
+    assert.equal(Number(await count(recent)), 0);
   } finally {
     await db.close();
   }

@@ -84,6 +84,7 @@ export async function GET(
           {
             items: await withPreviews(db, workspaceId, page.rows),
             next: page.next,
+            total: page.total,
           },
           { headers },
         );

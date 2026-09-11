@@ -170,9 +170,18 @@ export async function conversationPage(
   read: "all" | "unread" | "read" = "all",
   filters: ConversationFilter[] = [],
 ) {
-  const { data, error } = await db.rpc(
-    filters.length ? "conversation_page_v3" : "conversation_page_v2",
-    {
+  const countRequest =
+    !before && filters.some((f) => f.field === "first_reply")
+      ? db.rpc("conversation_count_v3", {
+          p_workspace: workspaceId,
+          p_query: query.slice(0, 200),
+          ...(label !== "all" ? { p_label: label } : {}),
+          p_read: read,
+          p_filters: filters,
+        })
+      : Promise.resolve({ data: undefined, error: null });
+  const [{ data, error }, count] = await Promise.all([
+    db.rpc(filters.length ? "conversation_page_v3" : "conversation_page_v2", {
       ...(filters.length ? { p_filters: filters } : {}),
       p_read: read,
       p_workspace: workspaceId,
@@ -180,14 +189,17 @@ export async function conversationPage(
       ...(label !== "all" ? { p_label: label } : {}),
       ...(before ? { p_before: before.at, p_before_id: before.id } : {}),
       p_limit: PAGE_SIZE + 1,
-    },
-  );
+    }),
+    countRequest,
+  ]);
   databaseError(error);
+  databaseError(count.error);
   const rows = data ?? [];
   const items = rows.slice(0, PAGE_SIZE);
   const last = items.at(-1);
   return {
     rows: items,
+    ...(count.data !== undefined ? { total: count.data } : {}),
     next:
       rows.length > PAGE_SIZE && last
         ? { at: last.last_message_at ?? last.created_at, id: last.id }

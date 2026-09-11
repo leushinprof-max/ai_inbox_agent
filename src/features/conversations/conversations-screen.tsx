@@ -207,6 +207,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
           </Button>
           {filtersOpen ? (
             <FilterBuilder
+              timezone={workspace.timezone}
               applied={filters}
               catalog={catalog}
               canPin={views.length < 30}
@@ -297,6 +298,15 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
         </Notice>
       ) : null}
       <div className="conversation-results" aria-busy={loading}>
+        {!loading &&
+        filters.some((f) => f.field === "first_reply") &&
+        (!state.paging ||
+          state.paging.conversationFilteredTotal !== undefined) ? (
+          <p className="conversation-filter-total" role="status">
+            {state.paging?.conversationFilteredTotal ?? filtered.length} leads
+            match filters
+          </p>
+        ) : null}
         <div className="conversation-rows">
           {filtered.map((c) => (
             <article

@@ -376,17 +376,22 @@ export class LiveGateway implements InboxGateway {
     const version = this.searchVersion;
     let before: PageCursor | null = null;
     const items: Conversation[] = [];
+    let total: number | undefined;
     for (let page = 0; page < pages; page++) {
-      const result: { items: Conversation[]; next: PageCursor | null } =
-        await this.read({
-          view: "conversations",
-          q: this.search.query,
-          label: this.search.label,
-          read: this.search.read,
-          filters: JSON.stringify(this.search.filters ?? []),
-          ...(before ? { before: JSON.stringify(before) } : {}),
-        });
+      const result: {
+        items: Conversation[];
+        next: PageCursor | null;
+        total?: number;
+      } = await this.read({
+        view: "conversations",
+        q: this.search.query,
+        label: this.search.label,
+        read: this.search.read,
+        filters: JSON.stringify(this.search.filters ?? []),
+        ...(before ? { before: JSON.stringify(before) } : {}),
+      });
       items.push(...result.items);
+      if (page === 0) total = result.total;
       before = result.next;
       if (!before) break;
     }
@@ -398,6 +403,7 @@ export class LiveGateway implements InboxGateway {
         ...this.state.paging!,
         conversationIds: items.map((c) => c.id),
         conversationNext: before,
+        conversationFilteredTotal: total,
       },
     });
   }
