@@ -25,6 +25,10 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
   const { state, scope, repository, workspace } = useInbox();
   const { preferences } = usePreferences(scope.userId);
   const [error, setError] = useState("");
+  const [unreadFailure, setUnreadFailure] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
   const [query, setQuery] = useState("");
   const [storedFilters, setFilters] = useState<ConversationFilter[]>([]);
@@ -165,7 +169,14 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
           key={`thread-${selected.id}`}
           conversation={selected}
           onBack={() => setSelected(null)}
-          onMarkedUnread={() => setSelected(null)}
+          onMarkedUnread={(save) => {
+            const { id, contact } = selected;
+            setUnreadFailure(null);
+            setSelected(null);
+            void save.catch(() =>
+              setUnreadFailure({ id, name: contact.name }),
+            );
+          }}
           onToggleDetails={() => setDetails(!details)}
         >
           <Composer key={selected.id} conversation={selected} />
@@ -291,6 +302,20 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
             </div>
           ))}
         </nav>
+      ) : null}
+      {unreadFailure ? (
+        <Notice variant="error">
+          Could not mark {unreadFailure.name} as unread. Open the conversation
+          to retry.
+          <Button
+            onClick={() => {
+              setSelected(unreadFailure.id);
+              setUnreadFailure(null);
+            }}
+          >
+            Open conversation
+          </Button>
+        </Notice>
       ) : null}
       {error ? (
         <Notice variant="error">

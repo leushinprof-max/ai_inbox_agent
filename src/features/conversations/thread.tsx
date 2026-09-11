@@ -34,7 +34,7 @@ export function ConversationThread({
   conversation: Conversation;
   children: ReactNode;
   onBack: () => void;
-  onMarkedUnread?: () => void;
+  onMarkedUnread?: (save: Promise<void>) => void;
   onToggleDetails: () => void;
   mobileOpen?: boolean;
   active?: boolean;

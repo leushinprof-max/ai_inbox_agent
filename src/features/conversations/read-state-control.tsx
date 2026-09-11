@@ -16,7 +16,7 @@ export function ReadStateControl({
   autoRead?: boolean;
   loaded?: boolean;
   visibilityKey?: boolean;
-  onMarkedUnread?: () => void;
+  onMarkedUnread?: (save: Promise<void>) => void;
 }) {
   const { state, scope, repository, mode } = useInbox();
   const { workspaceId, userId } = scope;
@@ -44,14 +44,15 @@ export function ReadStateControl({
       setError("");
       if (next) setManualUnread(true);
       try {
-        await repository.setConversationRead(
+        const save = repository.setConversationRead(
           { workspaceId, userId },
           id,
           readStateRevision,
           next,
         );
+        if (next) onMarkedUnread?.(save);
+        await save;
         if (button.current?.isConnected && !next) setManualUnread(false);
-        if (button.current?.isConnected && next) onMarkedUnread?.();
       } catch (e) {
         // Refreshing a confirmed snapshot may rerun the effect; it must not hide errors.
         if (button.current?.isConnected)
@@ -140,6 +141,7 @@ export function ReadStateControl({
         type="button"
         className="read-button"
         aria-disabled={busy || conversation.readStatePending}
+        disabled={busy || conversation.readStatePending}
         aria-busy={busy || conversation.readStatePending}
         aria-label={
           error
