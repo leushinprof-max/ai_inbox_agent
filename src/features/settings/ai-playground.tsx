@@ -11,11 +11,8 @@ import { RequestBody } from "@/features/drafts/draft-request";
 type TestResult = Awaited<ReturnType<typeof testAIAdmin>>;
 type Preview = Awaited<ReturnType<typeof previewAIAdmin>>;
 const modes = [
-  { value: "full", label: "Classify & reply" },
-  { value: "classify", label: "Classification only" },
-  { value: "reply", label: "Draft reply" },
-  { value: "rewrite", label: "Rewrite" },
-  { value: "needs_input", label: "Missing knowledge" },
+  { value: "classify", label: "Classification" },
+  { value: "reply", label: "Reply agent" },
 ] as const;
 type Mode = (typeof modes)[number]["value"];
 
@@ -31,7 +28,7 @@ export function AIPlayground({
   onBusy: (busy: boolean) => void;
 }) {
   const { state, scope } = useInbox();
-  const [mode, setMode] = useState<Mode>("full");
+  const [mode, setMode] = useState<Mode>("reply");
   const [source, setSource] = useState("example");
   const [agentId, setAgent] = useState(state.agents[0]?.id ?? "");
   const [conversationId, setConversation] = useState("");
@@ -49,19 +46,23 @@ export function AIPlayground({
   const [testedKey, setTestedKey] = useState("");
   const [previewKey, setPreviewKey] = useState("");
   const fixedLabel =
-    configuration.schemaVersion !== 2 && mode !== "classify" && mode !== "full";
+    configuration.schemaVersion !== 2 && mode === "reply";
   const conversation = state.conversations.find((c) => c.id === conversationId);
   const sample = {
     workspaceId: scope.workspaceId,
     agentId: mode === "classify" ? null : agentId || null,
     conversationId: source === "saved" ? conversationId || null : null,
     transcript,
-    scenario: mode === "full" ? ("classify" as const) : mode,
-    generateDraft: mode !== "classify",
-    instructions: mode === "rewrite" ? instructions : "",
-    approvedAnswer:
-      mode === "rewrite" || mode === "needs_input" ? approvedAnswer : "",
-    currentDraft: mode === "rewrite" ? currentDraft : "",
+    scenario:
+      mode === "reply" && currentDraft.trim()
+        ? ("rewrite" as const)
+        : mode === "reply" && approvedAnswer.trim()
+          ? ("needs_input" as const)
+          : mode,
+    generateDraft: mode === "reply",
+    instructions: mode === "reply" ? instructions : "",
+    approvedAnswer: mode === "reply" ? approvedAnswer : "",
+    currentDraft: mode === "reply" ? currentDraft : "",
   };
   const inputKey = JSON.stringify([configuration, sample, source, version]);
   const visibleResults = testedKey === inputKey ? results : [];
@@ -69,9 +70,7 @@ export function AIPlayground({
   const invalid =
     (mode !== "classify" && !agentId) ||
     (source === "saved" ? !conversationId : !transcript.trim()) ||
-    (fixedLabel && !conversation?.labelId) ||
-    (mode === "rewrite" && (!currentDraft.trim() || !instructions.trim())) ||
-    (mode === "needs_input" && !approvedAnswer.trim());
+    (fixedLabel && !conversation?.labelId);
   async function run(kind: "test" | "preview") {
     setError("");
     setRunning(kind);
@@ -122,7 +121,7 @@ export function AIPlayground({
             <label htmlFor="test-mode">Test</label>
             <AdminSelect
               id="test-mode"
-              label="Test scenario"
+              label="What to test"
               value={mode}
               options={modes}
               disabled={disabled}
@@ -130,8 +129,7 @@ export function AIPlayground({
                 setMode(value as Mode);
                 if (
                   configuration.schemaVersion !== 2 &&
-                  value !== "full" &&
-                  value !== "classify"
+                  value === "reply"
                 )
                   setSource("saved");
                 setError("");
@@ -155,6 +153,11 @@ export function AIPlayground({
             </div>
           )}
         </div>
+        <small className="muted">
+          {mode === "classify"
+            ? "Uses the classification prompt and active system and workspace labels."
+            : "Uses the Reply agent prompt. Add operator input below when you want to revise a draft or supply more information."}
+        </small>
         <div className="admin-source-tabs" aria-label="Conversation source">
           {[
             { value: "example", label: "Example" },
@@ -231,43 +234,50 @@ export function AIPlayground({
             </small>
           </div>
         )}
-        {(mode === "rewrite" || mode === "needs_input") && (
-          <div className="admin-test-extra">
-            {mode === "rewrite" && (
-              <>
-                <div className="field">
-                  <label htmlFor="test-current-draft">Current draft</label>
-                  <textarea
-                    id="test-current-draft"
-                    value={currentDraft}
-                    maxLength={8000}
-                    onChange={(e) => setDraft(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="test-instructions">Your instructions</label>
-                  <textarea
-                    id="test-instructions"
-                    value={instructions}
-                    placeholder="Make it shorter and remove the meeting invitation."
-                    maxLength={2000}
-                    onChange={(e) => setInstructions(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-            <div className="field">
-              <label htmlFor="test-approved-answer">
-                Approved answer{mode === "rewrite" ? " (optional)" : ""}
-              </label>
-              <textarea
-                id="test-approved-answer"
-                value={approvedAnswer}
-                maxLength={8000}
-                onChange={(e) => setAnswer(e.target.value)}
-              />
+        {mode === "reply" && (
+          <details className="admin-details admin-operator-input">
+            <summary>
+              Operator input <span className="muted">Optional</span>
+            </summary>
+            <p className="muted">
+              Fill any fields that apply to this reply. Leave them empty to
+              generate a new reply from the conversation alone.
+            </p>
+            <div className="admin-test-extra">
+              <div className="field">
+                <label htmlFor="test-current-draft">Current draft</label>
+                <textarea
+                  id="test-current-draft"
+                  value={currentDraft}
+                  placeholder="Paste a draft you want the agent to revise."
+                  maxLength={8000}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="test-instructions">Instructions</label>
+                <textarea
+                  id="test-instructions"
+                  value={instructions}
+                  placeholder="Make it shorter and remove the meeting invitation."
+                  maxLength={2000}
+                  onChange={(e) => setInstructions(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="test-approved-answer">
+                  Confirmed information
+                </label>
+                <textarea
+                  id="test-approved-answer"
+                  value={approvedAnswer}
+                  placeholder="Facts or answers the agent needs for this conversation."
+                  maxLength={8000}
+                  onChange={(e) => setAnswer(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
+          </details>
         )}
         <div className="admin-test-actions">
           <Button
@@ -315,7 +325,9 @@ export function AIPlayground({
             <h3>
               {running
                 ? "Testing your configuration"
-                : "See how your agent responds"}
+                : mode === "classify"
+                  ? "See how the conversation is classified"
+                  : "See how your agent responds"}
             </h3>
             <p>
               {running
@@ -327,12 +339,14 @@ export function AIPlayground({
         <div aria-live="polite" className="admin-test-results">
           {visibleResults.map((r, i) => (
             <article className="admin-result" key={i}>
-              <div className="row between wrap">
-                <LabelBadge label={r.label} />
-                <small className="muted">
-                  {visibleResults.length > 1 ? `Example ${i + 1}` : ""}
-                </small>
-              </div>
+              {(mode === "classify" || visibleResults.length > 1) && (
+                <div className="row between wrap">
+                  {mode === "classify" && <LabelBadge label={r.label} />}
+                  {visibleResults.length > 1 && (
+                    <small className="muted">Example {i + 1}</small>
+                  )}
+                </div>
+              )}
               <h3>
                 {r.output.contactStopped
                   ? "Contact stopped"
@@ -364,7 +378,7 @@ export function AIPlayground({
               )}
               <details className="admin-details">
                 <summary>Details</summary>
-                {r.output.evidenceQuote && (
+                {mode === "classify" && r.output.evidenceQuote && (
                   <blockquote>{r.output.evidenceQuote}</blockquote>
                 )}
                 <dl>

@@ -354,6 +354,19 @@
   min-height: 110px;
   background: var(--bg);
 }
+.admin-operator-input {
+  border-top: 1px solid var(--line);
+}
+.admin-operator-input > summary {
+  color: var(--text);
+  font-size: 13px;
+}
+.admin-operator-input > summary .muted {
+  margin-left: 8px;
+}
+.admin-operator-input > p {
+  margin: 0 0 16px;
+}
 .admin-test-actions {
   display: flex;
   flex-wrap: wrap;
