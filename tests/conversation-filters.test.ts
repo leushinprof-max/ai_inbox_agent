@@ -20,6 +20,31 @@ const condition = (
 
 test("First reply uses earliest inbound, calendar timezone boundaries, inclusive dates and valid ordered ranges", () => {
   const now = Date.parse("2026-09-11T12:00:00Z");
+  assert.equal(
+    conversationFilters.safeParse([condition("first_reply", ["today"])])
+      .success,
+    true,
+  );
+  for (const [at, expected] of [
+    ["2026-09-10T20:59:59.999Z", false],
+    ["2026-09-10T21:00:00Z", true],
+    ["2026-09-11T12:00:00.001Z", false],
+  ] as const) {
+    assert.equal(
+      matchesFirstReply(Date.parse(at), ["today"], now, "Europe/Moscow"),
+      expected,
+    );
+  }
+  // Local midnight on the spring DST transition day differs from UTC midnight.
+  assert.equal(
+    matchesFirstReply(
+      Date.parse("2026-03-08T05:00:00Z"),
+      ["today"],
+      Date.parse("2026-03-08T18:00:00Z"),
+      "America/New_York",
+    ),
+    true,
+  );
   const c = createDemoState().conversations[0];
   const message = c.messages[0];
   const messages = [
@@ -308,6 +333,23 @@ test("SQL filters apply before pagination, match intent groups, latest sender, a
         )
       ).rows[0].total;
     assert.equal(Number(await count(recent)), 120);
+    for (const timezone of ["UTC", "Europe/Moscow", "America/New_York"]) {
+      const today = { ...condition("first_reply", ["today"]), timezone };
+      const expected = (
+        await db.query<{ total: number }>(
+          `select count(*) total from public.conversations c
+        where c.workspace_id=$1 and not c.archived and c.inbound_revision>0
+        and (select min(m.occurred_at) from public.messages m where m.workspace_id=c.workspace_id and m.conversation_id=c.id and m.direction='inbound')
+          between (date_trunc('day',now() at time zone $2) at time zone $2) and now()`,
+          [workspace, timezone],
+        )
+      ).rows[0].total;
+      assert.equal(Number(await count([today])), Number(expected));
+      assert.equal(
+        (await page([today])).length,
+        Math.min(Number(expected), 50),
+      );
+    }
     assert.equal(
       Number(await count([...recent, condition("intent", ["positive"])])),
       30,
