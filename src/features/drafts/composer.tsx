@@ -17,6 +17,7 @@ import { outgoingStore, useOutgoing } from "@/lib/outgoing-messages";
 import { usePreferences } from "@/lib/preferences";
 import { DraftRequest } from "./draft-request";
 import { composerBuffers } from "@/lib/composer-buffer";
+import { getGenerationProgress } from "@/lib/draft-generation-progress";
 
 export function Composer({
   conversation,
@@ -97,7 +98,12 @@ export function Composer({
     conversation.messages.at(-1)?.direction === "inbound"
       ? conversation.noReplyReason
       : "";
-  const generating = requesting || generation?.status === "queued";
+  const { pending: awaitingGeneration, generatedDraft } = getGenerationProgress(
+    generationId,
+    generation,
+    state.drafts,
+  );
+  const generating = requesting || awaitingGeneration;
   const writable = state.memberships.some(
     (m) =>
       m.workspaceId === scope.workspaceId &&
@@ -177,7 +183,7 @@ export function Composer({
   }, [unresolved]);
   const lock = useRef(false);
   useEffect(() => {
-    if (generation?.status !== "queued") return;
+    if (!awaitingGeneration) return;
     const timer = setInterval(
       () =>
         void repository
@@ -190,12 +196,7 @@ export function Composer({
       2000,
     );
     return () => clearInterval(timer);
-  }, [generation?.id, generation?.status, repository]);
-  const generatedDraft = state.drafts.find(
-    (d) =>
-      d.id === generation?.draftId &&
-      d.revision >= (generation?.resultRevision ?? 1),
-  );
+  }, [awaitingGeneration, repository]);
   if (
     generationId &&
     generation &&
@@ -367,14 +368,7 @@ export function Composer({
     generationMode: "reply" | "rewrite" = "reply",
     approvedAnswer = "",
   ) {
-    if (
-      requesting ||
-      generation?.status === "queued" ||
-      lock.current ||
-      locked ||
-      !writable
-    )
-      return;
+    if (generating || lock.current || locked || !writable) return;
     if (
       generationMode === "rewrite" &&
       (!instructions.trim() || !text.trim() || stale)
@@ -573,10 +567,14 @@ export function Composer({
             </div>
             <div className="composer-actions">
               <span className="small muted">
-                {text ? "Your previous draft is saved." : "Preparing your reply…"}
+                {text
+                  ? "Your previous draft is saved."
+                  : "Preparing your reply…"}
               </span>
               <Button
-                disabled={!generation || environment === "demo"}
+                disabled={
+                  generation?.status !== "queued" || environment === "demo"
+                }
                 onClick={() =>
                   void run(async () => {
                     if (!generation) return;
