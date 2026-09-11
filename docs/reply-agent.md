@@ -6,12 +6,14 @@ Agents has two tabs:
 
 | Tab           | Fields                                                                                         |
 | ------------- | ---------------------------------------------------------------------------------------------- |
-| Background    | About company (name and description), Product & offer, optional Selling points, Materials      |
+| Background    | Company & offer (company name and one description), optional Selling points, Materials         |
 | Communication | Conversation goal, Reply language, Tone & style, optional Reply examples (situation and reply) |
 
 **Test agent** and **Assign senders** are header actions. Assign senders also contains allowed intent groups, workspace default and activation/pause controls. Sender name and grammatical form remain properties of the actual LinkedIn sender.
 
-The `agent-background-v2` document is stored in the existing versioned `knowledge` field. Reading older agents maps their product offer and FAQs into Product & offer without changing their wording or order. Company name, resource URLs and file metadata are preserved; company description, Selling points and examples start empty. Old custom instructions and meeting instructions are combined, in that order, into Tone & style. Reading does not write a new version; saving does. Historical snapshots remain immutable.
+The `agent-background-v2` document is stored in the existing versioned `knowledge` field. Reading older agents maps their product offer and FAQs into Company & offer without changing their wording or order. If a separate company description exists, the editor places it before the offer, separated by a blank line. Saving stores the combined text in `productOffer` and clears the legacy `companyDescription`. The combined field retains the capacity of both former fields. Company name, resource URLs and file metadata are preserved; Selling points and examples start empty. Old custom instructions and meeting instructions are combined, in that order, into Tone & style. Reading does not write a new version; saving does. Historical snapshots remain immutable.
+
+The Reply agent template uses `{{company_offer}}` for the combined description. Older `{{company_description}}` and `{{product_offer}}` placeholders remain supported for saved versions; they appear in the variable list only when the current template uses them.
 
 ## Reply flow
 

@@ -3,6 +3,7 @@ import { readAgentKnowledge } from "@/domain/agent-knowledge";
 import {
   readAgentBackground,
   communicationStyle,
+  companyAndOffer,
 } from "@/domain/agent-background";
 import { renderTemplate } from "./prompt-templates";
 import type { AgentResource, GrammaticalForm } from "@/domain/agent-guidance";
@@ -257,6 +258,7 @@ export function buildModelRequest(
           sender_grammatical_form: quoted(input.sender?.grammaticalForm),
           agent_goal: quoted(agent?.goal),
           company_name: quoted(background?.companyName),
+          company_offer: quoted(background ? companyAndOffer(background) : ""),
           company_description: quoted(background?.companyDescription),
           product_offer: quoted(background?.productOffer),
           selling_points: quoted(background?.sellingPoints ?? []),

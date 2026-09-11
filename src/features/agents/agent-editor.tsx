@@ -10,6 +10,7 @@ import {
   readAgentBackground,
   writeAgentBackground,
   communicationStyle,
+  companyAndOffer,
   type AgentBackground,
 } from "@/domain/agent-background";
 import { intentGroup } from "@/domain/labels";
@@ -20,9 +21,14 @@ import { AgentLaunch } from "./agent-launch";
 import { LiveAgentTest } from "./live-agent-test";
 
 function editable(agent: Agent): Agent {
+  const background = readAgentBackground(agent.knowledge);
   return {
     ...agent,
-    knowledge: writeAgentBackground(readAgentBackground(agent.knowledge)),
+    knowledge: writeAgentBackground({
+      ...background,
+      companyDescription: "",
+      productOffer: companyAndOffer(background),
+    }),
     customInstructions: communicationStyle(agent),
     meetingInstructions: "",
   };
@@ -127,7 +133,7 @@ export function AgentEditor({ id }: { id: string }) {
           !agent.goal.trim())
       )
         throw new Error(
-          "Add a company name, product & offer and conversation goal before activating.",
+          "Add a company name, company & offer description and conversation goal before activating.",
         );
       const next = {
         ...agent,
@@ -226,7 +232,7 @@ export function AgentEditor({ id }: { id: string }) {
                   conversations.
                 </p>
                 <section className="agent-setting-section">
-                  <h2>About company</h2>
+                  <h2>Company &amp; offer</h2>
                   <div className="field">
                     <label htmlFor="company-name">Company name</label>
                     <input
@@ -243,45 +249,27 @@ export function AgentEditor({ id }: { id: string }) {
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="company-about">
-                      What your company does{" "}
-                      <small className="muted">Optional</small>
+                    <label htmlFor="company-offer">
+                      About your company and offer
                     </label>
+                    <p className="help">
+                      What your company does, what you offer, who it helps, and
+                      how it works. Include important terms and limitations.
+                    </p>
                     <textarea
-                      id="company-about"
-                      value={background.companyDescription}
-                      maxLength={28000}
-                      placeholder="A short introduction to your company and who you work with."
+                      id="company-offer"
+                      className="agent-product"
+                      value={background.productOffer}
+                      maxLength={58002}
+                      placeholder="Describe your company and the offer your agent will discuss with leads."
                       onChange={(e) =>
                         information({
                           ...background,
-                          companyDescription: e.target.value,
+                          productOffer: e.target.value,
                         })
                       }
                     />
                   </div>
-                </section>
-                <section className="agent-setting-section">
-                  <h2>
-                    <label htmlFor="product-offer">Product &amp; offer</label>
-                  </h2>
-                  <p className="help">
-                    What you offer, who it helps, how it works, and any
-                    important terms or limitations.
-                  </p>
-                  <textarea
-                    id="product-offer"
-                    className="agent-product"
-                    value={background.productOffer}
-                    maxLength={30000}
-                    placeholder="Describe the offer your agent will discuss with leads."
-                    onChange={(e) =>
-                      information({
-                        ...background,
-                        productOffer: e.target.value,
-                      })
-                    }
-                  />
                 </section>
                 <section className="agent-setting-section">
                   <div className="agent-section-heading">
