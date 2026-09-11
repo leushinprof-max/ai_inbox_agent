@@ -18,6 +18,54 @@ const editableLabel = z.object({
   enabled: z.boolean(),
   archived: z.boolean(),
 });
+export async function assignConversationLabel(input: unknown) {
+  try {
+    const value = z
+      .object({
+        workspaceId: z.uuid(),
+        conversationId: z.uuid(),
+        labelId: z.uuid(),
+        revision: z.number().int().positive(),
+        assignmentRevision: z.number().int().nonnegative(),
+      })
+      .parse(input);
+    const { db, user } = await authenticatedClient();
+    await authorizeWorkspace(db, user.id, value.workspaceId);
+    const conversation = await db
+      .from("conversations")
+      .select("label_id,label_state")
+      .eq("workspace_id", value.workspaceId)
+      .eq("id", value.conversationId)
+      .single();
+    databaseError(conversation.error);
+    if (
+      conversation.data?.label_id !== null ||
+      conversation.data.label_state !== "uncategorized"
+    )
+      throw new Error(
+        "This conversation is no longer awaiting a label. Refresh to see its current category.",
+      );
+    // The RPC checks both revisions, protecting a classification saved after this read.
+    databaseError(
+      (
+        await db.rpc("assign_conversation_label", {
+          p_workspace: value.workspaceId,
+          p_conversation: value.conversationId,
+          p_label: value.labelId,
+          p_revision: value.revision,
+          p_assignment: value.assignmentRevision,
+        })
+      ).error,
+    );
+    return { ok: true as const };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Could not save the label.",
+    };
+  }
+}
+
 export async function saveLabel(workspaceId: string, value: unknown) {
   try {
     const label = editableLabel.parse(value);
