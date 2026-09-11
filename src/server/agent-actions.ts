@@ -125,12 +125,18 @@ export async function testAgent(input: unknown) {
             ? [
                 {
                   id: "team",
+                  createdAt: null,
                   direction: "outbound" as const,
                   body: previousMessage,
                 },
               ]
             : []),
-          { id: "sample", direction: "inbound", body: message },
+          {
+            id: "sample",
+            direction: "inbound",
+            body: message,
+            createdAt: null,
+          },
         ],
         operator: { instructions: "", approvedAnswer, currentDraft: "" },
         generateDraft: true,

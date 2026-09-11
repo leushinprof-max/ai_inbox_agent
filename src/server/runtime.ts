@@ -178,7 +178,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             .single(),
           db
             .from("messages")
-            .select("id,direction,body")
+            .select("id,direction,body,occurred_at")
             .eq("workspace_id", job.workspace_id)
             .eq("conversation_id", g.conversation_id)
             .order("occurred_at", { ascending: false })
@@ -240,6 +240,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
               .reverse()
               .map((m) => ({
                 id: m.id,
+                createdAt: m.occurred_at,
                 body: m.body,
                 direction: z.enum(["inbound", "outbound"]).parse(m.direction),
               })),
@@ -351,6 +352,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
       const context = (messages.data ?? []).slice(0, 50);
       const transcript = context.reverse().map((m) => ({
         id: m.id,
+        createdAt: m.occurred_at,
         body: m.body,
         direction: z.enum(["inbound", "outbound"]).parse(m.direction),
       }));

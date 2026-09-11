@@ -30,7 +30,9 @@ export function AgentResources({
   const [error, setError] = useState("");
   function update(
     id: string,
-    changes: Partial<Pick<AgentResource, "name" | "whenToUse" | "url">>,
+    changes: Partial<
+      Pick<AgentResource, "name" | "whenToUse" | "url" | "description">
+    >,
   ) {
     onChange(
       value.map((item) => (item.id === id ? { ...item, ...changes } : item)),
@@ -75,6 +77,7 @@ export function AgentResources({
           id: crypto.randomUUID(),
           kind: "pdf",
           name: file.name.replace(/\.pdf$/i, ""),
+          description: "",
           whenToUse: "",
           url: prepared.url,
           fileName: file.name,
@@ -126,7 +129,7 @@ export function AgentResources({
               value={resource.name}
               maxLength={200}
               disabled={disabled || busy}
-              placeholder="ReStaff presentation"
+              placeholder="Company overview"
               onChange={(e) => update(resource.id, { name: e.target.value })}
             />
           </div>
@@ -154,6 +157,21 @@ export function AgentResources({
             </a>
           )}
           <div className="field">
+            <label htmlFor={`resource-description-${resource.id}`}>
+              Description <span className="muted">Optional</span>
+            </label>
+            <textarea
+              id={`resource-description-${resource.id}`}
+              value={resource.description ?? ""}
+              maxLength={2000}
+              disabled={disabled || busy}
+              placeholder="What this material covers, such as a service overview, workflow and pricing."
+              onChange={(e) =>
+                update(resource.id, { description: e.target.value })
+              }
+            />
+          </div>
+          <div className="field">
             <label htmlFor={`resource-use-${resource.id}`}>When to use</label>
             <textarea
               id={`resource-use-${resource.id}`}
@@ -180,6 +198,7 @@ export function AgentResources({
                 id: crypto.randomUUID(),
                 kind: "link",
                 name: "",
+                description: "",
                 url: "",
                 whenToUse: "",
               },
