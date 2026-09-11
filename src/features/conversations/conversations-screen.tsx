@@ -165,6 +165,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
           key={`thread-${selected.id}`}
           conversation={selected}
           onBack={() => setSelected(null)}
+          onMarkedUnread={() => setSelected(null)}
           onToggleDetails={() => setDetails(!details)}
         >
           <Composer key={selected.id} conversation={selected} />

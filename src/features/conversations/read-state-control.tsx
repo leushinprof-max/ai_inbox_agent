@@ -10,11 +10,13 @@ export function ReadStateControl({
   autoRead = false,
   loaded = true,
   visibilityKey = false,
+  onMarkedUnread,
 }: {
   conversation: Conversation;
   autoRead?: boolean;
   loaded?: boolean;
   visibilityKey?: boolean;
+  onMarkedUnread?: () => void;
 }) {
   const { state, scope, repository, mode } = useInbox();
   const { workspaceId, userId } = scope;
@@ -49,6 +51,7 @@ export function ReadStateControl({
           next,
         );
         if (button.current?.isConnected && !next) setManualUnread(false);
+        if (button.current?.isConnected && next) onMarkedUnread?.();
       } catch (e) {
         // Refreshing a confirmed snapshot may rerun the effect; it must not hide errors.
         if (button.current?.isConnected)
@@ -67,6 +70,7 @@ export function ReadStateControl({
       id,
       readStateRevision,
       conversation.readStatePending,
+      onMarkedUnread,
     ],
   );
   useEffect(() => {
