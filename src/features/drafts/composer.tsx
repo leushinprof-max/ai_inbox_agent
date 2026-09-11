@@ -56,12 +56,11 @@ export function Composer({
   const [instructions, setInstructions] = useState("");
   const [redrafting, setRedrafting] = useState(false);
   const [generationId, setGenerationId] = useState<string | null>(
-    initialBuffer?.generationId ??
-      state.generations?.find(
-        (g) => g.conversationId === conversation.id && g.status === "queued",
-      )?.id ??
-      null,
+    initialBuffer?.generationId ?? null,
   );
+  const [observedGenerationId, setObservedGenerationId] = useState<
+    string | null
+  >(null);
   const [requesting, setRequesting] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -70,10 +69,21 @@ export function Composer({
   const [composerHeight, setComposerHeight] = useState<number>();
   const retainedInputHeight = useRef(0);
   const generation =
-    state.generations?.find((g) => g.id === generationId) ??
+    state.generations?.find(
+      (g) => g.id === (generationId ?? observedGenerationId),
+    ) ??
     state.generations?.find(
       (g) => g.conversationId === conversation.id && g.status === "queued",
     );
+  // Keep requests started by manual classification visible through completion
+  // or failure, even after they leave the queue.
+  if (
+    !generationId &&
+    !observedGenerationId &&
+    generation?.status === "queued"
+  ) {
+    setObservedGenerationId(generation.id);
+  }
   const workspaceAgent = resolveSenderAgent(
     state,
     scope.workspaceId,
@@ -99,7 +109,7 @@ export function Composer({
       ? conversation.noReplyReason
       : "";
   const { pending: awaitingGeneration, generatedDraft } = getGenerationProgress(
-    generationId,
+    generationId ?? observedGenerationId,
     generation,
     state.drafts,
   );
@@ -198,14 +208,19 @@ export function Composer({
     return () => clearInterval(timer);
   }, [awaitingGeneration, repository]);
   if (
-    generationId &&
+    (generationId || observedGenerationId) &&
     generation &&
     generation.status !== "queued" &&
     (generation.status !== "completed" ||
       generatedDraft ||
       generation.error === "no_reply_needed")
   ) {
-    if (generation.status === "completed" && generatedDraft) {
+    if (
+      generation.status === "completed" &&
+      generatedDraft &&
+      (generationId ||
+        (!reviewedDraft && mode === "manual" && text === "" && !locked))
+    ) {
       setReviewedDraft(generatedDraft);
       setText(generatedDraft.body);
       setMode("draft");
@@ -231,6 +246,7 @@ export function Composer({
       );
     }
     setGenerationId(null);
+    setObservedGenerationId(null);
   }
 
   const stale =
@@ -904,7 +920,8 @@ export function Composer({
             ) : null}
             {!draft && conversation.labelState === "uncategorized" ? (
               <p className="composer-context-note">
-                No automatic draft: intent could not be determined.
+                Click Unable to categorize to choose a label. The agent will
+                draft a reply if its reply rules allow it.
               </p>
             ) : null}
           </>
