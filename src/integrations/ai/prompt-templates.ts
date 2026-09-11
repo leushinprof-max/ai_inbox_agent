@@ -3,8 +3,10 @@ export const replyVariables = {
   sender_grammatical_form: "Sender profile: grammatical form",
   agent_goal: "Communication: conversation goal",
   company_name: "Background: company name",
-  company_description: "Background: about company",
-  product_offer: "Background: product & offer",
+  company_offer: "Background: company & offer",
+  company_description:
+    "Compatibility: original company description in older templates",
+  product_offer: "Compatibility: original product & offer in older templates",
   selling_points: "Background: selling points",
   resources: "Background: materials",
   reply_language: "Communication: reply language",
@@ -90,11 +92,7 @@ or a meeting invitation.
 
 Company: {{company_name}}
 
-About the company:
-{{company_description}}
-
-Product and offer:
-{{product_offer}}
+{{company_offer}}
 
 Selling points you can use:
 {{selling_points}}

@@ -323,12 +323,23 @@ export function AIConfigurationScreen() {
                             section === "reply"
                               ? replyVariables
                               : classificationVariables,
-                          ).map(([name, source]) => (
-                            <div key={name}>
-                              <dt>{"{{" + name + "}}"}</dt>
-                              <dd>{source}</dd>
-                            </div>
-                          ))}
+                          )
+                            .filter(
+                              ([name]) =>
+                                ![
+                                  "company_description",
+                                  "product_offer",
+                                ].includes(name) ||
+                                new RegExp(`\\{\\{\\s*${name}\\s*\\}\\}`).test(
+                                  instructionValue,
+                                ),
+                            )
+                            .map(([name, source]) => (
+                              <div key={name}>
+                                <dt>{"{{" + name + "}}"}</dt>
+                                <dd>{source}</dd>
+                              </div>
+                            ))}
                         </dl>
                       </details>
                     )}

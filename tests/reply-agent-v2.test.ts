@@ -5,6 +5,7 @@ import {
   readAgentBackground,
   writeAgentBackground,
   communicationStyle,
+  companyAndOffer,
 } from "../src/domain/agent-background";
 import { writeAgentKnowledge } from "../src/domain/agent-knowledge";
 import {
@@ -145,6 +146,57 @@ test("Migration preserves all legacy content and order without inventing selling
   );
   assert.throws(() =>
     readAgentBackground('{"format":"agent-background-v2","companyName":42}'),
+  );
+});
+
+test("Combining company and offer preserves both full fields once, with older templates still usable", () => {
+  const background = {
+    ...readAgentBackground(source),
+    companyDescription: "C".repeat(28000),
+    productOffer: "P".repeat(30000),
+  };
+  const combined = companyAndOffer(background);
+  assert.equal(
+    combined,
+    background.companyDescription + "\n\n" + background.productOffer,
+  );
+  const saved = readAgentBackground(
+    writeAgentBackground({
+      ...background,
+      companyDescription: "",
+      productOffer: combined,
+    }),
+  );
+  assert.equal(companyAndOffer(saved), combined);
+  const config = {
+    ...initialAIConfiguration,
+    reply: "{{company_offer}}\n{{conversation}}",
+  };
+  const before = buildModelRequest({
+    ...input,
+    configuration: config,
+    agent: { ...input.agent!, knowledge: writeAgentBackground(background) },
+  });
+  const after = buildModelRequest({
+    ...input,
+    configuration: config,
+    agent: { ...input.agent!, knowledge: writeAgentBackground(saved) },
+  });
+  assert.deepEqual(before.request, after.request);
+  const legacy = validateConfiguration({
+    ...config,
+    reply: "{{company_description}}\n{{product_offer}}\n{{conversation}}",
+  });
+  const oldRequest = buildModelRequest({
+    ...input,
+    configuration: legacy,
+    agent: { ...input.agent!, knowledge: writeAgentBackground(background) },
+  });
+  assert.ok(
+    oldRequest.request.input[0].content.includes(background.companyDescription),
+  );
+  assert.ok(
+    oldRequest.request.input[0].content.includes(background.productOffer),
   );
 });
 
