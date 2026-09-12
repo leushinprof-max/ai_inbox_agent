@@ -15,9 +15,6 @@
   display: flex;
   flex-direction: column;
 }
-.agent-editor-v3.is-testing > .agent-step-footer {
-  display: none;
-}
 .playground-v4 {
   flex: 1;
   min-height: 0;

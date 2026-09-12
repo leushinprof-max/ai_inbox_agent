@@ -594,7 +594,8 @@
   gap: 16px;
 }
 .agent-editor-v3.is-testing .agent-step-footer > div {
-  max-width: 1160px;
+  max-width: none;
+  padding: 12px 24px 16px;
 }
 .agent-editor-v3 [hidden] {
   display: none !important;
