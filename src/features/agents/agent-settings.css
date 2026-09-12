@@ -498,9 +498,6 @@
     border-bottom: 1px solid var(--line);
     border-radius: 0;
 }
-.agent-routing-row:hover {
-  background: var(--panel);
-}
   .agent-routing-row.is-assigned {
     background: transparent;
 }
