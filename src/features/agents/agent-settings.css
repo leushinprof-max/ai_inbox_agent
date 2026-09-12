@@ -534,8 +534,8 @@
   cursor: pointer;
 }
   .agent-editor-v3 input.agent-sender-check:checked {
-    background: var(--hover);
-    border-color: var(--line-strong);
+    background: #35c6a0;
+    border-color: #35c6a0;
   }
   .agent-editor-v3 input.agent-sender-check::after {
   content: "";
@@ -550,7 +550,7 @@
   }
   .agent-editor-v3 input.agent-sender-check:checked::after {
     transform: translateX(14px);
-    background: var(--text);
+    background: #102923;
   }
   @media (prefers-reduced-motion: reduce) {
     .agent-editor-v3 input.agent-sender-check::after {
