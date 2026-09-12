@@ -4,7 +4,14 @@ import "./agent-settings.css";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
-import { Avatar, Button, Empty, IconButton, Notice } from "@/components/ui";
+import {
+  Avatar,
+  Button,
+  Empty,
+  Icon,
+  IconButton,
+  Notice,
+} from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import {
   agentGuidance,
@@ -29,9 +36,11 @@ const steps = [
   "Background",
   "Communication",
   "References",
-  "Settings",
   "Test",
+  "Settings",
 ] as const;
+const testStep = steps.indexOf("Test");
+const settingsStep = steps.indexOf("Settings");
 function editable(agent: Agent): Agent {
   return {
     ...agent,
@@ -132,7 +141,7 @@ export function AgentEditor({ id }: { id: string }) {
     setStep(index);
     scroll.current?.scrollTo({ top: 0 });
   }
-  async function save() {
+  async function save(finish = false) {
     if (saveLock.current || !canManage) return;
     saveLock.current = true;
     setSaving(true);
@@ -201,7 +210,9 @@ export function AgentEditor({ id }: { id: string }) {
       }
       await repository.refresh?.();
       setSaved(true);
-      if (id === "new") router.replace(`${basePath}/agents/${persisted.id}`);
+      if (finish) router.push(`${basePath}/agents`);
+      else if (id === "new")
+        router.replace(`${basePath}/agents/${persisted.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save the agent.");
     } finally {
@@ -217,7 +228,7 @@ export function AgentEditor({ id }: { id: string }) {
         : "Draft";
   return (
     <div
-      className={`agent-editor agent-editor-v3 ${step === 4 ? "is-testing" : ""}`}
+      className={`agent-editor agent-editor-v3 ${step === testStep ? "is-testing" : ""}`}
     >
       <header className="agent-editor-header">
         <IconButton
@@ -305,7 +316,7 @@ export function AgentEditor({ id }: { id: string }) {
             role="tabpanel"
             aria-labelledby={`agent-step-${step}`}
           >
-            {step !== 4 ? (
+            {step !== testStep ? (
               <fieldset disabled={disabled} className="agent-settings-fields">
                 {step === 0 ? (
                   <>
@@ -407,7 +418,7 @@ export function AgentEditor({ id }: { id: string }) {
                     disabled={disabled}
                   />
                 ) : null}
-                {step === 3 ? (
+                {step === settingsStep ? (
                   <>
                     <div className="agent-settings-heading">
                       <h2>Agent settings</h2>
@@ -603,9 +614,9 @@ export function AgentEditor({ id }: { id: string }) {
                 ) : null}
               </fieldset>
             ) : null}
-            <div hidden={step !== 4} id="agent-test-content">
+            <div hidden={step !== testStep} id="agent-test-content">
               <LiveAgentTest
-                active={step === 4}
+                active={step === testStep}
                 agent={agent}
                 senderForms={forms}
                 dirty={dirty}
@@ -627,15 +638,15 @@ export function AgentEditor({ id }: { id: string }) {
           )}
           {step < steps.length - 1 ? (
             <Button variant="primary" onClick={() => go(step + 1)}>
-              Next: {steps[step + 1]}
+              Next <Icon name="arrow" />
             </Button>
           ) : (
             <Button
               variant="primary"
-              disabled={disabled || (!dirty && !!agent.version)}
-              onClick={() => void save()}
+              disabled={disabled}
+              onClick={() => void save(true)}
             >
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? "Saving…" : "Finish setup"}
             </Button>
           )}
         </div>
