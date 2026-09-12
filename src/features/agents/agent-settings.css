@@ -304,18 +304,10 @@
   font-size: 12px;
   cursor: pointer;
 }
-.agent-reply-options button svg {
-  width: 13px;
-  height: 13px;
-  visibility: hidden;
-}
 .agent-reply-options button[aria-pressed="true"] {
   color: var(--text);
   background: rgba(124, 108, 248, 0.18);
   border-color: transparent;
-}
-.agent-reply-options button[aria-pressed="true"] svg {
-  visibility: visible;
 }
 .agent-reply-options button:not(:disabled):hover {
   background: var(--hover);

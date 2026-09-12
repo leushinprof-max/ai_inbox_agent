@@ -1,6 +1,6 @@
 # Agent editor and playground
 
-The editor has five freely accessible steps: Background, Communication, References, Settings and Test. Back/Next navigation changes the visible step without saving or discarding edits. The header, step navigation and footer stay fixed while the form scrolls.
+The editor has five steps: Background, Communication, References, Settings and Test. Back/Next navigation changes the visible step without saving or discarding edits. The header, step navigation and footer stay fixed while the form scrolls. Entering Test with no reply categories selected opens an explanatory dialog and keeps the current step; choosing a category allows navigation. No inline empty-selection message changes the form layout.
 
 - Background combines the former company name, description and offer into About your company. Existing content is preserved when opened and is persisted only when the agent is saved. Selling points use add/edit dialogs.
 - Communication contains the conversation goal, tone/style and optional custom instructions. Explanations appear as empty-field placeholders.

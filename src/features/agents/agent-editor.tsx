@@ -4,14 +4,7 @@ import "./agent-settings.css";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
-import {
-  Avatar,
-  Button,
-  Empty,
-  Icon,
-  IconButton,
-  Notice,
-} from "@/components/ui";
+import { Avatar, Button, Empty, IconButton, Notice } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import {
   agentGuidance,
@@ -98,6 +91,7 @@ export function AgentEditor({ id }: { id: string }) {
   const [forms, setForms] = useState<Record<number, GrammaticalForm>>({});
   const [step, setStep] = useState(0);
   const [naming, setNaming] = useState(id === "new");
+  const [missingGroups, setMissingGroups] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -130,6 +124,10 @@ export function AgentEditor({ id }: { id: string }) {
     field("knowledge", writeAgentBackground(value));
   }
   function go(index: number) {
+    if (index === 4 && !agent.replyGroups.length) {
+      setMissingGroups(true);
+      return;
+    }
     setStep(index);
     scroll.current?.scrollTo({ top: 0 });
   }
@@ -498,16 +496,12 @@ export function AgentEditor({ id }: { id: string }) {
                                 )
                               }
                             >
-                              <Icon name="check" />
                               <span>
                                 {group[0].toUpperCase() + group.slice(1)}
                               </span>
                             </button>
                           ))}
                         </div>
-                        {!agent.replyGroups.length ? (
-                          <p className="help">No replies will be prepared.</p>
-                        ) : null}
                       </div>
                     </div>
                     <section className="agent-setting-section">
@@ -621,6 +615,35 @@ export function AgentEditor({ id }: { id: string }) {
           )}
         </div>
       </footer>
+      {missingGroups ? (
+        <Dialog
+          title="Choose a reply category"
+          onClose={() => setMissingGroups(false)}
+        >
+          <p>
+            No reply categories are selected. Choose at least one category so
+            your agent can prepare replies.
+          </p>
+          <div className="row end">
+            <Button
+              variant="primary"
+              onClick={() => {
+                setMissingGroups(false);
+                go(3);
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector<HTMLButtonElement>(
+                      ".agent-reply-options button",
+                    )
+                    ?.focus(),
+                );
+              }}
+            >
+              Choose categories
+            </Button>
+          </div>
+        </Dialog>
+      ) : null}
       {naming ? (
         <Dialog
           title="New agent"
