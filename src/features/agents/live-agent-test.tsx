@@ -90,8 +90,6 @@ function AgentTestChat({
   const [retry, setRetry] = useState(0);
   const [turns, setTurns] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
-  const [previous, setPrevious] = useState("");
-  const [contextOpen, setContextOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [instructionEdit, setInstructionEdit] = useState("");
@@ -145,17 +143,7 @@ function AgentTestChat({
   const baseHistory =
     currentDetail && target
       ? historyThrough(currentDetail.messages, target.id)
-      : mode === "write" && previous.trim() && turns.length
-        ? [
-            {
-              id: "test-context",
-              direction: "outbound" as const,
-              body: previous,
-              createdAt: "",
-              source: "provider" as const,
-            },
-          ]
-        : [];
+      : [];
   const messages = [...baseHistory, ...turns];
   const lastTurn = turns.at(-1);
   const inputNeeded = !!outcome?.missingKnowledge;
@@ -260,8 +248,6 @@ function AgentTestChat({
     setError("");
     setLoadError("");
     setMessage("");
-    setPrevious("");
-    setContextOpen(false);
     setLastRequest(null);
     setInstructions("");
     setTruncated(false);
@@ -297,7 +283,6 @@ function AgentTestChat({
       setLastRequest(request);
       setMessage("");
       setOutcome(null);
-      setContextOpen(false);
       setError(
         "Your test message is ready. Open your workspace to generate a real reply; demo mode does not call AI.",
       );
@@ -309,7 +294,6 @@ function AgentTestChat({
       agent,
       conversationId: mode === "conversation" ? conversationId : null,
       messageId: mode === "conversation" ? (target?.id ?? null) : null,
-      previousMessage: mode === "write" ? previous : "",
       transcript: request.turns.map((m) => ({
         direction: m.direction,
         body: m.body,
@@ -333,7 +317,6 @@ function AgentTestChat({
     setMessage("");
     setOutcome(null);
     setError("");
-    setContextOpen(false);
     lock.current = true;
     const generation = ++run.current;
     setBusy(true);
@@ -685,27 +668,6 @@ function AgentTestChat({
                 submit();
               }}
             >
-              {contextOpen ? (
-                <div className="playground-context">
-                  <label htmlFor="test-previous">
-                    Earlier message from your team
-                  </label>
-                  <textarea
-                    id="test-previous"
-                    value={previous}
-                    onChange={(e) => setPrevious(e.target.value)}
-                    maxLength={8000}
-                    placeholder="What did you say before the lead replied?"
-                  />
-                  <button
-                    type="button"
-                    className="playground-text-button"
-                    onClick={() => setContextOpen(false)}
-                  >
-                    Done
-                  </button>
-                </div>
-              ) : null}
               <textarea
                 id="test-message"
                 className="reply-input"
@@ -731,17 +693,7 @@ function AgentTestChat({
               />
               <div className="composer-actions">
                 <div>
-                  {mode === "write" && !turns.length ? (
-                    <button
-                      type="button"
-                      className="playground-text-button"
-                      onClick={() => setContextOpen(!contextOpen)}
-                      aria-expanded={contextOpen}
-                    >
-                      <Icon name="plus" />
-                      {previous.trim() ? "Edit context" : "Add context"}
-                    </button>
-                  ) : (
+                  {mode !== "write" || turns.length ? (
                     <button
                       type="button"
                       className="playground-text-button"
@@ -751,7 +703,7 @@ function AgentTestChat({
                       <Icon name="settings" />
                       Adjust instructions
                     </button>
-                  )}
+                  ) : null}
                 </div>
                 <Button
                   variant="primary"

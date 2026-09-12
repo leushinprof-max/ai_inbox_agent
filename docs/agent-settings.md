@@ -12,7 +12,7 @@ New agents are named before entering Background. Save changes persists the agent
 
 ## Playground modes
 
-Test uses the same read-only message and participant components as Conversations, including avatars, timestamps, AI badges and message bubbles. The history scrolls independently above the composer. Write a message accepts a lead message, an optional preceding team message and an optional sender. Generated replies appear in the thread; further lead messages continue the test conversation.
+Test uses the same read-only message and participant components as Conversations, including avatars, timestamps, AI badges and message bubbles. The history scrolls independently above the composer. Write a message accepts a lead message and an optional sender. Generated replies appear in the thread; further lead messages continue the test conversation.
 
 Use a conversation opens a searchable dialog with the same row styling as Conversations. It searches up to 50 matching recent conversations and loads the latest 200 messages. Selecting an earlier incoming message tests a reply at that point; later messages are excluded. The model receives at most 200 historical messages ending at the selected message, ordered by timestamp and ID, followed by the test transcript. The UI notes when history is truncated. Synthetic transcripts are limited to 40 messages, 8,000 characters per message and 64,000 characters in total, and must end with an incoming message.
 

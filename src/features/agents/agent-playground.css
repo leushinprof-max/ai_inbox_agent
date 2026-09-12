@@ -167,15 +167,6 @@
 .playground-chat .composer-actions > .btn {
   margin-left: auto;
 }
-.playground-context {
-  margin-bottom: 16px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.playground-context label {
-  display: block;
-  margin-bottom: 8px;
-}
 .playground-question {
   margin: 0 0 12px;
   font-size: 13px;
