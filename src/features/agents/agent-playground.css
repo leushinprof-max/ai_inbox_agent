@@ -155,7 +155,7 @@
   margin: 0 0 12px;
   font-size: 13px;
 }
-.agent-editor-v3 .playground-chat textarea {
+.agent-editor-v3 .playground-chat textarea:not(.reply-input) {
   width: 100%;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -164,24 +164,8 @@
   padding: 10px 12px;
   font-size: 13.5px;
 }
-.playground-composer-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  padding-top: 10px;
-}
-.playground-composer-actions > .btn:only-child {
+.playground-chat .composer-actions > .btn {
   margin-left: auto;
-}
-.playground-context {
-  margin-bottom: 16px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.playground-context label {
-  display: block;
-  margin-bottom: 8px;
 }
 .playground-question {
   margin: 0 0 12px;
@@ -286,23 +270,11 @@
   .playground-sender {
     margin-left: auto;
   }
-  .playground-chat .thread-header {
-    padding: 0 16px;
-  }
-  .playground-chat .thread-scroll {
-    padding: 16px;
-  }
-  .playground-chat.kimi-thread .composer-wrap {
-    padding: 0 16px 14px;
-  }
   .playground-picker .conv-open {
     grid-template-columns: 6px 26px minmax(0, 1fr);
   }
   .playground-picker .conv-preview {
     grid-column: 3;
-  }
-  .playground-chat .message {
-    max-width: 96%;
   }
   .playground-empty {
     min-height: 170px;
@@ -310,7 +282,7 @@
   .playground-empty h2 {
     font-size: 20px;
   }
-  .agent-editor-v3 .playground-chat textarea {
+  .agent-editor-v3 .playground-chat textarea:not(.reply-input) {
     min-height: 72px;
     font-size: 16px;
   }

@@ -90,8 +90,6 @@ function AgentTestChat({
   const [retry, setRetry] = useState(0);
   const [turns, setTurns] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
-  const [previous, setPrevious] = useState("");
-  const [contextOpen, setContextOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [instructionEdit, setInstructionEdit] = useState("");
@@ -145,17 +143,7 @@ function AgentTestChat({
   const baseHistory =
     currentDetail && target
       ? historyThrough(currentDetail.messages, target.id)
-      : mode === "write" && previous.trim() && turns.length
-        ? [
-            {
-              id: "test-context",
-              direction: "outbound" as const,
-              body: previous,
-              createdAt: "",
-              source: "provider" as const,
-            },
-          ]
-        : [];
+      : [];
   const messages = [...baseHistory, ...turns];
   const lastTurn = turns.at(-1);
   const inputNeeded = !!outcome?.missingKnowledge;
@@ -212,6 +200,23 @@ function AgentTestChat({
     if (active && scroll.current)
       scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [active, turns, currentDetail, messageId, busy, outcome, error]);
+  useLayoutEffect(() => {
+    const input = composer.current;
+    if (!input || inputNeeded) return;
+    const resize = () => {
+      input.style.height = "0px";
+      input.style.height = `${Math.min(240, Math.max(44, input.scrollHeight))}px`;
+    };
+    resize();
+    let width = input.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (input.clientWidth === width) return;
+      width = input.clientWidth;
+      resize();
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [message, active, inputNeeded]);
   const shownChoices: Choice[] =
     appMode === "demo"
       ? state.conversations
@@ -243,8 +248,6 @@ function AgentTestChat({
     setError("");
     setLoadError("");
     setMessage("");
-    setPrevious("");
-    setContextOpen(false);
     setLastRequest(null);
     setInstructions("");
     setTruncated(false);
@@ -280,7 +283,6 @@ function AgentTestChat({
       setLastRequest(request);
       setMessage("");
       setOutcome(null);
-      setContextOpen(false);
       setError(
         "Your test message is ready. Open your workspace to generate a real reply; demo mode does not call AI.",
       );
@@ -292,7 +294,6 @@ function AgentTestChat({
       agent,
       conversationId: mode === "conversation" ? conversationId : null,
       messageId: mode === "conversation" ? (target?.id ?? null) : null,
-      previousMessage: mode === "write" ? previous : "",
       transcript: request.turns.map((m) => ({
         direction: m.direction,
         body: m.body,
@@ -316,7 +317,6 @@ function AgentTestChat({
     setMessage("");
     setOutcome(null);
     setError("");
-    setContextOpen(false);
     lock.current = true;
     const generation = ++run.current;
     setBusy(true);
@@ -634,7 +634,7 @@ function AgentTestChat({
         <div className="composer-wrap playground-composer-wrap">
           {inputNeeded ? (
             <form
-              className="composer"
+              className="composer composer-reply"
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
@@ -646,6 +646,7 @@ function AgentTestChat({
               </div>
               <p className="playground-question">{outcome?.missingKnowledge}</p>
               <textarea
+                className="reply-input"
                 aria-label="Your answer"
                 value={approved}
                 onChange={(e) => setApproved(e.target.value)}
@@ -653,7 +654,7 @@ function AgentTestChat({
                 disabled={busy}
                 placeholder="Add the information your agent needs…"
               />
-              <div className="playground-composer-actions">
+              <div className="composer-actions">
                 <Button variant="primary" type="submit" disabled={!canSubmit}>
                   Generate with your answer
                 </Button>
@@ -661,38 +662,17 @@ function AgentTestChat({
             </form>
           ) : (
             <form
-              className="composer"
+              className="composer composer-reply"
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
               }}
             >
-              {contextOpen ? (
-                <div className="playground-context">
-                  <label htmlFor="test-previous">
-                    Earlier message from your team
-                  </label>
-                  <textarea
-                    id="test-previous"
-                    value={previous}
-                    onChange={(e) => setPrevious(e.target.value)}
-                    maxLength={8000}
-                    placeholder="What did you say before the lead replied?"
-                  />
-                  <button
-                    type="button"
-                    className="playground-text-button"
-                    onClick={() => setContextOpen(false)}
-                  >
-                    Done
-                  </button>
-                </div>
-              ) : null}
-              <label className="composer-title" htmlFor="test-message">
-                Writing as the lead
-              </label>
               <textarea
                 id="test-message"
+                className="reply-input"
+                rows={2}
+                aria-label="Writing as the lead"
                 ref={composer}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -708,22 +688,12 @@ function AgentTestChat({
                     ? "Generate a reply below, or add another lead message…"
                     : turns.length
                       ? "What would the lead say next?"
-                      : "Write a message from your lead…"
+                      : "Write a message…"
                 }
               />
-              <div className="playground-composer-actions">
+              <div className="composer-actions">
                 <div>
-                  {mode === "write" && !turns.length ? (
-                    <button
-                      type="button"
-                      className="playground-text-button"
-                      onClick={() => setContextOpen(!contextOpen)}
-                      aria-expanded={contextOpen}
-                    >
-                      <Icon name="plus" />
-                      {previous.trim() ? "Edit context" : "Add context"}
-                    </button>
-                  ) : (
+                  {mode !== "write" || turns.length ? (
                     <button
                       type="button"
                       className="playground-text-button"
@@ -733,11 +703,11 @@ function AgentTestChat({
                       <Icon name="settings" />
                       Adjust instructions
                     </button>
-                  )}
+                  ) : null}
                 </div>
                 <Button
                   variant="primary"
-                  icon={busy ? "refresh" : "spark"}
+                  icon={busy ? "refresh" : "send"}
                   type="submit"
                   disabled={!canSubmit}
                 >
