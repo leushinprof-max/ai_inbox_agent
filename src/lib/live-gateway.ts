@@ -10,7 +10,8 @@ import type {
 import { InboxError } from "@/domain/inbox";
 import type { InboxGateway } from "@/domain/gateway";
 import { mutateInbox, type InboxMutation } from "@/server/inbox-actions";
-import { saveSenderAssignments } from "@/server/agent-actions";
+import { saveSenderAssignments, saveSenderVoice } from "@/server/agent-actions";
+import type { GrammaticalForm } from "@/domain/agent-guidance";
 import { sendInbox } from "@/server/send-actions";
 import { refreshInboxConversation } from "@/server/refresh-actions";
 import { disconnectHeyReach } from "@/server/connection-actions";
@@ -313,6 +314,22 @@ export class LiveGateway implements InboxGateway {
         resources: agent.resources ?? [],
       },
     });
+  saveSenderVoice = async (
+    scope: Scope,
+    senderId: number,
+    form: GrammaticalForm,
+    expected: GrammaticalForm,
+  ) => {
+    this.check(scope);
+    const result = await saveSenderVoice({
+      workspaceId: scope.workspaceId,
+      senderId,
+      form,
+      expected,
+    });
+    if (!result.ok) throw new Error(result.error);
+    await this.refresh();
+  };
   renameWorkspace = (scope: Scope, name: string, timezone: string) =>
     this.mutate(scope, {
       kind: "workspace",

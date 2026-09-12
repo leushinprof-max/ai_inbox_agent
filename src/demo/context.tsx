@@ -27,6 +27,7 @@ function createDemoGateway(
     saveSenderAssignments: async (...args) =>
       repository.saveSenderAssignments(...args),
     saveAgent: async (...args) => repository.saveAgent(...args),
+    saveSenderVoice: async (...args) => repository.saveSenderVoice(...args),
     addWorkspace: async (...args) => repository.addWorkspace(...args),
     renameWorkspace: async (...args) => repository.renameWorkspace(...args),
     connect: async (...args) => repository.connect(...args),

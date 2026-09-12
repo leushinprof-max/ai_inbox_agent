@@ -20,7 +20,6 @@ import {
 } from "@/domain/agent-background";
 import { intentGroup } from "@/domain/labels";
 import type { Agent } from "@/domain/inbox";
-import { saveSenderVoice } from "@/server/agent-actions";
 import { AgentMark } from "./agent-mark";
 import { AgentReferenceFields } from "./agent-reference-fields";
 import { LiveAgentTest } from "./live-agent-test";
@@ -44,7 +43,7 @@ function editable(agent: Agent): Agent {
 }
 
 export function AgentEditor({ id }: { id: string }) {
-  const { state, scope, repository, basePath, mode, workspace } = useInbox();
+  const { state, scope, repository, basePath, workspace } = useInbox();
   const router = useRouter();
   const existing = state.agents.find(
     (a) => a.id === id && a.workspaceId === scope.workspaceId,
@@ -181,13 +180,12 @@ export function AgentEditor({ id }: { id: string }) {
       for (const [senderId, form] of Object.entries(forms)) {
         const previous = senders.find((s) => s.id === Number(senderId));
         if (!previous) continue;
-        const response = await saveSenderVoice({
-          workspaceId: scope.workspaceId,
-          senderId: Number(senderId),
+        await repository.saveSenderVoice(
+          scope,
+          Number(senderId),
           form,
-          expected: previous.grammaticalForm ?? "unspecified",
-        });
-        if (!response.ok) throw new Error(response.error);
+          previous.grammaticalForm ?? "unspecified",
+        );
         setForms((current) => {
           const next = { ...current };
           delete next[Number(senderId)];
@@ -516,7 +514,6 @@ export function AgentEditor({ id }: { id: string }) {
                               className="agent-sender-form"
                               aria-label={`Writing form for ${sender.name}`}
                               title="How to write as this sender: понял or поняла. Saved for this sender across agents."
-                              disabled={mode === "demo"}
                               value={
                                 forms[sender.id] ??
                                 sender.grammaticalForm ??

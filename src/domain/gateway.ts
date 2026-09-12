@@ -1,4 +1,5 @@
 import type { ConversationFilter } from "./conversation-filters";
+import type { GrammaticalForm } from "./agent-guidance";
 import type { Agent, InboxState, Scope } from "./inbox";
 import type { SendOutcome, SendRequest } from "./send";
 
@@ -55,6 +56,12 @@ export interface InboxGateway {
     revision: number,
   ): Promise<void>;
   saveAgent(scope: Scope, agent: Agent): Promise<void>;
+  saveSenderVoice(
+    scope: Scope,
+    senderId: number,
+    form: GrammaticalForm,
+    expected: GrammaticalForm,
+  ): Promise<void>;
   addWorkspace(userId: string, id: string, name: string): Promise<void>;
   renameWorkspace(scope: Scope, name: string, timezone: string): Promise<void>;
   connect(scope: Scope): Promise<void>;
