@@ -515,18 +515,35 @@ export function AgentEditor({ id }: { id: string }) {
                       <h2>Assigned senders</h2>
 
                       {senders.map((sender) => (
-                        <div className="agent-routing-row" key={sender.id}>
-                          <Avatar initials={sender.name.slice(0, 2)} />
+                        <div
+                          className={`agent-routing-row ${selected.includes(sender.id) ? "is-assigned" : ""}`}
+                          key={sender.id}
+                        >
+                          <Avatar
+                            initials={sender.name.slice(0, 2)}
+                            photoUrl={
+                              sender.photoUrl ??
+                              state.conversations.find(
+                                (c) =>
+                                  c.workspaceId === scope.workspaceId &&
+                                  c.senderId === sender.id &&
+                                  c.senderPhotoUrl,
+                              )?.senderPhotoUrl
+                            }
+                          />
                           <label
                             className="agent-routing-name"
                             htmlFor={`assign-sender-${sender.id}`}
                           >
                             <strong>{sender.name}</strong>
-                            <small className="muted">
-                              {sender.agentId && sender.agentId !== agent.id
-                                ? `Currently assigned to ${state.agents.find((a) => a.id === sender.agentId)?.name ?? "another agent"}`
-                                : "LinkedIn"}
-                            </small>
+                            {sender.agentId && sender.agentId !== agent.id ? (
+                              <small className="muted">
+                                Currently assigned to{" "}
+                                {state.agents.find(
+                                  (a) => a.id === sender.agentId,
+                                )?.name ?? "another agent"}
+                              </small>
+                            ) : null}
                           </label>
                           {showSenderForm ? (
                             <AgentChoice
@@ -558,6 +575,7 @@ export function AgentEditor({ id }: { id: string }) {
                           ) : null}
                           <input
                             id={`assign-sender-${sender.id}`}
+                            className="agent-sender-check"
                             type="checkbox"
                             aria-label={`Assign ${sender.name}`}
                             checked={selected.includes(sender.id)}

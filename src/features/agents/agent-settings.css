@@ -487,11 +487,74 @@
   border-top: 1px solid var(--line);
 }
 .agent-routing-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line);
+  min-height: 72px;
+  padding: 13px 16px;
+  margin-top: 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+.agent-routing-row:hover {
+  background: var(--panel);
+}
+.agent-routing-row.is-assigned {
+  background: var(--raised);
+  border-color: var(--line-strong);
+}
+.agent-routing-row .avatar {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.agent-routing-name::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+}
+.agent-routing-row .agent-sender-choice {
+  z-index: 1;
+}
+.agent-editor-v3 input.agent-sender-check {
+  position: relative;
+  appearance: none;
+  width: 21px !important;
+  height: 21px;
+  min-height: 0;
+  margin: 0 0 0 8px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.agent-editor-v3 input.agent-sender-check:checked {
+  background: var(--text);
+  border-color: transparent;
+}
+.agent-editor-v3 input.agent-sender-check:checked::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 9px;
+  top: 3px;
+  left: 6px;
+  border: solid var(--bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.agent-routing-row:has(.agent-sender-check:focus-visible) {
+  outline: 2px solid var(--line-strong);
+  outline-offset: 2px;
+}
+.agent-editor-v3 input.agent-sender-check:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 .agent-routing-name {
   display: grid;

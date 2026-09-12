@@ -107,12 +107,25 @@ export function createDemoState(): InboxState {
       {
         id: 1,
         name: "John Richardson",
+        photoUrl: "https://randomuser.me/api/portraits/men/32.jpg",
         authValid: true,
         workspaceId: "aster",
         agentId: "reply-handler",
       },
-      { id: 2, name: "Sarah Mitchell", authValid: true, workspaceId: "aster" },
-      { id: 3, name: "Alex Morgan", authValid: false, workspaceId: "aster" },
+      {
+        id: 2,
+        name: "Sarah Mitchell",
+        authValid: true,
+        workspaceId: "aster",
+        photoUrl: "https://randomuser.me/api/portraits/women/44.jpg",
+      },
+      {
+        id: 3,
+        name: "Alex Morgan",
+        authValid: false,
+        workspaceId: "aster",
+        photoUrl: "https://randomuser.me/api/portraits/men/46.jpg",
+      },
     ],
     agents: [
       {
