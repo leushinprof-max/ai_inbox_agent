@@ -212,6 +212,23 @@ function AgentTestChat({
     if (active && scroll.current)
       scroll.current.scrollTop = scroll.current.scrollHeight;
   }, [active, turns, currentDetail, messageId, busy, outcome, error]);
+  useLayoutEffect(() => {
+    const input = composer.current;
+    if (!input || inputNeeded) return;
+    const resize = () => {
+      input.style.height = "0px";
+      input.style.height = `${Math.min(240, Math.max(44, input.scrollHeight))}px`;
+    };
+    resize();
+    let width = input.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (input.clientWidth === width) return;
+      width = input.clientWidth;
+      resize();
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [message, active, inputNeeded]);
   const shownChoices: Choice[] =
     appMode === "demo"
       ? state.conversations
@@ -634,7 +651,7 @@ function AgentTestChat({
         <div className="composer-wrap playground-composer-wrap">
           {inputNeeded ? (
             <form
-              className="composer"
+              className="composer composer-reply"
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
@@ -646,6 +663,7 @@ function AgentTestChat({
               </div>
               <p className="playground-question">{outcome?.missingKnowledge}</p>
               <textarea
+                className="reply-input"
                 aria-label="Your answer"
                 value={approved}
                 onChange={(e) => setApproved(e.target.value)}
@@ -653,7 +671,7 @@ function AgentTestChat({
                 disabled={busy}
                 placeholder="Add the information your agent needs…"
               />
-              <div className="playground-composer-actions">
+              <div className="composer-actions">
                 <Button variant="primary" type="submit" disabled={!canSubmit}>
                   Generate with your answer
                 </Button>
@@ -661,7 +679,7 @@ function AgentTestChat({
             </form>
           ) : (
             <form
-              className="composer"
+              className="composer composer-reply"
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
@@ -688,11 +706,11 @@ function AgentTestChat({
                   </button>
                 </div>
               ) : null}
-              <label className="composer-title" htmlFor="test-message">
-                Writing as the lead
-              </label>
               <textarea
                 id="test-message"
+                className="reply-input"
+                rows={2}
+                aria-label="Writing as the lead"
                 ref={composer}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -708,10 +726,10 @@ function AgentTestChat({
                     ? "Generate a reply below, or add another lead message…"
                     : turns.length
                       ? "What would the lead say next?"
-                      : "Write a message from your lead…"
+                      : "Write a message…"
                 }
               />
-              <div className="playground-composer-actions">
+              <div className="composer-actions">
                 <div>
                   {mode === "write" && !turns.length ? (
                     <button
@@ -737,7 +755,7 @@ function AgentTestChat({
                 </div>
                 <Button
                   variant="primary"
-                  icon={busy ? "refresh" : "spark"}
+                  icon={busy ? "refresh" : "send"}
                   type="submit"
                   disabled={!canSubmit}
                 >
