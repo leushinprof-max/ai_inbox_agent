@@ -11,6 +11,7 @@ import {
   readAgentTestConversation,
   runAgentPlayground,
 } from "@/server/agent-playground-actions";
+import { AgentChoice } from "./agent-choice";
 import "./agent-playground.css";
 
 type Choice = Awaited<ReturnType<typeof findAgentTestConversations>>[number];
@@ -260,9 +261,7 @@ export function LiveAgentTest({
       <div className="playground-heading">
         <div>
           <h2>Test your agent</h2>
-          <p className="help">
-            Try your current settings in a conversation. Nothing is sent.
-          </p>
+          <p className="help">Try a message or replay a real conversation.</p>
         </div>
         <div className="agents-segments" role="group" aria-label="Test mode">
           <button
@@ -292,56 +291,11 @@ export function LiveAgentTest({
       {!canManage ? (
         <Notice>Only workspace admins can run tests.</Notice>
       ) : null}
-      {appMode === "demo" ? (
-        <Notice>
-          Open your workspace to generate real replies. Demo mode does not call
-          a model.
-        </Notice>
-      ) : null}
-      <div className="playground-layout">
-        <aside className="playground-setup" aria-label="Test setup">
-          {mode === "write" ? (
-            <>
-              <div className="field">
-                <label htmlFor="test-sender">Sending as</label>
-                <select
-                  id="test-sender"
-                  value={senderId}
-                  onChange={(e) => setSenderId(e.target.value)}
-                >
-                  <option value="">No sender selected</option>
-                  {senders.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="test-message">Lead message</label>
-                <textarea
-                  id="test-message"
-                  value={message}
-                  maxLength={8000}
-                  placeholder="Write what a lead might say…"
-                  onChange={(e) => {
-                    setMessage(e.target.value);
-                    setApproved("");
-                  }}
-                />
-              </div>
-              <details>
-                <summary>Previous message from your team</summary>
-                <textarea
-                  aria-label="Previous message from your team"
-                  value={previous}
-                  maxLength={8000}
-                  placeholder="Optional: what did you say before the lead replied?"
-                  onChange={(e) => setPrevious(e.target.value)}
-                />
-              </details>
-            </>
-          ) : (
+      <div
+        className={`playground-layout ${mode === "write" ? "is-manual" : ""}`}
+      >
+        {mode === "conversation" ? (
+          <aside className="playground-setup" aria-label="Test setup">
             <>
               <div className="field">
                 <label htmlFor="test-search">Conversations</label>
@@ -396,22 +350,81 @@ export function LiveAgentTest({
                 Showing up to 50 recent conversations. Search to find another
                 lead.
               </p>
-            </>
-          )}
-        </aside>
+            </>{" "}
+          </aside>
+        ) : null}
         <div className="playground-chat">
           <header className="playground-chat-header">
             <Avatar initials={lead.slice(0, 2)} />
             <div>
-              <strong>{lead}</strong>
+              <strong>
+                {mode === "write" ? "New test conversation" : lead}
+              </strong>
               <small>
-                {mode === "conversation" ? "LinkedIn · " : "Your example · "}
+                {mode === "conversation"
+                  ? "Conversation with "
+                  : "Replying as "}
                 {sender}
               </small>
             </div>
             <span className="playground-badge">Test only</span>
           </header>
           <div className="playground-thread">
+            {mode === "write" ? (
+              <div className="playground-compose">
+                <>
+                  <div className="field">
+                    <label htmlFor="test-sender">Sending as</label>
+                    <AgentChoice
+                      id="test-sender"
+                      label="Sending as"
+                      value={senderId}
+                      onChange={setSenderId}
+                      disabled={busy}
+                      options={[
+                        { value: "", label: "Choose a sender" },
+                        ...senders.map((s) => ({
+                          value: String(s.id),
+                          label: s.name,
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="test-message">Lead message</label>
+                    <textarea
+                      id="test-message"
+                      value={message}
+                      maxLength={8000}
+                      placeholder="Write what a lead might say…"
+                      onChange={(e) => {
+                        setMessage(e.target.value);
+                        setApproved("");
+                      }}
+                    />
+                  </div>
+                  <details>
+                    <summary>Previous message from your team</summary>
+                    <textarea
+                      aria-label="Previous message from your team"
+                      value={previous}
+                      maxLength={8000}
+                      placeholder="Optional: what did you say before the lead replied?"
+                      onChange={(e) => setPrevious(e.target.value)}
+                    />
+                  </details>
+                </>
+              </div>
+            ) : null}
+            {mode === "conversation" && !conversationId ? (
+              <div className="playground-empty">
+                <Icon name="chat" />
+                <h3>Choose a conversation</h3>
+                <p>
+                  See how your agent would reply using the conversation history.
+                </p>
+              </div>
+            ) : null}
             {loadError?.key === conversationId ? (
               <Notice variant="error">
                 {loadError.text}
@@ -437,7 +450,7 @@ export function LiveAgentTest({
                 from the test.
               </p>
             ) : null}
-            {messages.map((m, i) => (
+            {(mode === "conversation" ? messages : []).map((m, i) => (
               <div
                 key={m.id}
                 className={`playground-message ${m.direction === "outbound" ? "outgoing" : ""} ${i === messages.length - 1 ? "selected" : ""}`}
@@ -484,92 +497,103 @@ export function LiveAgentTest({
                 </button>
               </p>
             ) : null}
-            <div className="playground-draft" aria-busy={busy}>
-              <div className="playground-draft-title">
-                <Icon name="spark" />
-                <strong>
-                  {currentResult?.output.missingKnowledge
-                    ? "Your input is needed"
-                    : "AI draft"}
-                </strong>
-                <small>
-                  {busy
-                    ? "Preparing reply…"
-                    : currentResult
-                      ? "Test result"
-                      : "Not generated"}
-                </small>
-              </div>
+            {mode === "write" || currentDetail ? (
               <div
-                className={`playground-draft-body ${busy ? "preparing" : ""}`}
-                role="status"
+                className={`playground-draft ${!currentResult && !busy ? "is-ready" : ""}`}
+                aria-busy={busy}
               >
-                {currentResult
-                  ? currentResult.output.missingKnowledge ||
-                    currentResult.output.draft ||
-                    currentResult.output.noReplyReason ||
-                    "No reply was generated."
-                  : mode === "conversation"
-                    ? target
-                      ? "Generate a reply to see how your agent handles this conversation."
-                      : currentDetail
-                        ? "This conversation has no incoming message to test."
-                        : "Choose a conversation to test a reply."
-                    : "Write a lead message and generate a reply to see your agent in action."}
-              </div>
-              {currentResult?.output.missingKnowledge ? (
-                <div className="field">
-                  <label htmlFor="test-answer">Your answer</label>
-                  <textarea
-                    id="test-answer"
-                    value={approved}
-                    disabled={busy}
-                    maxLength={8000}
-                    placeholder="Add the information your agent needs…"
-                    onChange={(e) => setApproved(e.target.value)}
-                  />
+                {currentResult || busy ? (
+                  <>
+                    <div className="playground-draft-title">
+                      <Icon name="spark" />
+                      <strong>
+                        {currentResult?.output.missingKnowledge
+                          ? "Your input is needed"
+                          : "AI draft"}
+                      </strong>
+                      <small>
+                        {busy
+                          ? "Preparing reply…"
+                          : currentResult
+                            ? "Test result"
+                            : "Not generated"}
+                      </small>
+                    </div>
+                    <div
+                      className={`playground-draft-body ${busy ? "preparing" : ""}`}
+                      role="status"
+                    >
+                      {currentResult
+                        ? currentResult.output.missingKnowledge ||
+                          currentResult.output.draft ||
+                          currentResult.output.noReplyReason ||
+                          "No reply was generated."
+                        : mode === "conversation"
+                          ? target
+                            ? "Generate a reply to see how your agent handles this conversation."
+                            : currentDetail
+                              ? "This conversation has no incoming message to test."
+                              : "Choose a conversation to test a reply."
+                          : "Write a lead message and generate a reply to see your agent in action."}
+                    </div>
+                  </>
+                ) : null}
+                {currentResult?.output.missingKnowledge ? (
+                  <div className="field">
+                    <label htmlFor="test-answer">Your answer</label>
+                    <textarea
+                      id="test-answer"
+                      value={approved}
+                      disabled={busy}
+                      maxLength={8000}
+                      placeholder="Add the information your agent needs…"
+                      onChange={(e) => setApproved(e.target.value)}
+                    />
+                  </div>
+                ) : null}
+                {error?.key === sourceKey ? (
+                  <Notice variant="error">{error.text}</Notice>
+                ) : null}
+                <div className="playground-draft-actions">
+                  <button
+                    type="button"
+                    className="playground-text-button"
+                    onClick={onAdjust}
+                  >
+                    Adjust communication
+                  </button>
+                  <Button
+                    variant="primary"
+                    icon={busy ? "refresh" : "spark"}
+                    disabled={
+                      busy ||
+                      !canManage ||
+                      appMode === "demo" ||
+                      !agent.name.trim() ||
+                      (mode === "write" ? !message.trim() : !target) ||
+                      (!!currentResult?.output.missingKnowledge &&
+                        !approved.trim())
+                    }
+                    onClick={() => void generate()}
+                  >
+                    {busy
+                      ? "Preparing reply…"
+                      : currentResult?.output.missingKnowledge
+                        ? "Generate with your answer"
+                        : currentResult
+                          ? "Generate again"
+                          : "Generate reply"}
+                  </Button>
                 </div>
-              ) : null}
-              {error?.key === sourceKey ? (
-                <Notice variant="error">{error.text}</Notice>
-              ) : null}
-              <div className="playground-draft-actions">
-                <button
-                  type="button"
-                  className="playground-text-button"
-                  onClick={onAdjust}
-                >
-                  Adjust communication
-                </button>
-                <Button
-                  variant="primary"
-                  icon={busy ? "refresh" : "spark"}
-                  disabled={
-                    busy ||
-                    !canManage ||
-                    appMode === "demo" ||
-                    !agent.name.trim() ||
-                    (mode === "write" ? !message.trim() : !target) ||
-                    (!!currentResult?.output.missingKnowledge &&
-                      !approved.trim())
-                  }
-                  onClick={() => void generate()}
-                >
-                  {busy
-                    ? "Preparing reply…"
-                    : currentResult?.output.missingKnowledge
-                      ? "Generate with your answer"
-                      : currentResult
-                        ? "Generate again"
-                        : "Generate reply"}
-                </Button>
               </div>
-            </div>
+            ) : null}
             <p className="help playground-footnote">
               {dirty
                 ? "Uses your unsaved agent settings."
                 : "Uses current agent settings."}{" "}
-              Test replies do not change your working drafts.
+              {appMode === "demo"
+                ? "Generation is available in your workspace."
+                : "Nothing is sent or added to Drafts."}
             </p>
           </div>
         </div>
