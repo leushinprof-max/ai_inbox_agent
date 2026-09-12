@@ -10,17 +10,17 @@ The editor has five steps: Background, Communication, References, Settings and T
 
 New agents are named before entering Background. Save changes persists the agent with optimistic version checks and then saves any changed routing or sender forms. Successful parts of a partial save are retained; remaining errors are displayed for review.
 
-## Playground modes
+## Test lead chat
 
-Test uses the same read-only message and participant components as Conversations, including avatars, timestamps, AI badges and message bubbles. The history scrolls independently above the composer. Write a message accepts a lead message and an optional sender. Generated replies appear in the thread; further lead messages continue the test conversation.
+Test uses the same read-only message and participant components as Conversations, including avatars, timestamps, AI badges and message bubbles. The history scrolls independently above the composer. Test accepts a lead message and an optional sender, selected in the thread header. Generated replies appear in the thread; further lead messages continue the test conversation.
 
-Use a conversation opens a searchable dialog with the same row styling as Conversations. It searches up to 50 matching recent conversations and loads the latest 200 messages. Selecting an earlier incoming message tests a reply at that point; later messages are excluded. The model receives at most 200 historical messages ending at the selected message, ordered by timestamp and ID, followed by the test transcript. The UI notes when history is truncated. Synthetic transcripts are limited to 40 messages, 8,000 characters per message and 64,000 characters in total, and must end with an incoming message.
+The agent editor only offers a synthetic Test lead chat; it does not select or load real conversations. Synthetic transcripts are limited to 40 messages, 8,000 characters per message and 64,000 characters in total, and must end with an incoming message.
 
 `agent-playground-actions.ts` authenticates each request and requires workspace owner/admin access. `agent-playground-context.ts` loads workspace-scoped records with the caller's RLS client, validates resource ownership, and combines the unsaved agent snapshot with the published product configuration. Present-day labels, classification evidence and contact-stop flags are not injected into historical tests.
 
 The playground runs the reply stage only, through the existing rate limit and `runRecordedAI` audit path. Redraft replaces the latest generated reply only after a successful result; failures keep the previous reply visible and allow retry. Adjust instructions applies operator guidance to this test, with a separate link to edit the agent's Communication settings. Missing knowledge is answered within the test. A no-reply decision is displayed without inventing a message.
 
-Start over, a different conversation/cutoff or sender, and changed agent guidance clear the synthetic transcript, operator instructions and answers. Late results from an invalidated run are discarded. Merely switching editor tabs retains the test. Demo mode can show manual messages and example history but does not generate simulated model responses.
+Start over, a different sender, and changed agent guidance clear the synthetic transcript, operator instructions and answers. Late results from an invalidated run are discarded. Merely switching editor tabs retains the test. Demo mode can show manual test messages but does not generate simulated model responses.
 
 ## Verification
 

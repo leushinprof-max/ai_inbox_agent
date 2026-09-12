@@ -6,12 +6,8 @@ import type { Classification } from "@/integrations/ai/classify";
 import { Avatar, Button, Icon, Notice } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { useInbox } from "@/lib/inbox-context";
-import { agentTestRequest, historyThrough } from "@/domain/agent-test";
-import {
-  findAgentTestConversations,
-  readAgentTestConversation,
-  runAgentPlayground,
-} from "@/server/agent-playground-actions";
+import { agentTestRequest } from "@/domain/agent-test";
+import { runAgentPlayground } from "@/server/agent-playground-actions";
 import {
   ThreadMessage,
   ThreadParticipants,
@@ -22,8 +18,6 @@ import { AgentChoice } from "./agent-choice";
 import "../conversations/conversations.css";
 import "./agent-playground.css";
 
-type Choice = Awaited<ReturnType<typeof findAgentTestConversations>>[number];
-type Detail = Awaited<ReturnType<typeof readAgentTestConversation>>;
 type Props = {
   agent: Agent;
   dirty: boolean;
@@ -75,19 +69,6 @@ function AgentTestChat({
       senders.find((s) => s.agentId === agent.id)?.id ?? senders[0]?.id ?? "",
     ),
   );
-  const [mode, setMode] = useState<"write" | "conversation">("write");
-  const [picker, setPicker] = useState(false);
-  const [query, setQuery] = useState("");
-  const [choices, setChoices] = useState<{
-    query: string;
-    values: Choice[];
-  } | null>(null);
-  const [listError, setListError] = useState("");
-  const [conversationId, setConversationId] = useState("");
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [messageId, setMessageId] = useState("");
-  const [loadError, setLoadError] = useState("");
-  const [retry, setRetry] = useState(0);
   const [turns, setTurns] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -98,40 +79,21 @@ function AgentTestChat({
   const [lastRequest, setLastRequest] = useState<PendingRequest | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [truncated, setTruncated] = useState(false);
   const run = useRef(0),
     lock = useRef(false);
   const scroll = useRef<HTMLDivElement>(null),
     composer = useRef<HTMLTextAreaElement>(null);
-  const currentDetail =
-    mode === "conversation" && detail?.conversation.id === conversationId
-      ? detail
-      : null;
-  const target =
-    currentDetail?.messages.find(
-      (m) => m.id === messageId && m.direction === "inbound",
-    ) ?? currentDetail?.messages.findLast((m) => m.direction === "inbound");
-  const selectedSenderId =
-    mode === "conversation"
-      ? currentDetail?.conversation.sender_id
-      : Number(senderId);
+  const selectedSenderId = Number(senderId);
   const selectedSender = senders.find((s) => s.id === selectedSenderId);
-  const senderName =
-    mode === "conversation"
-      ? (currentDetail?.conversation.sender_name ?? "Your team")
-      : (selectedSender?.name ?? "Your team");
+  const senderName = selectedSender?.name ?? "Your team";
   const identity: ThreadIdentity = {
     contact: {
-      name: currentDetail?.conversation.contact_name ?? "Test lead",
-      initials: initials(
-        currentDetail?.conversation.contact_name ?? "Test lead",
-      ),
+      name: "Test lead",
+      initials: "TL",
       color: "",
-      photoUrl: currentDetail?.conversation.contact_photo_url,
     },
     senderName,
     senderPhotoUrl:
-      currentDetail?.conversation.sender_photo_url ??
       selectedSender?.photoUrl ??
       state.conversations.find(
         (c) =>
@@ -140,56 +102,11 @@ function AgentTestChat({
           c.senderPhotoUrl,
       )?.senderPhotoUrl,
   };
-  const baseHistory =
-    currentDetail && target
-      ? historyThrough(currentDetail.messages, target.id)
-      : [];
-  const messages = [...baseHistory, ...turns];
+  const messages = turns;
   const lastTurn = turns.at(-1);
   const inputNeeded = !!outcome?.missingKnowledge;
-  const awaitingReply =
-    (lastTurn?.direction === "inbound" || (!turns.length && !!target)) &&
-    !outcome;
+  const awaitingReply = lastTurn?.direction === "inbound" && !outcome;
 
-  useEffect(() => {
-    if (!active || !picker || !canManage || appMode === "demo") return;
-    let cancelled = false;
-    const timeout = setTimeout(() => {
-      void findAgentTestConversations(agent.workspaceId, query)
-        .then((values) => {
-          if (!cancelled) setChoices({ query, values });
-        })
-        .catch(() => {
-          if (!cancelled)
-            setListError("Could not load conversations. Try again.");
-        });
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [agent.workspaceId, query, picker, active, canManage, appMode, retry]);
-  useEffect(() => {
-    if (
-      mode !== "conversation" ||
-      !conversationId ||
-      !canManage ||
-      appMode === "demo"
-    )
-      return;
-    let cancelled = false;
-    void readAgentTestConversation(agent.workspaceId, conversationId)
-      .then((value) => {
-        if (!cancelled) setDetail(value);
-      })
-      .catch(() => {
-        if (!cancelled)
-          setLoadError("Could not load this conversation. Try again.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [agent.workspaceId, conversationId, mode, canManage, appMode, retry]);
   useEffect(
     () => () => {
       run.current++;
@@ -199,7 +116,7 @@ function AgentTestChat({
   useLayoutEffect(() => {
     if (active && scroll.current)
       scroll.current.scrollTop = scroll.current.scrollHeight;
-  }, [active, turns, currentDetail, messageId, busy, outcome, error]);
+  }, [active, turns, busy, outcome, error]);
   useLayoutEffect(() => {
     const input = composer.current;
     if (!input || inputNeeded) return;
@@ -217,27 +134,6 @@ function AgentTestChat({
     observer.observe(input);
     return () => observer.disconnect();
   }, [message, active, inputNeeded]);
-  const shownChoices: Choice[] =
-    appMode === "demo"
-      ? state.conversations
-          .filter(
-            (c) =>
-              c.workspaceId === agent.workspaceId &&
-              c.contact.name.toLowerCase().includes(query.toLowerCase()),
-          )
-          .slice(0, 50)
-          .map((c) => ({
-            id: c.id,
-            contact_name: c.contact.name,
-            contact_photo_url: c.contact.photoUrl ?? null,
-            sender_name: c.senderName,
-            sender_id: c.senderId,
-            last_message_at: c.messages.at(-1)?.createdAt ?? null,
-          }))
-      : choices?.query === query
-        ? choices.values
-        : [];
-
   function reset() {
     run.current++;
     lock.current = false;
@@ -246,35 +142,9 @@ function AgentTestChat({
     setOutcome(null);
     setApproved("");
     setError("");
-    setLoadError("");
     setMessage("");
     setLastRequest(null);
     setInstructions("");
-    setTruncated(false);
-  }
-  function choose(value: Choice) {
-    reset();
-    setMode("conversation");
-    setConversationId(value.id);
-    setMessageId("");
-    setLoadError("");
-    setPicker(false);
-    if (appMode === "demo") {
-      const c = state.conversations.find((c) => c.id === value.id)!;
-      setDetail({
-        conversation: {
-          id: c.id,
-          contact_name: c.contact.name,
-          contact_photo_url: c.contact.photoUrl ?? null,
-          sender_name: c.senderName,
-          sender_photo_url: c.senderPhotoUrl ?? null,
-          sender_id: c.senderId,
-          inbound_revision: c.revision,
-        },
-        messages: c.messages,
-        historyTruncated: false,
-      });
-    }
   }
   async function generate(request: PendingRequest) {
     if (lock.current || !canManage) return;
@@ -292,8 +162,6 @@ function AgentTestChat({
       workspaceId: agent.workspaceId,
       agentId: agent.version ? agent.id : null,
       agent,
-      conversationId: mode === "conversation" ? conversationId : null,
-      messageId: mode === "conversation" ? (target?.id ?? null) : null,
       transcript: request.turns.map((m) => ({
         direction: m.direction,
         body: m.body,
@@ -325,7 +193,6 @@ function AgentTestChat({
       if (generation !== run.current) return;
       if (!response.ok) throw new Error(response.error);
       setOutcome(response.output);
-      setTruncated(response.historyTruncated);
       setApproved("");
       if (response.output.draft && !response.output.missingKnowledge)
         setTurns([
@@ -370,12 +237,9 @@ function AgentTestChat({
       approvedAnswer: "",
     });
   }
-  const loading = mode === "conversation" && !!conversationId && !currentDetail;
   const canSubmit =
     canManage &&
     !busy &&
-    !loading &&
-    (mode !== "conversation" || !!target) &&
     (inputNeeded ? !!approved.trim() : !!message.trim() || awaitingReply);
   const openAdjust = () => {
     setInstructionEdit(instructions);
@@ -384,64 +248,31 @@ function AgentTestChat({
 
   return (
     <section className="agent-playground playground-v4" aria-label="Test agent">
-      <div className="playground-toolbar">
-        <div className="agents-segments" role="group" aria-label="Test mode">
-          <button
-            type="button"
-            aria-pressed={mode === "write"}
-            onClick={() => {
-              if (mode !== "write") {
-                reset();
-                setMode("write");
-              }
-            }}
-          >
-            <Icon name="edit" />
-            Write a message
-          </button>
-          <button
-            type="button"
-            aria-pressed={mode === "conversation"}
-            disabled={!canManage}
-            onClick={() => setPicker(true)}
-          >
-            <Icon name="chat" />
-            Use a conversation
-          </button>
-        </div>
-        <div className="playground-sender">
-          <Avatar
-            initials={initials(senderName)}
-            photoUrl={identity.senderPhotoUrl}
-          />
-          {mode === "write" ? (
-            <AgentChoice
-              compact
-              label="Sending as"
-              value={senderId}
-              disabled={busy}
-              onChange={(value) => {
-                reset();
-                setSenderId(value);
-              }}
-              options={[
-                { value: "", label: "Your team" },
-                ...senders.map((s) => ({ value: String(s.id), label: s.name })),
-              ]}
-            />
-          ) : (
-            <span>{senderName}</span>
-          )}
-        </div>
-      </div>
       <div className="thread kimi-thread playground-chat">
         <header className="thread-header">
           <ThreadParticipants {...identity} />
           <div className="grow">
-            <h2>{loading ? "Loading conversation…" : identity.contact.name}</h2>
-            <p>
-              Sending as <span>{senderName}</span>
-            </p>
+            <h2>{identity.contact.name}</h2>
+            <div className="playground-sender">
+              <span>Sending as</span>
+              <AgentChoice
+                compact
+                label="Sending as"
+                value={senderId}
+                disabled={busy}
+                onChange={(value) => {
+                  reset();
+                  setSenderId(value);
+                }}
+                options={[
+                  { value: "", label: "Your team" },
+                  ...senders.map((s) => ({
+                    value: String(s.id),
+                    label: s.name,
+                  })),
+                ]}
+              />
+            </div>
           </div>
           <button
             className="playground-text-button"
@@ -460,46 +291,20 @@ function AgentTestChat({
           ref={scroll}
           role="log"
           aria-label="Test messages"
-          aria-busy={busy || loading}
+          aria-busy={busy}
         >
           <div className="thread-content">
             {!canManage ? (
               <Notice>Only workspace admins can run tests.</Notice>
             ) : null}
-            {loadError ? (
-              <Notice variant="error">
-                {loadError}
-                <Button
-                  onClick={() => {
-                    setLoadError("");
-                    setRetry((n) => n + 1);
-                  }}
-                >
-                  Retry
-                </Button>
-              </Notice>
-            ) : loading ? (
-              <div className="thread-loading" role="status">
-                <span
-                  className="thread-loading-spinner"
-                  aria-label="Loading conversation"
-                />
-              </div>
-            ) : null}
-            {!messages.length && !loading && !loadError ? (
+            {!messages.length ? (
               <div className="playground-empty">
                 <span>
                   <Icon name="chat" />
                 </span>
-                <h2>
-                  {currentDetail
-                    ? "No incoming messages"
-                    : "Let’s try a conversation"}
-                </h2>
+                <h2>Let’s try a conversation</h2>
                 <p>
-                  {currentDetail
-                    ? "Choose another conversation to test a reply."
-                    : "Write a message as your lead and see how the agent responds."}
+                  Write a message as your lead and see how the agent responds.
                 </p>
               </div>
             ) : null}
@@ -541,44 +346,9 @@ function AgentTestChat({
                       </button>
                     </div>
                   ) : null}
-                  {mode === "conversation" &&
-                  m.direction === "inbound" &&
-                  baseHistory.includes(m) ? (
-                    <button
-                      type="button"
-                      className="playground-text-button playground-cutoff"
-                      aria-pressed={m.id === target?.id}
-                      disabled={busy}
-                      onClick={() => {
-                        reset();
-                        setMessageId(m.id);
-                      }}
-                    >
-                      {m.id === target?.id
-                        ? "Replying from here"
-                        : "Test reply here"}
-                    </button>
-                  ) : null}
                 </ThreadMessage>
               </div>
             ))}
-            {currentDetail &&
-            target?.id !==
-              currentDetail.messages.findLast((m) => m.direction === "inbound")
-                ?.id ? (
-              <p className="help">
-                Later messages are excluded.{" "}
-                <button
-                  className="playground-text-button"
-                  onClick={() => {
-                    reset();
-                    setMessageId("");
-                  }}
-                >
-                  Back to latest incoming
-                </button>
-              </p>
-            ) : null}
             {busy ? (
               <div
                 className="message outbound playground-preparing"
@@ -622,12 +392,6 @@ function AgentTestChat({
                   </Button>
                 ) : null}
               </Notice>
-            ) : null}
-            {currentDetail?.historyTruncated || truncated ? (
-              <p className="help playground-truncated">
-                Only the latest 200 messages up to the selected reply are
-                included.
-              </p>
             ) : null}
           </div>
         </div>
@@ -676,12 +440,7 @@ function AgentTestChat({
                 ref={composer}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                disabled={
-                  !canManage ||
-                  busy ||
-                  loading ||
-                  (mode === "conversation" && !target)
-                }
+                disabled={!canManage || busy}
                 maxLength={8000}
                 placeholder={
                   awaitingReply
@@ -693,7 +452,7 @@ function AgentTestChat({
               />
               <div className="composer-actions">
                 <div>
-                  {mode !== "write" || turns.length ? (
+                  {turns.length ? (
                     <button
                       type="button"
                       className="playground-text-button"
@@ -731,90 +490,6 @@ function AgentTestChat({
           </div>
         </div>
       </div>
-      {picker && active ? (
-        <Dialog title="Choose a conversation" onClose={() => setPicker(false)}>
-          <div className="playground-picker conversations-page">
-            <label className="conversation-search">
-              <Icon name="search" />
-              <input
-                autoFocus
-                aria-label="Search conversations"
-                placeholder="Search by lead name…"
-                value={query}
-                maxLength={200}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setListError("");
-                }}
-              />
-            </label>
-            {listError ? (
-              <Notice variant="error">
-                {listError}
-                <Button
-                  onClick={() => {
-                    setListError("");
-                    setRetry((n) => n + 1);
-                  }}
-                >
-                  Retry
-                </Button>
-              </Notice>
-            ) : null}
-            <div className="conversation-rows">
-              {shownChoices.map((c) => (
-                <article className="conv-row" key={c.id}>
-                  <button
-                    type="button"
-                    className="conv-open"
-                    onClick={() => choose(c)}
-                    aria-label={`Use conversation with ${c.contact_name}`}
-                  >
-                    <span className="conv-unread-slot" />
-                    <Avatar
-                      initials={initials(c.contact_name)}
-                      photoUrl={c.contact_photo_url}
-                    />
-                    <span className="conv-name">{c.contact_name}</span>
-                    <span className="conv-preview">
-                      <span className="conv-snippet">
-                        {state.conversations
-                          .find((v) => v.id === c.id)
-                          ?.messages.at(-1)?.body ??
-                          `Sending as ${c.sender_name}`}
-                      </span>
-                    </span>
-                  </button>
-                  <span className="conv-end">
-                    <time>
-                      {c.last_message_at
-                        ? new Date(c.last_message_at).toLocaleDateString(
-                            "en-GB",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              timeZone: workspace.timezone,
-                            },
-                          )
-                        : ""}
-                    </time>
-                  </span>
-                </article>
-              ))}
-            </div>
-            {!shownChoices.length && !listError ? (
-              <p className="help">
-                {appMode === "demo" || choices?.query === query
-                  ? "No conversations found."
-                  : "Loading conversations…"}
-              </p>
-            ) : null}
-            <p className="help">
-              Up to 50 recent conversations. Search to find another lead.
-            </p>
-          </div>
-        </Dialog>
-      ) : null}
       {adjustOpen && active ? (
         <Dialog
           title="Adjust instructions"
