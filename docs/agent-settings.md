@@ -5,7 +5,7 @@ The editor has five freely accessible steps: Background, Communication, Referenc
 - Background combines the former company name, description and offer into About your company. Existing content is preserved when opened and is persisted only when the agent is saved. Selling points use add/edit dialogs.
 - Communication contains the conversation goal, tone/style and optional custom instructions. Explanations appear as empty-field placeholders.
 - References contains reply examples and materials, with add/edit dialogs and local deletion. Existing PDF resources remain editable; new materials use links.
-- Settings contains the internal name, reply language, independent response-group switches, sender assignments and workspace default. Sender speaking forms remain available under a disclosure. Activation is controlled from the header and is saved with the other edits.
+- Settings contains the internal name, reply language, independent response-group switches, sender assignments and workspace default. A compact writing-form selector sits in each sender row when the language is Russian, automatic or another language that may need it. English, German and Dutch hide the selector without clearing its saved value. Activation is controlled from the header and is saved with the other edits.
 - Test uses the editor's current, possibly unsaved guidance and sender speaking form. It does not publish settings, change conversation labels, replace working drafts or send messages.
 
 New agents are named before entering Background. Save changes persists the agent with optimistic version checks and then saves any changed routing or sender forms. Successful parts of a partial save are retained; remaining errors are displayed for review.

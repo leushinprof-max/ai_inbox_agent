@@ -106,6 +106,9 @@ export function AgentEditor({ id }: { id: string }) {
     routingDirty ||
     Object.keys(forms).length > 0;
   const disabled = !canManage || saving;
+  const showSenderForm = !["English", "German", "Dutch"].includes(
+    agent.language,
+  );
   if (id !== "new" && !existing)
     return (
       <Empty title="Agent not found">
@@ -497,29 +500,59 @@ export function AgentEditor({ id }: { id: string }) {
                       {senders.map((sender) => (
                         <div className="agent-routing-row" key={sender.id}>
                           <Avatar initials={sender.name.slice(0, 2)} />
-                          <label className="agent-routing-name">
+                          <label
+                            className="agent-routing-name"
+                            htmlFor={`assign-sender-${sender.id}`}
+                          >
                             <strong>{sender.name}</strong>
                             <small className="muted">
                               {sender.agentId && sender.agentId !== agent.id
                                 ? `Currently assigned to ${state.agents.find((a) => a.id === sender.agentId)?.name ?? "another agent"}`
                                 : "LinkedIn"}
                             </small>
-                            <input
-                              type="checkbox"
-                              aria-label={`Assign ${sender.name}`}
-                              checked={selected.includes(sender.id)}
+                          </label>
+                          {showSenderForm ? (
+                            <select
+                              className="agent-sender-form"
+                              aria-label={`Writing form for ${sender.name}`}
+                              title="How to write as this sender: понял or поняла. Saved for this sender across agents."
+                              disabled={mode === "demo"}
+                              value={
+                                forms[sender.id] ??
+                                sender.grammaticalForm ??
+                                "unspecified"
+                              }
                               onChange={(e) => {
-                                setSelected((current) =>
-                                  e.target.checked
-                                    ? [...current, sender.id]
-                                    : current.filter(
-                                        (value) => value !== sender.id,
-                                      ),
-                                );
+                                setForms((current) => ({
+                                  ...current,
+                                  [sender.id]: grammaticalForm.parse(
+                                    e.target.value,
+                                  ),
+                                }));
                                 setSaved(false);
                               }}
-                            />
-                          </label>
+                            >
+                              <option value="unspecified">Not specified</option>
+                              <option value="masculine">Masculine</option>
+                              <option value="feminine">Feminine</option>
+                            </select>
+                          ) : null}
+                          <input
+                            id={`assign-sender-${sender.id}`}
+                            type="checkbox"
+                            aria-label={`Assign ${sender.name}`}
+                            checked={selected.includes(sender.id)}
+                            onChange={(e) => {
+                              setSelected((current) =>
+                                e.target.checked
+                                  ? [...current, sender.id]
+                                  : current.filter(
+                                      (value) => value !== sender.id,
+                                    ),
+                              );
+                              setSaved(false);
+                            }}
+                          />
                         </div>
                       ))}
                       {!senders.length ? (
@@ -549,49 +582,6 @@ export function AgentEditor({ id }: { id: string }) {
                           ? " Saving will replace the current workspace default."
                           : ""}
                       </p>
-                      {senders.length ? (
-                        <details className="agent-speaking-forms">
-                          <summary>Sender speaking forms</summary>
-                          <p className="help">
-                            These settings belong to the LinkedIn account and
-                            are shared across agents.
-                          </p>
-                          {senders.map((sender) => (
-                            <div className="field" key={sender.id}>
-                              <label htmlFor={`sender-form-${sender.id}`}>
-                                {sender.name}
-                              </label>
-                              <select
-                                id={`sender-form-${sender.id}`}
-                                disabled={mode === "demo"}
-                                value={
-                                  forms[sender.id] ??
-                                  sender.grammaticalForm ??
-                                  "unspecified"
-                                }
-                                onChange={(e) =>
-                                  setForms((current) => ({
-                                    ...current,
-                                    [sender.id]: grammaticalForm.parse(
-                                      e.target.value,
-                                    ),
-                                  }))
-                                }
-                              >
-                                <option value="unspecified">
-                                  Avoid gendered forms
-                                </option>
-                                <option value="feminine">
-                                  Feminine · поняла
-                                </option>
-                                <option value="masculine">
-                                  Masculine · понял
-                                </option>
-                              </select>
-                            </div>
-                          ))}
-                        </details>
-                      ) : null}
                     </section>
                   </>
                 ) : null}
