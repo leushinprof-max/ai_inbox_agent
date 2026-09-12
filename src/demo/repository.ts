@@ -8,6 +8,7 @@ import {
   type Scope,
 } from "@/domain/inbox";
 import type { SendOutcome, SendRepository, SendRequest } from "@/domain/send";
+import { grammaticalForm, type GrammaticalForm } from "@/domain/agent-guidance";
 
 interface Operation {
   scope: Scope;
@@ -226,6 +227,35 @@ export class DemoRepository implements SendRepository {
       agents: previous
         ? this.state.agents.map((a) => (a.id === agent.id ? saved : a))
         : [...this.state.agents, saved],
+    });
+  }
+  saveSenderVoice(
+    scope: Scope,
+    senderId: number,
+    form: GrammaticalForm,
+    expected: GrammaticalForm,
+  ) {
+    const member = assertMember(this.state, scope, true);
+    if (!["owner", "admin"].includes(member.role))
+      throw new InboxError(
+        "forbidden",
+        "Only workspace admins can configure senders.",
+      );
+    const sender = this.state.senders?.find(
+      (s) =>
+        s.id === senderId &&
+        (!s.workspaceId || s.workspaceId === scope.workspaceId),
+    );
+    if (!sender)
+      throw new InboxError("forbidden", "Sender not found in this workspace.");
+    if ((sender.grammaticalForm ?? "unspecified") !== expected)
+      throw new Error("This sender changed. Reload before saving.");
+    const value = grammaticalForm.parse(form);
+    this.publish({
+      ...this.state,
+      senders: this.state.senders!.map((s) =>
+        s === sender ? { ...s, grammaticalForm: value } : s,
+      ),
     });
   }
   addWorkspace(userId: string, id: string, name: string) {

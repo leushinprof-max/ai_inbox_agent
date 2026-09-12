@@ -123,6 +123,7 @@ export interface InboxState {
     workspaceId?: string;
     agentId?: string | null;
     grammaticalForm?: GrammaticalForm;
+    photoUrl?: string | null;
   }[];
   imports?: {
     id: string;

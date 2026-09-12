@@ -1,0 +1,317 @@
+.agent-editor-v3.is-testing > .content-scroll {
+  overflow: hidden;
+}
+.agent-editor-v3.is-testing .agent-settings-content {
+  max-width: none;
+  height: 100%;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.agent-editor-v3.is-testing .agent-settings-content > [role="tabpanel"],
+.agent-editor-v3.is-testing #agent-test-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.agent-editor-v3.is-testing > .agent-step-footer {
+  display: none;
+}
+.playground-v4 {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.playground-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.playground-toolbar .agents-segments {
+  gap: 3px;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+.playground-toolbar .agents-segments button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+.playground-toolbar .agents-segments button[aria-pressed="true"] {
+  background: var(--hover);
+  border-color: var(--line-strong);
+}
+.playground-toolbar .agents-segments .icon {
+  width: 14px;
+  height: 14px;
+}
+.playground-sender {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.playground-sender > .avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 9px;
+}
+.playground-sender .agent-sender-choice {
+  width: auto;
+  min-width: 110px;
+  z-index: 5;
+}
+.playground-chat.kimi-thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  background: var(--bg);
+}
+.playground-chat .thread-header {
+  flex-shrink: 0;
+}
+.playground-chat .thread-content {
+  padding-bottom: 4px;
+}
+.playground-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 5px 0;
+}
+.playground-text-button .icon {
+  width: 14px;
+  height: 14px;
+}
+.playground-text-button:hover,
+.playground-text-button[aria-pressed="true"] {
+  color: var(--accent-text);
+}
+.playground-reply-actions {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.playground-cutoff {
+  font-size: 11px;
+}
+.playground-empty {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.playground-empty > span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--soft);
+  border: 1px solid #7c6cf840;
+  color: var(--accent-text);
+}
+.playground-empty h2 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+.playground-empty p {
+  margin: 0;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.playground-chat .playground-composer-wrap {
+  flex-shrink: 0;
+  max-height: 55%;
+}
+.playground-chat .composer-title {
+  display: block;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.agent-editor-v3 .playground-chat textarea {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 88px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+}
+.playground-composer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding-top: 10px;
+}
+.playground-composer-actions > .btn:only-child {
+  margin-left: auto;
+}
+.playground-context {
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.playground-context label {
+  display: block;
+  margin-bottom: 8px;
+}
+.playground-question {
+  margin: 0 0 12px;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.playground-footnote {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--faint);
+  font-size: 11px;
+  padding-top: 12px;
+}
+.playground-footnote > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.playground-footnote .icon {
+  width: 12px;
+  height: 12px;
+}
+.playground-preparing .bubble {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+}
+.playground-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.playground-dots i {
+  width: 5px;
+  height: 5px;
+  background: var(--accent-text);
+  border-radius: 50%;
+  animation: playground-pulse 1.2s ease-in-out infinite;
+}
+.playground-dots i:nth-child(2) {
+  animation-delay: 150ms;
+}
+.playground-dots i:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes playground-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playground-dots i {
+    animation: none;
+  }
+}
+.native-dialog:has(.playground-picker) {
+  width: min(800px, calc(100vw - 32px));
+}
+.playground-picker.conversations-page {
+  padding: 18px 0 0;
+  min-height: 0;
+  background: none;
+}
+.playground-picker .conversation-search {
+  margin-bottom: 12px;
+  width: 100%;
+}
+.playground-picker .conversation-rows {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.playground-picker .conv-open {
+  grid-template-columns: 6px 26px 158px minmax(0, 1fr);
+  gap: 10px;
+}
+.playground-picker .conv-preview > :first-child {
+  max-width: 100%;
+  flex-shrink: 1;
+}
+.playground-picker .help {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+.playground-truncated {
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .playground-toolbar {
+    flex-wrap: wrap;
+    padding: 6px 16px 12px;
+    gap: 8px;
+  }
+  .playground-sender {
+    margin-left: auto;
+  }
+  .playground-chat .thread-header {
+    padding: 0 16px;
+  }
+  .playground-chat .thread-scroll {
+    padding: 16px;
+  }
+  .playground-chat.kimi-thread .composer-wrap {
+    padding: 0 16px 14px;
+  }
+  .playground-picker .conv-open {
+    grid-template-columns: 6px 26px minmax(0, 1fr);
+  }
+  .playground-picker .conv-preview {
+    grid-column: 3;
+  }
+  .playground-chat .message {
+    max-width: 96%;
+  }
+  .playground-empty {
+    min-height: 170px;
+  }
+  .playground-empty h2 {
+    font-size: 20px;
+  }
+  .agent-editor-v3 .playground-chat textarea {
+    min-height: 72px;
+    font-size: 16px;
+  }
+}
