@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 const paths = {
+  trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   chat: "M4 4h16v12H9l-5 4V4Z",
   draft: "M5 3h10l4 4v14H5V3Zm10 0v5h4M8 12h8M8 16h5",
   agent:

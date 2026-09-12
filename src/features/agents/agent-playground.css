@@ -1,0 +1,253 @@
+.playground-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.playground-heading h2 {
+  font-size: 21px;
+  margin: 0 0 6px;
+}
+.playground-heading p {
+  margin: 0;
+}
+.playground-heading .agents-segments {
+  flex-wrap: wrap;
+}
+.playground-heading .agents-segments button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  padding: 9px 11px;
+}
+.playground-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  overflow: clip;
+  min-height: 490px;
+}
+.playground-setup {
+  padding: 18px 14px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+.playground-setup .field {
+  margin-bottom: 18px;
+}
+.playground-setup .field > label {
+  font-size: 12px;
+  margin-bottom: 9px;
+}
+.playground-setup input,
+.playground-setup select,
+.playground-setup textarea {
+  font-size: 13px;
+  padding: 10px;
+}
+.playground-setup details {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.playground-setup summary {
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+.playground-setup .help {
+  font-size: 11px;
+}
+.playground-contact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.playground-contact[aria-pressed="true"] {
+  background: var(--soft);
+  border-color: var(--accent);
+}
+.playground-contact > span:last-child {
+  min-width: 0;
+}
+.playground-contact strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.playground-contact small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.playground-contact .avatar {
+  width: 29px;
+  height: 29px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.playground-chat {
+  min-width: 0;
+  background: var(--bg);
+}
+.playground-chat-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.playground-chat-header > div {
+  flex: 1;
+  min-width: 0;
+}
+.playground-chat-header strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.playground-chat-header small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.playground-badge {
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.playground-thread {
+  padding: 22px;
+}
+.playground-message {
+  max-width: 86%;
+  margin-bottom: 22px;
+}
+.playground-message.outgoing {
+  margin-left: auto;
+}
+.playground-message-meta {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+.playground-message.outgoing .playground-message-meta {
+  text-align: right;
+}
+.playground-bubble {
+  padding: 13px 16px;
+  border-radius: 11px;
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid transparent;
+}
+.playground-message.outgoing .playground-bubble {
+  background: var(--soft);
+}
+.playground-message.selected:not(.outgoing) .playground-bubble {
+  border-color: var(--line-strong);
+}
+.playground-text-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 0;
+  text-align: left;
+}
+.playground-text-button:hover,
+.playground-text-button[aria-pressed="true"] {
+  color: var(--accent-text);
+}
+.playground-draft {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--raised);
+  padding: 18px;
+}
+.playground-draft-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--accent-text);
+}
+.playground-draft-title strong {
+  font-weight: 500;
+}
+.playground-draft-title small {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+.playground-draft-body {
+  padding: 23px 0;
+  line-height: 1.7;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.playground-draft-body.preparing {
+  opacity: 0.45;
+}
+.playground-draft-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.playground-draft-actions .btn {
+  font-size: 12px;
+}
+.playground-footnote {
+  font-size: 11px;
+  margin: 12px 0 0;
+}
+.playground-draft textarea {
+  min-height: 80px;
+}
+@media (max-width: 1100px) {
+  .playground-layout {
+    grid-template-columns: 195px minmax(0, 1fr);
+  }
+  .playground-thread {
+    padding: 16px;
+  }
+}
+@media (max-width: 760px) {
+  .playground-layout {
+    grid-template-columns: 1fr;
+  }
+  .playground-setup {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .playground-message {
+    max-width: 95%;
+  }
+  .playground-chat-header {
+    padding: 14px;
+  }
+}

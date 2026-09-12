@@ -5,7 +5,7 @@ export const agentBackground = z.object({
   format: z.literal("agent-background-v2"),
   companyName: z.string().max(200),
   companyDescription: z.string().max(28000),
-  productOffer: z.string().max(58002),
+  productOffer: z.string().max(64000),
   sellingPoints: z.array(z.string().max(8000)).max(40),
   conversationInstructions: z.string().max(8000).default(""),
   replyExamples: z
@@ -65,4 +65,24 @@ export function communicationStyle(agent: {
   return [agent.customInstructions ?? "", agent.meetingInstructions ?? ""]
     .filter(Boolean)
     .join("\n\n");
+}
+
+/** Consolidate the legacy company name into the visible description without losing it. */
+export function unifiedCompanyBackground(
+  background: AgentBackground,
+): AgentBackground {
+  const offer = companyAndOffer(background);
+  const name = background.companyName.trim();
+  const mentioned =
+    name &&
+    new RegExp(
+      `(^|[^\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^\\p{L}\\p{N}])`,
+      "iu",
+    ).test(offer);
+  return {
+    ...background,
+    companyName: "",
+    companyDescription: "",
+    productOffer: name && !mentioned ? `${name}\n\n${offer}` : offer,
+  };
 }
