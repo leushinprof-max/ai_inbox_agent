@@ -516,6 +516,9 @@
 .agent-routing-row .agent-sender-choice {
   z-index: 1;
 }
+.agent-routing-row .agent-sender-choice:has([aria-expanded="true"]) {
+  z-index: 2;
+}
 .agent-editor-v3 input.agent-sender-check {
   position: relative;
   appearance: none;
