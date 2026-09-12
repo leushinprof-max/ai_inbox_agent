@@ -17,6 +17,38 @@ const agent = {
   knowledge: "Approved offer",
   replyGroups: ["positive"],
 };
+test("chat tests accept a bounded transcript ending with the lead and separate redraft guidance", () => {
+  const input = {
+    workspaceId: id,
+    agentId: null,
+    agent,
+    transcript: [
+      { direction: "inbound", body: "How does it work?" },
+      { direction: "outbound", body: "We handle incoming replies." },
+      { direction: "inbound", body: "Can I see a demo?" },
+    ],
+    instructions: "Keep it short",
+    currentDraft: "Old draft",
+  };
+  const parsed = agentTestRequest.parse(input);
+  assert.equal(parsed.transcript.length, 3);
+  assert.equal(parsed.instructions, "Keep it short");
+  assert.equal(parsed.currentDraft, "Old draft");
+  for (const transcript of [
+    [{ direction: "outbound", body: "No lead message" }],
+    [{ direction: "system", body: "Not a conversation turn" }],
+    [{ direction: "inbound", body: " " }],
+    Array.from({ length: 41 }, () => ({ direction: "inbound", body: "x" })),
+    Array.from({ length: 9 }, () => ({
+      direction: "inbound",
+      body: "x".repeat(8000),
+    })),
+  ])
+    assert.equal(
+      agentTestRequest.safeParse({ ...input, transcript }).success,
+      false,
+    );
+});
 test("company consolidation retains large legacy descriptions and names that occur only inside words", () => {
   const background = readAgentBackground("");
   const consolidated = unifiedCompanyBackground({

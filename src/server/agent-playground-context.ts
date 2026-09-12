@@ -42,12 +42,16 @@ export async function prepareAgentPlayground(
           },
         ]
       : []),
-    {
-      id: "sample",
-      direction: "inbound" as const,
-      body: value.message,
-      createdAt: null as string | null,
-    },
+    ...(value.message.trim()
+      ? [
+          {
+            id: "sample",
+            direction: "inbound" as const,
+            body: value.message,
+            createdAt: null as string | null,
+          },
+        ]
+      : []),
   ];
   if (value.conversationId) {
     const conversation = await db
@@ -93,6 +97,15 @@ export async function prepareAgentPlayground(
     senderName = conversation.data!.sender_name;
     leadName = conversation.data!.contact_name;
   }
+  // Synthetic turns extend the verified history only inside this preview request.
+  messages.push(
+    ...value.transcript.map((m, index) => ({
+      id: `test-${index}`,
+      direction: m.direction,
+      body: m.body,
+      createdAt: null,
+    })),
+  );
   const sender = senderId
     ? await db
         .from("senders")
@@ -129,9 +142,9 @@ export async function prepareAgentPlayground(
       replyPreview: true,
       generateDraft: true,
       operator: {
-        instructions: "",
+        instructions: value.instructions,
         approvedAnswer: value.approvedAnswer,
-        currentDraft: "",
+        currentDraft: value.currentDraft,
       },
     } satisfies ModelInput,
     context: {

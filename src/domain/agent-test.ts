@@ -18,15 +18,43 @@ export const agentTestRequest = z
     messageId: z.uuid().nullable().default(null),
     message: z.string().max(8000).default(""),
     previousMessage: z.string().max(8000).default(""),
+    transcript: z
+      .array(
+        z.object({
+          direction: z.enum(["inbound", "outbound"]),
+          body: z.string().trim().min(1).max(8000),
+        }),
+      )
+      .max(40)
+      .default([]),
+    instructions: z.string().max(8000).default(""),
+    currentDraft: z.string().max(8000).default(""),
     approvedAnswer: z.string().max(8000).default(""),
     senderId: z.number().int().positive().nullable().default(null),
     senderForm: grammaticalForm.nullable().default(null),
   })
   .superRefine((value, ctx) => {
-    if (value.conversationId ? !value.messageId : !value.message.trim())
+    if (
+      value.conversationId
+        ? !value.messageId
+        : !value.message.trim() && !value.transcript.length
+    )
       ctx.addIssue({
         code: "custom",
         message: "Choose an incoming message or write a sample message.",
+      });
+    if (
+      value.transcript.length &&
+      value.transcript.at(-1)?.direction !== "inbound"
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "The test must end with a lead message.",
+      });
+    if (value.transcript.reduce((total, m) => total + m.body.length, 0) > 64000)
+      ctx.addIssue({
+        code: "custom",
+        message: "This test conversation is too long. Start a new test.",
       });
   });
 

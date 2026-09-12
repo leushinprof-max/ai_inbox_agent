@@ -31,7 +31,9 @@ export async function findAgentTestConversations(
     .replace(/[\\%_]/g, "\\$&");
   let request = db
     .from("conversations")
-    .select("id,contact_name,sender_name,sender_id,last_message_at")
+    .select(
+      "id,contact_name,contact_photo_url,sender_name,sender_id,last_message_at",
+    )
     .eq("workspace_id", workspaceId)
     .order("last_message_at", { ascending: false })
     .order("id")
@@ -50,7 +52,9 @@ export async function readAgentTestConversation(
   z.uuid().parse(conversationId);
   const conversation = await db
     .from("conversations")
-    .select("id,contact_name,sender_name,sender_id,inbound_revision")
+    .select(
+      "id,contact_name,contact_photo_url,sender_name,sender_photo_url,sender_id,inbound_revision",
+    )
     .eq("workspace_id", workspaceId)
     .eq("id", conversationId)
     .single();

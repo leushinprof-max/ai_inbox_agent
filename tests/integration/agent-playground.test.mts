@@ -162,6 +162,47 @@ test("playground uses unsaved settings, enforces historical scope and records on
     manual.input.messages.map((m) => m.body),
     ["MANUAL-TEAM", "MANUAL-LEAD"],
   );
+  const continued = await prepareAgentPlayground(db, {
+    ...request,
+    transcript: [
+      { direction: "outbound", body: "PREVIEW-REPLY" },
+      { direction: "inbound", body: "TEST-FOLLOWUP" },
+    ],
+    instructions: "TEST-REDRAFT-INSTRUCTIONS",
+    currentDraft: "PRIOR-TEST-DRAFT",
+  });
+  assert.deepEqual(
+    continued.input.messages.map((m) => m.body),
+    [
+      "Earlier team message",
+      "What can you offer?",
+      "PREVIEW-REPLY",
+      "TEST-FOLLOWUP",
+    ],
+  );
+  assert.equal(
+    continued.input.operator?.instructions,
+    "TEST-REDRAFT-INSTRUCTIONS",
+  );
+  assert.equal(continued.input.operator?.currentDraft, "PRIOR-TEST-DRAFT");
+  assert.ok(!JSON.stringify(continued.input).includes("FUTURE-SECRET-PRICE"));
+  const manualChat = await prepareAgentPlayground(db, {
+    ...request,
+    agentId: null,
+    conversationId: null,
+    messageId: null,
+    previousMessage: "TEST-CONTEXT",
+    message: "",
+    transcript: [
+      { direction: "inbound", body: "CHAT-LEAD" },
+      { direction: "outbound", body: "CHAT-REPLY" },
+      { direction: "inbound", body: "CHAT-FOLLOWUP" },
+    ],
+  });
+  assert.deepEqual(
+    manualChat.input.messages.map((m) => m.body),
+    ["TEST-CONTEXT", "CHAT-LEAD", "CHAT-REPLY", "CHAT-FOLLOWUP"],
+  );
   const snapshot = async () => ({
     agent: must(
       await admin.from("agents").select().eq("id", agent.id).single(),
