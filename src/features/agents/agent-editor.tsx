@@ -477,6 +477,13 @@ export function AgentEditor({ id }: { id: string }) {
                           role="radiogroup"
                           aria-labelledby="agent-groups-label"
                         >
+                          <span
+                            className="agent-coverage-thumb"
+                            aria-hidden="true"
+                            style={{
+                              transform: `translateX(${replyCoverageIndex(agent.replyGroups) * 100}%)`,
+                            }}
+                          />
                           {replyCoverage.map((option, index) => (
                             <label
                               key={option.label}
