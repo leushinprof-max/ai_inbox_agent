@@ -287,7 +287,7 @@
 .agent-reply-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .agent-reply-options button {
   display: inline-flex;
@@ -295,9 +295,9 @@
   justify-content: center;
   gap: 5px;
   min-height: 38px;
-  padding: 7px 10px;
+  padding: 7px 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -310,15 +310,18 @@
   visibility: hidden;
 }
 .agent-reply-options button[aria-pressed="true"] {
-  color: var(--accent-text);
-  background: var(--soft);
-  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(124, 108, 248, 0.18);
+  border-color: transparent;
 }
 .agent-reply-options button[aria-pressed="true"] svg {
   visibility: visible;
 }
-.agent-reply-options button:hover {
+.agent-reply-options button:not(:disabled):hover {
   background: var(--hover);
+}
+.agent-reply-options button[aria-pressed="true"]:not(:disabled):hover {
+  background: rgba(124, 108, 248, 0.26);
 }
 .agent-choice {
   position: relative;
