@@ -4,7 +4,14 @@ import "./agent-settings.css";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useInbox } from "@/lib/inbox-context";
-import { Avatar, Button, Empty, IconButton, Notice } from "@/components/ui";
+import {
+  Avatar,
+  Button,
+  Empty,
+  Icon,
+  IconButton,
+  Notice,
+} from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import {
   agentGuidance,
@@ -20,6 +27,7 @@ import {
 } from "@/domain/agent-background";
 import { intentGroup } from "@/domain/labels";
 import type { Agent } from "@/domain/inbox";
+import { AgentChoice } from "./agent-choice";
 import { AgentMark } from "./agent-mark";
 import { AgentReferenceFields } from "./agent-reference-fields";
 import { LiveAgentTest } from "./live-agent-test";
@@ -402,12 +410,32 @@ export function AgentEditor({ id }: { id: string }) {
                 ) : null}
                 {step === 3 ? (
                   <>
-                    <div className="agent-page-heading">
+                    <div className="agent-settings-heading">
                       <h2>Agent settings</h2>
-                      <p className="help">
-                        Manage the agent’s name, reply coverage and senders.
-                      </p>
+                      <label
+                        className="agent-default-control"
+                        title="Used for senders without another agent assigned."
+                      >
+                        <span>Workspace default</span>
+                        <input
+                          className="agent-setting-toggle"
+                          type="checkbox"
+                          role="switch"
+                          checked={defaultAgent}
+                          onChange={(e) => {
+                            setDefaultAgent(e.target.checked);
+                            setSaved(false);
+                          }}
+                        />
+                      </label>
                     </div>
+                    {defaultAgent &&
+                    workspace.defaultAgentId &&
+                    workspace.defaultAgentId !== agent.id ? (
+                      <p className="help">
+                        Saving will replace the current workspace default.
+                      </p>
+                    ) : null}
                     <div className="field">
                       <label htmlFor="agent-name">Agent name</label>
                       <input
@@ -416,35 +444,27 @@ export function AgentEditor({ id }: { id: string }) {
                         maxLength={100}
                         onChange={(e) => field("name", e.target.value)}
                       />
-                      <p className="help">
-                        An internal name to help your team find this agent.
-                        Leads won’t see it.
-                      </p>
                     </div>
                     <div className="agent-operational-fields">
                       <div className="field">
                         <label htmlFor="agent-language">Reply language</label>
-                        <select
+                        <AgentChoice
                           id="agent-language"
+                          label="Reply language"
                           value={agent.language}
-                          onChange={(e) => field("language", e.target.value)}
-                        >
-                          {Array.from(
+                          disabled={disabled}
+                          onChange={(value) => field("language", value)}
+                          options={Array.from(
                             new Set([
+                              "Match the conversation",
                               "English",
                               "Russian",
                               "German",
                               "Dutch",
-                              "Match the conversation",
                               agent.language,
                             ]),
-                          ).map((language) => (
-                            <option key={language}>{language}</option>
-                          ))}
-                        </select>
-                        <p className="help">
-                          Use a specific language or match the conversation.
-                        </p>
+                          ).map((value) => ({ value, label: value }))}
+                        />
                       </div>
                       <div className="field">
                         <span
@@ -453,48 +473,46 @@ export function AgentEditor({ id }: { id: string }) {
                         >
                           Prepare replies for
                         </span>
-                        <div role="group" aria-labelledby="agent-groups-label">
+                        <div
+                          className="agent-reply-options"
+                          role="group"
+                          aria-labelledby="agent-groups-label"
+                        >
                           {intentGroup.options.map((group) => (
-                            <label className="agent-group-row" key={group}>
+                            <button
+                              key={group}
+                              type="button"
+                              aria-pressed={agent.replyGroups.includes(group)}
+                              onClick={() =>
+                                field(
+                                  "replyGroups",
+                                  agent.replyGroups.includes(group)
+                                    ? agent.replyGroups.filter(
+                                        (value) => value !== group,
+                                      )
+                                    : intentGroup.options.filter(
+                                        (value) =>
+                                          value === group ||
+                                          agent.replyGroups.includes(value),
+                                      ),
+                                )
+                              }
+                            >
+                              <Icon name="check" />
                               <span>
                                 {group[0].toUpperCase() + group.slice(1)}
                               </span>
-                              <input
-                                className="agent-setting-toggle"
-                                type="checkbox"
-                                role="switch"
-                                checked={agent.replyGroups.includes(group)}
-                                onChange={(e) =>
-                                  field(
-                                    "replyGroups",
-                                    e.target.checked
-                                      ? intentGroup.options.filter(
-                                          (value) =>
-                                            value === group ||
-                                            agent.replyGroups.includes(value),
-                                        )
-                                      : agent.replyGroups.filter(
-                                          (value) => value !== group,
-                                        ),
-                                  )
-                                }
-                              />
-                            </label>
+                            </button>
                           ))}
                         </div>
-                        <p className="help">
-                          {agent.replyGroups.length
-                            ? "Enable each response group your agent should handle."
-                            : "No groups selected. This agent will not prepare replies."}
-                        </p>
+                        {!agent.replyGroups.length ? (
+                          <p className="help">No replies will be prepared.</p>
+                        ) : null}
                       </div>
                     </div>
                     <section className="agent-setting-section">
                       <h2>Assigned senders</h2>
-                      <p className="help">
-                        Select the LinkedIn senders this agent prepares replies
-                        for.
-                      </p>
+
                       {senders.map((sender) => (
                         <div className="agent-routing-row" key={sender.id}>
                           <Avatar initials={sender.name.slice(0, 2)} />
@@ -510,29 +528,32 @@ export function AgentEditor({ id }: { id: string }) {
                             </small>
                           </label>
                           {showSenderForm ? (
-                            <select
-                              className="agent-sender-form"
-                              aria-label={`Writing form for ${sender.name}`}
+                            <AgentChoice
+                              compact
+                              label={`Writing form for ${sender.name}`}
                               title="How to write as this sender: понял or поняла. Saved for this sender across agents."
+                              disabled={disabled}
                               value={
                                 forms[sender.id] ??
                                 sender.grammaticalForm ??
                                 "unspecified"
                               }
-                              onChange={(e) => {
+                              onChange={(value) => {
                                 setForms((current) => ({
                                   ...current,
-                                  [sender.id]: grammaticalForm.parse(
-                                    e.target.value,
-                                  ),
+                                  [sender.id]: grammaticalForm.parse(value),
                                 }));
                                 setSaved(false);
                               }}
-                            >
-                              <option value="unspecified">Not specified</option>
-                              <option value="masculine">Masculine</option>
-                              <option value="feminine">Feminine</option>
-                            </select>
+                              options={[
+                                {
+                                  value: "unspecified",
+                                  label: "Not specified",
+                                },
+                                { value: "masculine", label: "Masculine" },
+                                { value: "feminine", label: "Feminine" },
+                              ]}
+                            />
                           ) : null}
                           <input
                             id={`assign-sender-${sender.id}`}
@@ -558,27 +579,6 @@ export function AgentEditor({ id }: { id: string }) {
                           senders.
                         </p>
                       ) : null}
-                      <label className="agent-group-row">
-                        <span>Use as workspace default</span>
-                        <input
-                          className="agent-setting-toggle"
-                          type="checkbox"
-                          role="switch"
-                          checked={defaultAgent}
-                          onChange={(e) => {
-                            setDefaultAgent(e.target.checked);
-                            setSaved(false);
-                          }}
-                        />
-                      </label>
-                      <p className="help">
-                        Used for senders without another agent assigned.
-                        {defaultAgent &&
-                        workspace.defaultAgentId &&
-                        workspace.defaultAgentId !== agent.id
-                          ? " Saving will replace the current workspace default."
-                          : ""}
-                      </p>
                     </section>
                   </>
                 ) : null}
