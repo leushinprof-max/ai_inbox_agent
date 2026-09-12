@@ -284,36 +284,59 @@
   font-size: 12px;
   cursor: pointer;
 }
-.agent-reply-options {
+.agent-reply-coverage {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  padding: 4px;
+  gap: 3px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
 }
-.agent-reply-options button {
-  display: inline-flex;
+.agent-editor-v3 .field .agent-reply-coverage label {
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-height: 38px;
-  padding: 7px 14px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: transparent;
+  flex: 1;
+  margin: 0;
+  padding: 8px 9px;
+  border-radius: 7px;
   color: var(--muted);
-  font: inherit;
   font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
 }
-.agent-reply-options button[aria-pressed="true"] {
-  color: var(--text);
+.agent-editor-v3 .field .agent-reply-coverage label.selected {
   background: rgba(124, 108, 248, 0.18);
-  border-color: transparent;
+  color: var(--text);
 }
-.agent-reply-options button:not(:disabled):hover {
+.agent-reply-coverage label:hover {
   background: var(--hover);
 }
-.agent-reply-options button[aria-pressed="true"]:not(:disabled):hover {
-  background: rgba(124, 108, 248, 0.26);
+.agent-reply-coverage label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.agent-editor-v3 .field .agent-reply-coverage input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  pointer-events: none;
+  margin: 0;
+}
+.agent-reply-coverage label:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
+}
+@media (max-width: 650px) {
+  .agent-editor-v3 .field .agent-reply-coverage label {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
 }
 .agent-choice {
   position: relative;

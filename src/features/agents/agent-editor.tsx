@@ -18,7 +18,7 @@ import {
   unifiedCompanyBackground,
   type AgentBackground,
 } from "@/domain/agent-background";
-import { intentGroup } from "@/domain/labels";
+import { replyCoverage, replyCoverageIndex } from "@/domain/reply-coverage";
 import type { Agent } from "@/domain/inbox";
 import { AgentChoice } from "./agent-choice";
 import { AgentMark } from "./agent-mark";
@@ -35,6 +35,9 @@ const steps = [
 function editable(agent: Agent): Agent {
   return {
     ...agent,
+    replyGroups: [
+      ...replyCoverage[replyCoverageIndex(agent.replyGroups)].groups,
+    ],
     knowledge: writeAgentBackground(
       unifiedCompanyBackground(readAgentBackground(agent.knowledge)),
     ),
@@ -74,7 +77,10 @@ export function AgentEditor({ id }: { id: string }) {
       },
     ),
   );
-  const [baseline, setBaseline] = useState(agent);
+  const [baseline, setBaseline] = useState(() => ({
+    ...agent,
+    replyGroups: existing?.replyGroups ?? agent.replyGroups,
+  }));
   const [selected, setSelected] = useState(() =>
     senders.filter((s) => s.agentId === agent.id).map((s) => s.id),
   );
@@ -91,7 +97,6 @@ export function AgentEditor({ id }: { id: string }) {
   const [forms, setForms] = useState<Record<number, GrammaticalForm>>({});
   const [step, setStep] = useState(0);
   const [naming, setNaming] = useState(id === "new");
-  const [missingGroups, setMissingGroups] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -124,10 +129,6 @@ export function AgentEditor({ id }: { id: string }) {
     field("knowledge", writeAgentBackground(value));
   }
   function go(index: number) {
-    if (index === 4 && !agent.replyGroups.length) {
-      setMissingGroups(true);
-      return;
-    }
     setStep(index);
     scroll.current?.scrollTo({ top: 0 });
   }
@@ -472,34 +473,33 @@ export function AgentEditor({ id }: { id: string }) {
                           Prepare replies for
                         </span>
                         <div
-                          className="agent-reply-options"
-                          role="group"
+                          className="agent-reply-coverage"
+                          role="radiogroup"
                           aria-labelledby="agent-groups-label"
                         >
-                          {intentGroup.options.map((group) => (
-                            <button
-                              key={group}
-                              type="button"
-                              aria-pressed={agent.replyGroups.includes(group)}
-                              onClick={() =>
-                                field(
-                                  "replyGroups",
-                                  agent.replyGroups.includes(group)
-                                    ? agent.replyGroups.filter(
-                                        (value) => value !== group,
-                                      )
-                                    : intentGroup.options.filter(
-                                        (value) =>
-                                          value === group ||
-                                          agent.replyGroups.includes(value),
-                                      ),
-                                )
+                          {replyCoverage.map((option, index) => (
+                            <label
+                              key={option.label}
+                              className={
+                                replyCoverageIndex(agent.replyGroups) === index
+                                  ? "selected"
+                                  : ""
                               }
                             >
-                              <span>
-                                {group[0].toUpperCase() + group.slice(1)}
-                              </span>
-                            </button>
+                              <input
+                                type="radio"
+                                name="reply-coverage"
+                                value={index}
+                                checked={
+                                  replyCoverageIndex(agent.replyGroups) ===
+                                  index
+                                }
+                                onChange={() =>
+                                  field("replyGroups", [...option.groups])
+                                }
+                              />
+                              <span>{option.label}</span>
+                            </label>
                           ))}
                         </div>
                       </div>
@@ -615,35 +615,6 @@ export function AgentEditor({ id }: { id: string }) {
           )}
         </div>
       </footer>
-      {missingGroups ? (
-        <Dialog
-          title="Choose a reply category"
-          onClose={() => setMissingGroups(false)}
-        >
-          <p>
-            No reply categories are selected. Choose at least one category so
-            your agent can prepare replies.
-          </p>
-          <div className="row end">
-            <Button
-              variant="primary"
-              onClick={() => {
-                setMissingGroups(false);
-                go(3);
-                requestAnimationFrame(() =>
-                  document
-                    .querySelector<HTMLButtonElement>(
-                      ".agent-reply-options button",
-                    )
-                    ?.focus(),
-                );
-              }}
-            >
-              Choose categories
-            </Button>
-          </div>
-        </Dialog>
-      ) : null}
       {naming ? (
         <Dialog
           title="New agent"
