@@ -184,18 +184,21 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           id: number;
+          name: string | null;
         };
         Insert: {
           configuration: Json;
           created_at?: string;
           created_by?: string | null;
           id?: never;
+          name?: string | null;
         };
         Update: {
           configuration?: Json;
           created_at?: string;
           created_by?: string | null;
           id?: never;
+          name?: string | null;
         };
         Relationships: [];
       };
@@ -1391,6 +1394,10 @@ export type Database = {
           user_id: string;
           workspace_id: string;
         }[];
+      };
+      name_ai_configuration: {
+        Args: { p_version: number; p_name: string };
+        Returns: undefined;
       };
       publish_ai_configuration: {
         Args: { p_revision: number; p_version: number };

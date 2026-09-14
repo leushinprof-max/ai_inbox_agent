@@ -95,6 +95,17 @@ export async function saveAIAdmin(value: unknown) {
   databaseError(result.error);
   return result.data!;
 }
+export async function nameAIAdmin(version: number, name: string) {
+  const { db } = await ownerClient();
+  databaseError(
+    (
+      await db.rpc("name_ai_configuration", {
+        p_version: z.number().int().positive().parse(version),
+        p_name: z.string().trim().max(120).parse(name),
+      })
+    ).error,
+  );
+}
 export async function publishAIAdmin(version: number, revision: number) {
   const { db } = await ownerClient();
   const candidate = await db
