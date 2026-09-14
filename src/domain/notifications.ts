@@ -120,7 +120,7 @@ export function renderDraftNotification(
     message.text += text;
   };
   append(
-    `${n.missingKnowledge ? "⚠️ Draft needs input" : "📝 Draft ready"} · ${shorten(n.workspaceName, 100)}`,
+    `${n.missingKnowledge ? "⚠️ Draft needs input" : "✨ Draft ready"} · ${shorten(n.workspaceName, 100)}`,
     "bold",
   );
   append("\n\n");
@@ -128,18 +128,18 @@ export function renderDraftNotification(
   append(`${shorten(n.contactName, 120)}\n`);
   append("Sender: ", "bold");
   append(`${shorten(n.senderName, 120)}\n\n`);
-  append("💬 Lead’s reply:", "bold");
-  append("\n");
+  append("💬 Lead's Reply:", "bold");
+  append("\n\n");
   append(
     shorten(n.inboundBody || "Open the conversation for context.", 500),
     "blockquote",
   );
   append("\n\n");
   append(
-    n.missingKnowledge ? "🧩 Input needed:" : "✍️ Prepared reply:",
+    n.missingKnowledge ? "🧩 Input needed:" : "✍️ Prepared Draft:",
     "bold",
   );
-  append("\n");
+  append("\n\n");
   const body = n.missingKnowledge ?? n.draftBody;
   // Keep the full approved text visible. A truncated preview has no send button.
   const fits = message.text.length + body.length <= 3800;

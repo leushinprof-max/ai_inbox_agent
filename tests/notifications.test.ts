@@ -69,7 +69,7 @@ test("Formatting keeps literal text and emoji intact, including status updates a
       (entity) =>
         entity.type === "bold" &&
         message.text.slice(entity.offset, entity.offset + entity.length) ===
-          "✍️ Prepared reply:",
+          "✍️ Prepared Draft:",
     ),
   );
   const sent = withNotificationStatus(message, "✅ Sent");
@@ -88,7 +88,7 @@ test("Formatting keeps literal text and emoji intact, including status updates a
       demoHeading.offset,
       demoHeading.offset + demoHeading.length,
     ),
-    `📝 Draft ready · ${source.workspaceName}`,
+    `✨ Draft ready · ${source.workspaceName}`,
   );
 });
 
