@@ -136,6 +136,14 @@ export class LiveGateway implements InboxGateway {
       const old = byId.get(item.id);
       byId.set(item.id, {
         ...item,
+        notes:
+          old && (old.notesRevision ?? 0) > (item.notesRevision ?? 0)
+            ? old.notes
+            : item.notes,
+        notesRevision: Math.max(
+          old?.notesRevision ?? 0,
+          item.notesRevision ?? 0,
+        ),
         agentEnabled:
           (old?.agentControlRevision ?? 0) > (item.agentControlRevision ?? 0)
             ? old?.agentEnabled
@@ -300,17 +308,39 @@ export class LiveGateway implements InboxGateway {
     if (this.search.read !== "all")
       void this.reloadConversationPages(this.conversationPages).catch(() => {});
   };
-  note = (scope: Scope, id: string, notes: string, revision?: number) =>
-    this.mutate(scope, {
+  note = async (scope: Scope, id: string, notes: string, revision?: number) => {
+    this.check(scope);
+    const expected =
+      revision ??
+      this.state.conversations.find((c) => c.id === id)?.notesRevision ??
+      0;
+    const result = await this.mutationAction({
       kind: "note",
       workspaceId: this.workspaceId,
       id,
       notes,
-      revision:
-        revision ??
-        this.state.conversations.find((c) => c.id === id)?.notesRevision ??
-        0,
+      revision: expected,
     });
+    if (!result.ok)
+      throw new InboxError(
+        result.code === "conflict"
+          ? "conflict"
+          : result.code === "forbidden"
+            ? "forbidden"
+            : "invalid",
+        result.error,
+      );
+    // save_note advances the revision once. Only update the acknowledged fields;
+    // a full workspace refresh is unnecessary and can outlast the write itself.
+    this.publish({
+      ...this.state,
+      conversations: this.state.conversations.map((c) =>
+        c.id === id && (c.notesRevision ?? 0) <= expected
+          ? { ...c, notes, notesRevision: expected + 1 }
+          : c,
+      ),
+    });
+  };
   saveSenderAssignments = async (
     scope: Scope,
     agentId: string,
@@ -744,6 +774,15 @@ export class LiveGateway implements InboxGateway {
         ...others,
         {
           ...(newer ? old : result.conversation),
+          notes:
+            old &&
+            (old.notesRevision ?? 0) > (result.conversation.notesRevision ?? 0)
+              ? old.notes
+              : result.conversation.notes,
+          notesRevision: Math.max(
+            old?.notesRevision ?? 0,
+            result.conversation.notesRevision ?? 0,
+          ),
           unread:
             old && old.readStateRevision > result.conversation.readStateRevision
               ? old.unread

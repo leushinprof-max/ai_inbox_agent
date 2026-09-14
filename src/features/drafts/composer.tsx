@@ -285,11 +285,13 @@ export function Composer({
       ));
   const messageInput = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
+    // Preserve dimensions only while loading; finished replies fit their text.
+    if (!generating) retainedInputHeight.current = 0;
     const input = messageInput.current;
     if (!input) return;
     const resize = () => {
       input.style.height = "0px";
-      input.style.height = `${Math.min(240, Math.max(mode === "manual" ? 44 : 112, retainedInputHeight.current, input.scrollHeight))}px`;
+      input.style.height = `${Math.min(240, Math.max(44, retainedInputHeight.current, input.scrollHeight))}px`;
     };
     resize();
     // Opening lead details changes the available width without a window resize.
@@ -596,7 +598,11 @@ export function Composer({
     >
       <div
         ref={composerElement}
-        style={composerHeight ? { minHeight: composerHeight } : undefined}
+        style={
+          composerHeight && (generating || redrafting)
+            ? { minHeight: composerHeight }
+            : undefined
+        }
         className={`composer ${!generating && !redrafting && !needsInput ? `composer-reply ${mode === "manual" ? "composer-manual" : "composer-draft"}` : ""}`}
       >
         {generating ? (

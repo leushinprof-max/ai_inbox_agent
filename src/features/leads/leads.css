@@ -357,6 +357,15 @@
 .lead-note.is-empty {
   color: var(--faint);
 }
+.lead-note-save-status {
+  display: block;
+  padding: 0 0 4px;
+  color: var(--faint);
+  font-size: 10px;
+}
+.lead-note-save-status.is-error {
+  color: var(--red);
+}
 .lead-note-action {
   display: none;
 }

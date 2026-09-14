@@ -7,12 +7,21 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation } from "@/domain/inbox";
+import { noteSaves } from "@/lib/note-saves";
 
 export function LeadNote({ conversation }: { conversation: Conversation }) {
-  const { scope, state } = useInbox();
+  const { repository, scope, state } = useInbox();
+  const saves = noteSaves(repository);
+  const saved = useSyncExternalStore(
+    saves.subscribe,
+    () => saves.get(scope, conversation.id),
+    () => undefined,
+  );
+  const displayText = saved?.text ?? conversation.notes;
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const writable = state.memberships.some(
     (member) =>
@@ -24,13 +33,14 @@ export function LeadNote({ conversation }: { conversation: Conversation }) {
     <>
       <button
         type="button"
-        className={`lead-note ${conversation.notes ? "" : "is-empty"}`}
-        disabled={!writable && !conversation.notes}
+        className={`lead-note ${displayText ? "" : "is-empty"}`}
+        disabled={saved?.saving || (!writable && !displayText)}
+        title={saved?.error || undefined}
         aria-label={`Note for ${conversation.contact.name}`}
         aria-expanded={!!anchor}
         onClick={(event) => setAnchor(event.currentTarget)}
       >
-        {conversation.notes || (
+        {displayText || (
           <>
             <span className="lead-note-placeholder" aria-hidden="true">
               —
@@ -39,11 +49,26 @@ export function LeadNote({ conversation }: { conversation: Conversation }) {
           </>
         )}
       </button>
+      {saved ? (
+        <span
+          className={`lead-note-save-status ${saved.error ? "is-error" : ""}`}
+          role={saved.error ? "alert" : "status"}
+        >
+          {saved.saving ? "Saving…" : "Not saved — click to retry"}
+        </span>
+      ) : null}
       {anchor && (
         <NoteEditor
           conversation={conversation}
           anchor={anchor}
           writable={writable}
+          initialText={saved?.text ?? conversation.notes}
+          initialError={saved?.error ?? ""}
+          initialRevision={saved?.revision ?? conversation.notesRevision ?? 0}
+          onSave={(text, revision) => {
+            void saves.save(repository, scope, conversation.id, text, revision);
+          }}
+          onDiscard={() => saves.discard(scope, conversation.id)}
           onClose={(restoreFocus) => {
             setAnchor(null);
             if (restoreFocus) anchor.focus({ preventScroll: true });
@@ -59,24 +84,31 @@ function NoteEditor({
   anchor,
   writable,
   onClose,
+  initialText,
+  initialError,
+  initialRevision,
+  onSave,
+  onDiscard,
 }: {
   conversation: Conversation;
   anchor: HTMLButtonElement;
   writable: boolean;
   onClose: (restoreFocus: boolean) => void;
+  initialText: string;
+  initialError: string;
+  initialRevision: number;
+  onSave: (text: string, revision: number) => void;
+  onDiscard: () => void;
 }) {
-  const { repository, scope } = useInbox();
   const panel = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const original = useRef({
     text: conversation.notes,
-    revision: conversation.notesRevision,
+    revision: initialRevision,
   });
-  const pending = useRef(false);
   const closing = useRef(false);
-  const [text, setText] = useState(conversation.notes);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [text, setText] = useState(initialText);
+  const error = initialError;
   const helpId = useId();
   const errorId = useId();
   const close = useCallback(
@@ -121,7 +153,7 @@ function NoteEditor({
     );
     return () => editor.hidePopover();
   }, [position]);
-  useLayoutEffect(position, [position, text, error, saving]);
+  useLayoutEffect(position, [position, text, error]);
   useEffect(() => {
     const move = (event: Event) => {
       if (event.target instanceof Node && panel.current?.contains(event.target))
@@ -144,36 +176,17 @@ function NoteEditor({
   }, [anchor, position]);
 
   const save = useCallback(
-    async (restoreFocus: boolean) => {
-      if (pending.current || closing.current) return;
+    (restoreFocus: boolean) => {
+      if (closing.current) return;
       if (!writable || text === original.current.text) {
+        if (writable) onDiscard();
         close(restoreFocus);
         return;
       }
-      pending.current = true;
-      setSaving(true);
-      setError("");
-      try {
-        await repository.note(
-          scope,
-          conversation.id,
-          text,
-          original.current.revision,
-        );
-        close(restoreFocus);
-      } catch (cause) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Could not save the note. Try again.",
-        );
-        input.current?.focus({ preventScroll: true });
-      } finally {
-        pending.current = false;
-        setSaving(false);
-      }
+      onSave(text, original.current.revision);
+      close(restoreFocus);
     },
-    [conversation.id, close, repository, scope, text, writable],
+    [close, onDiscard, onSave, text, writable],
   );
 
   useEffect(() => {
@@ -184,30 +197,11 @@ function NoteEditor({
         anchor.contains(event.target)
       )
         return;
-      // Keep the edit available if saving fails instead of losing it to navigation.
-      if (writable && text !== original.current.text) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
       void save(false);
     };
     document.addEventListener("pointerdown", outside, true);
-    const guardClick = (event: MouseEvent) => {
-      if (
-        writable &&
-        text !== original.current.text &&
-        event.target instanceof Node &&
-        !panel.current?.contains(event.target) &&
-        !anchor.contains(event.target)
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    document.addEventListener("click", guardClick, true);
     return () => {
       document.removeEventListener("pointerdown", outside, true);
-      document.removeEventListener("click", guardClick, true);
     };
   }, [anchor, save, text, writable]);
 
@@ -218,7 +212,6 @@ function NoteEditor({
       className="lead-note-editor"
       role="group"
       aria-label={`Edit note for ${conversation.contact.name}`}
-      aria-busy={saving}
       onBlur={(event) => {
         if (
           event.relatedTarget &&
@@ -234,7 +227,7 @@ function NoteEditor({
         aria-describedby={error ? `${helpId} ${errorId}` : helpId}
         aria-invalid={!!error}
         value={text}
-        readOnly={!writable || saving}
+        readOnly={!writable}
         rows={1}
         maxLength={8000}
         placeholder="Add a note…"
@@ -244,7 +237,7 @@ function NoteEditor({
           if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();
-            if (!pending.current) close(true);
+            close(true);
           } else if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             void save(false);
@@ -252,9 +245,7 @@ function NoteEditor({
         }}
       />
       <div id={helpId} className="lead-note-editor-hint">
-        {saving ? (
-          <span role="status">Saving…</span>
-        ) : writable ? (
+        {writable ? (
           <>
             Enter to save <span>Shift + Enter for a new line</span>
           </>
@@ -268,14 +259,16 @@ function NoteEditor({
             {error}
           </span>
           <div>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void save(true)}
-            >
+            <button type="button" onClick={() => void save(true)}>
               Retry
             </button>
-            <button type="button" disabled={saving} onClick={() => close(true)}>
+            <button
+              type="button"
+              onClick={() => {
+                onDiscard();
+                close(true);
+              }}
+            >
               Discard changes
             </button>
           </div>
