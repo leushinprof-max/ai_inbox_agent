@@ -16,7 +16,7 @@ import {
 import { outgoingStore, useOutgoing } from "@/lib/outgoing-messages";
 import { usePreferences } from "@/lib/preferences";
 import { DraftRequest } from "./draft-request";
-import { composerBuffers } from "@/lib/composer-buffer";
+import { canAdoptIncomingDraft, composerBuffers } from "@/lib/composer-buffer";
 import { getGenerationProgress } from "@/lib/draft-generation-progress";
 
 export function Composer({
@@ -40,7 +40,7 @@ export function Composer({
   const buffers = composerBuffers(repository);
   const [initialBuffer] = useState(() => buffers.get(scope, conversation.id));
   const [reviewedDraft, setReviewedDraft] = useState(
-    initialBuffer?.reviewedDraft ?? draft,
+    initialBuffer ? initialBuffer.reviewedDraft : draft,
   );
   const [mode, setMode] = useState<"draft" | "manual">(
     initialBuffer
@@ -70,17 +70,25 @@ export function Composer({
   const retainedInputHeight = useRef(0);
   const generation =
     state.generations?.find(
-      (g) => g.id === (generationId ?? observedGenerationId),
+      (g) =>
+        g.id === (generationId ?? observedGenerationId) &&
+        (!g.automatic || g.sourceRevision === conversation.revision),
     ) ??
     state.generations?.find(
-      (g) => g.conversationId === conversation.id && g.status === "queued",
+      (g) =>
+        g.conversationId === conversation.id &&
+        (g.status === "queued" ||
+          (g.automatic &&
+            getGenerationProgress(g.id, g, state.drafts).pending)) &&
+        (!g.automatic || g.sourceRevision === conversation.revision),
     );
-  // Keep requests started by manual classification visible through completion
+  // Keep automatic replies and manual classification visible through completion
   // or failure, even after they leave the queue.
   if (
     !generationId &&
     !observedGenerationId &&
-    generation?.status === "queued"
+    generation &&
+    getGenerationProgress(generation.id, generation, state.drafts).pending
   ) {
     setObservedGenerationId(generation.id);
   }
@@ -112,11 +120,16 @@ export function Composer({
       ? conversation.noReplyReason
       : "";
   const { pending: awaitingGeneration, generatedDraft } = getGenerationProgress(
-    generationId ?? observedGenerationId,
+    generationId ??
+      (observedGenerationId?.startsWith("automatic:") && !generation
+        ? null
+        : observedGenerationId),
     generation,
     state.drafts,
   );
   const generating = requesting || awaitingGeneration;
+  if (observedGenerationId?.startsWith("automatic:") && !generation)
+    setObservedGenerationId(null);
   const writable = state.memberships.some(
     (m) =>
       m.workspaceId === scope.workspaceId &&
@@ -174,11 +187,11 @@ export function Composer({
   // A first incoming draft can arrive while this conversation is already open.
   // Adopt it only into an untouched empty composer; never replace typed text.
   if (
-    !reviewedDraft &&
     draft &&
     mode === "manual" &&
-    text === "" &&
+    canAdoptIncomingDraft({ text, reviewedDraft, manual: true }, draft) &&
     !locked &&
+    !generating &&
     !generationId
   ) {
     setReviewedDraft(draft);
@@ -222,7 +235,11 @@ export function Composer({
       generation.status === "completed" &&
       generatedDraft &&
       (generationId ||
-        (!reviewedDraft && mode === "manual" && text === "" && !locked))
+        (!locked &&
+          canAdoptIncomingDraft(
+            { text, reviewedDraft, manual: mode === "manual" },
+            generatedDraft,
+          )))
     ) {
       setReviewedDraft(generatedDraft);
       setText(generatedDraft.body);
@@ -614,24 +631,26 @@ export function Composer({
                   ? "Your previous draft is saved."
                   : "Preparing your reply…"}
               </span>
-              <Button
-                disabled={
-                  generation?.status !== "queued" || environment === "demo"
-                }
-                onClick={() =>
-                  void run(async () => {
-                    if (!generation) return;
-                    const result = await cancelGeneration(
-                      scope.workspaceId,
-                      generation.id,
-                    );
-                    if (!result.ok) throw new Error(result.error);
-                    await repository.refresh?.();
-                  })
-                }
-              >
-                Cancel generation
-              </Button>
+              {!generation?.automatic ? (
+                <Button
+                  disabled={
+                    generation?.status !== "queued" || environment === "demo"
+                  }
+                  onClick={() =>
+                    void run(async () => {
+                      if (!generation) return;
+                      const result = await cancelGeneration(
+                        scope.workspaceId,
+                        generation.id,
+                      );
+                      if (!result.ok) throw new Error(result.error);
+                      await repository.refresh?.();
+                    })
+                  }
+                >
+                  Cancel generation
+                </Button>
+              ) : null}
             </div>
           </>
         ) : redrafting ? (

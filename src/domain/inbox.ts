@@ -146,6 +146,8 @@ export interface InboxState {
   agentActivity?: Record<string, number>;
   conversationCounts?: Record<string, number>;
   generations?: {
+    automatic?: boolean;
+    sourceRevision?: number;
     id: string;
     conversationId: string;
     status: string;

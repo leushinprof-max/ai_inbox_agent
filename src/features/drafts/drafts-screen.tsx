@@ -13,6 +13,7 @@ import { Composer } from "./composer";
 import { ConversationLabel } from "@/components/label-badge";
 import { usePreferences } from "@/lib/preferences";
 import { useContactDetails } from "@/lib/use-contact-details";
+import { getDraftQueue } from "@/lib/draft-queue";
 
 export function DraftsScreen() {
   const [now, setNow] = useState<number | null>(null);
@@ -60,15 +61,9 @@ export function DraftsScreen() {
       d.workspaceId === scope.workspaceId &&
       !["sent", "dismissed"].includes(d.status),
   );
-  const orderedDrafts = state.paging?.draftIds
-    ? state.paging.draftIds
-        .map((id) => drafts.find((d) => d.id === id))
-        .filter((d): d is NonNullable<typeof d> => !!d)
-    : drafts;
-  const visible = orderedDrafts.filter((d) => {
-    const contact = state.conversations.find(
-      (c) => c.id === d.conversationId,
-    )?.contact;
+  const queue = getDraftQueue(state, scope.workspaceId);
+  const visible = queue.filter((item) => {
+    const contact = item.conversation.contact;
     return `${contact?.name} ${contact?.company}`
       .toLowerCase()
       .includes(query.toLowerCase());
@@ -78,13 +73,13 @@ export function DraftsScreen() {
     : (visible.find((d) => d.id === selectedId) ?? visible[0]);
   const currentId = selected?.id;
   if (currentId && currentId !== selectedId) setSelected(currentId);
-  const conversation = selected
-    ? state.conversations.find((c) => c.id === selected.conversationId)!
-    : null;
+  const conversation = selected?.conversation ?? null;
+  const selectedDraft = selected?.draft;
   return (
     <>
       {error ? <Notice variant="error">{error}</Notice> : null}
-      {!(state.paging
+      {!queue.length &&
+      !(state.paging
         ? Object.values(state.paging.draftCounts).reduce((a, b) => a + b, 0)
         : drafts.length) ? (
         <Empty
@@ -115,19 +110,17 @@ export function DraftsScreen() {
               </label>
             </div>
             <div className="queue-list">
-              {visible.map((draft) => {
-                const c = state.conversations.find(
-                  (c) => c.id === draft.conversationId,
-                )!;
+              {visible.map((item) => {
+                const { conversation: c, draft } = item;
                 const leadMessage = c.messages.findLast(
                   (message) => message.direction === "inbound",
                 );
                 return (
                   <button
-                    key={draft.id}
-                    className={`queue-item draft-lead-card ${selected?.id === draft.id ? "selected" : ""}`}
+                    key={item.id}
+                    className={`queue-item draft-lead-card ${selected?.id === item.id ? "selected" : ""}`}
                     onClick={() => {
-                      setSelected(draft.id);
+                      setSelected(item.id);
                       setAwaitingSelection(false);
                       setMobileThread(true);
                     }}
@@ -142,12 +135,17 @@ export function DraftsScreen() {
                       <span className="snippet">{leadMessage?.body}</span>
                       <span className="draft-lead-footer">
                         <ConversationLabel conversation={c} />
-                        {draft.followUpNumber ? (
+                        {item.pending ? (
+                          <span className="draft-follow-up-label" role="status">
+                            Writing a draft…
+                          </span>
+                        ) : null}
+                        {draft?.followUpNumber ? (
                           <span className="draft-follow-up-label">
                             Follow-up {draft.followUpNumber}
                           </span>
                         ) : null}
-                        {draft.status === "needs_input" ? (
+                        {draft?.status === "needs_input" ? (
                           <span
                             className="draft-input-indicator"
                             role="img"
@@ -204,12 +202,12 @@ export function DraftsScreen() {
               onBack={() => setMobileThread(false)}
               onToggleDetails={() => setDetails(!details)}
             >
-              {selected.status === "snoozed" ? (
+              {selectedDraft?.status === "snoozed" && !selected.pending ? (
                 <div className="composer-wrap">
                   <div className="composer">
                     <p className="draft-text">
                       Snoozed until{" "}
-                      {new Date(selected.snoozedUntil!).toLocaleString(
+                      {new Date(selectedDraft.snoozedUntil!).toLocaleString(
                         "en-GB",
                         { timeZone: workspace.timezone },
                       )}
@@ -221,8 +219,8 @@ export function DraftsScreen() {
                           try {
                             await repository.restore(
                               scope,
-                              selected.id,
-                              selected.revision,
+                              selectedDraft.id,
+                              selectedDraft.revision,
                             );
                             setSelected(selected.id);
                             setError("");
@@ -244,7 +242,7 @@ export function DraftsScreen() {
                 <Composer
                   key={selected.id}
                   conversation={conversation}
-                  draft={selected}
+                  draft={selectedDraft}
                   onDone={() => {
                     const index = visible.findIndex(
                       (item) => item.id === selected.id,
