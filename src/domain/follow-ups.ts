@@ -23,15 +23,43 @@ export const followUpSettings = z
     attempts: z.number().int().min(1).max(5).default(5),
     minDays: z.number().int().min(1).max(365).default(2),
     maxDays: z.number().int().min(1).max(365).default(4),
+    waitDays: z
+      .array(z.number().int().min(1).max(365))
+      .min(1)
+      .max(5)
+      .optional(),
     instructions: z.string().max(8000).default(""),
     examples: z.array(z.string().trim().min(1).max(4000)).max(3).default([]),
   })
   .refine((value) => value.maxDays >= value.minDays, {
     message: "The maximum interval must be at least the minimum interval.",
     path: ["maxDays"],
-  });
+  })
+  .refine(
+    (value) => !value.waitDays || value.waitDays.length === value.attempts,
+    {
+      message: "Choose a wait period for each follow-up.",
+      path: ["waitDays"],
+    },
+  )
+  .transform((value) => ({ ...value, waitDays: followUpWaitDays(value) }));
 export type FollowUpSettings = z.infer<typeof followUpSettings>;
 export const defaultFollowUps: FollowUpSettings = followUpSettings.parse({});
+
+/** Old range settings use their midpoint until the per-attempt values are saved. */
+export function followUpWaitDays(settings: {
+  attempts: number;
+  minDays: number;
+  maxDays: number;
+  waitDays?: number[];
+}): number[] {
+  return (
+    settings.waitDays ??
+    Array.from({ length: settings.attempts }, () =>
+      Math.round((settings.minDays + settings.maxDays) / 2),
+    )
+  );
+}
 export const followUpState = z.enum([
   "idle",
   "waiting_reply",
@@ -53,18 +81,14 @@ export interface Lead {
   error: string | null;
 }
 
-export function sampleFollowUpDate(
+export function followUpDate(
   settings: FollowUpSettings,
   anchor: Date,
-  random = Math.random,
+  attempt = 1,
 ) {
-  const { minDays, maxDays } = followUpSettings.parse(settings);
-  const days =
-    minDays +
-    Math.min(
-      maxDays - minDays,
-      Math.floor(Math.max(0, random()) * (maxDays - minDays + 1)),
-    );
+  const { waitDays } = followUpSettings.parse(settings);
+  // The final attempt also defines the response window before No reply.
+  const days = waitDays[Math.max(0, Math.min(attempt, waitDays.length) - 1)];
   return new Date(anchor.getTime() + days * 86_400_000).toISOString();
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, IconButton } from "@/components/ui";
-import type { FollowUpSettings } from "@/domain/follow-ups";
+import { followUpWaitDays, type FollowUpSettings } from "@/domain/follow-ups";
 import "@/features/leads/leads.css";
 
 export function AgentFollowUps({
@@ -11,78 +11,109 @@ export function AgentFollowUps({
   value: FollowUpSettings;
   onChange: (value: FollowUpSettings) => void;
 }) {
+  const waitDays = followUpWaitDays(value);
   function field<K extends keyof FollowUpSettings>(
     key: K,
     next: FollowUpSettings[K],
   ) {
     onChange({ ...value, [key]: next });
   }
+  function chooseAttempts(attempts: number) {
+    onChange({
+      ...value,
+      attempts,
+      waitDays: Array.from(
+        { length: attempts },
+        (_, index) => waitDays[index] ?? waitDays.at(-1) ?? 3,
+      ),
+    });
+  }
   return (
     <>
-      <p className="page-description">
-        Automatically prepare follow-ups after you reply to an interested lead.
-        Every message appears in Drafts for review before sending.
-      </p>
-      <section className="agent-setting-section">
-        <div className="field">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={value.enabled}
-              onChange={(event) => field("enabled", event.target.checked)}
-            />
-            Enable follow-ups
-          </label>
+      <section className="agent-setting-section agent-follow-up-settings">
+        <div className="agent-follow-up-heading">
+          <div>
+            <h2 id="follow-up-heading">Automatic follow-ups</h2>
+            <p className="page-description" id="follow-up-description">
+              Prepare a follow-up when a lead hasn’t replied. Every message
+              appears in Drafts for review before sending.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            role="switch"
+            className="agent-setting-toggle"
+            aria-label="Enable follow-ups"
+            aria-describedby="follow-up-description"
+            checked={value.enabled}
+            onChange={(event) => field("enabled", event.target.checked)}
+          />
         </div>
-      </section>
-      <section className="agent-setting-section">
-        <h2>Timing &amp; attempts</h2>
-        <div className="agent-follow-up-interval">
-          <div className="field">
-            <label htmlFor="follow-up-attempts">Maximum attempts</label>
-            <input
-              id="follow-up-attempts"
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              value={value.attempts}
-              onChange={(event) =>
-                field("attempts", Number(event.target.value))
-              }
-            />
+        <fieldset className="agent-follow-up-count">
+          <legend>Number of follow-ups</legend>
+          <div className="agent-follow-up-options">
+            {[1, 2, 3, 4, 5].map((attempts) => (
+              <label key={attempts}>
+                <input
+                  type="radio"
+                  name="follow-up-attempts"
+                  aria-label={`${attempts} ${attempts === 1 ? "follow-up" : "follow-ups"}`}
+                  checked={value.attempts === attempts}
+                  onChange={() => chooseAttempts(attempts)}
+                />
+                <span>{attempts}</span>
+              </label>
+            ))}
           </div>
-          <div className="field">
-            <label htmlFor="follow-up-min">Minimum interval, days</label>
-            <input
-              id="follow-up-min"
-              type="number"
-              min={1}
-              max={365}
-              step={1}
-              value={value.minDays}
-              onChange={(event) => field("minDays", Number(event.target.value))}
-            />
+          <p className="agent-follow-up-help">
+            The series stops after {value.attempts}{" "}
+            {value.attempts === 1
+              ? "unanswered follow-up"
+              : "unanswered follow-ups"}
+            .
+          </p>
+        </fieldset>
+        <fieldset className="agent-follow-up-periods">
+          <legend>Wait period (days)</legend>
+          <div className="agent-follow-up-waits">
+            {waitDays.map((days, index) => (
+              <div className="agent-follow-up-wait" key={index}>
+                <label htmlFor={`follow-up-wait-${index}`}>
+                  Follow-up {index + 1}
+                </label>
+                <div className="agent-follow-up-days">
+                  <input
+                    id={`follow-up-wait-${index}`}
+                    type="number"
+                    min={1}
+                    max={365}
+                    step={1}
+                    value={days || ""}
+                    aria-describedby="follow-up-wait-help"
+                    onChange={(event) =>
+                      field(
+                        "waitDays",
+                        waitDays.map((day, position) =>
+                          position === index ? Number(event.target.value) : day,
+                        ),
+                      )
+                    }
+                  />
+                  <span aria-hidden="true">days</span>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="field">
-            <label htmlFor="follow-up-max">Maximum interval, days</label>
-            <input
-              id="follow-up-max"
-              type="number"
-              min={1}
-              max={365}
-              step={1}
-              value={value.maxDays}
-              onChange={(event) => field("maxDays", Number(event.target.value))}
-            />
-          </div>
-        </div>
-        <p className="page-description">
-          The agent chooses a random interval within this range after each sent
-          message. A new reply and your response start a fresh series. After the
-          last attempt and one final waiting interval, the lead moves to No
-          reply.
-        </p>
+          <p className="agent-follow-up-help" id="follow-up-wait-help">
+            Each wait starts when the previous message is sent. A new reply
+            starts a fresh series after your response.
+          </p>
+          <p className="agent-follow-up-help">
+            After the final follow-up, wait another {waitDays.at(-1) || "…"}{" "}
+            {waitDays.at(-1) === 1 ? "day" : "days"} before moving the lead to
+            No reply.
+          </p>
+        </fieldset>
       </section>
       <section className="agent-setting-section">
         <h2>Writing instructions</h2>

@@ -36,7 +36,7 @@ interface DraftRow {
   source_revision: number;
   body: string;
 }
-async function fixture(attempts = 2) {
+async function fixture(attempts = 2, waitDays?: number[]) {
   const owner = randomUUID(),
     agent = randomUUID(),
     conversation = randomUUID();
@@ -63,6 +63,7 @@ async function fixture(attempts = 2) {
       attempts,
       minDays: 2,
       maxDays: 4,
+      ...(waitDays ? { waitDays } : {}),
       instructions: "Keep it short",
       examples: [],
     },
@@ -236,6 +237,73 @@ test("positive admission automatically schedules follow-ups after our reply and 
     planned.due_at,
     "polling and classification do not reroll the interval",
   );
+});
+
+test("each configured wait starts at actual delivery, the final wait is retained, and a reply resets the first step", async () => {
+  const f = await fixture(3, [2, 5, 9]);
+  const expectWait = async (operation: string, days: number) => {
+    const result = await db.query<{ days: string }>(
+      "select (extract(epoch from (l.due_at-s.updated_at))/86400)::text days from public.leads l join public.send_operations s on s.id=$1 where l.workspace_id=$2 and l.conversation_id=$3",
+      [operation, f.workspace, f.conversation],
+    );
+    assert.equal(Number(result.rows[0].days), days);
+  };
+  await expectWait(await f.send(), 2);
+  const planned = (await f.lead()).due_at;
+  await db.query("select public.server_schedule_follow_ups()");
+  assert.deepEqual((await f.lead()).due_at, planned);
+  for (const [index, days] of [5, 9, 9].entries()) {
+    await f.due();
+    await f.complete();
+    const draft = await f.draft();
+    assert.equal(draft.follow_up_number, index + 1);
+    const scheduled = (await f.lead()).due_at;
+    await db.query("select public.server_schedule_follow_ups()");
+    assert.deepEqual(
+      (await f.lead()).due_at,
+      scheduled,
+      "a prepared draft does not start the next wait",
+    );
+    await expectWait(await f.send(draft), days);
+  }
+  assert.equal((await f.lead()).sent_count, 3);
+  assert.equal((await f.lead()).status, "follow_up");
+  await f.inbound("Let's continue");
+  await expectWait(await f.send(), 2);
+  assert.equal((await f.lead()).sent_count, 0);
+});
+
+test("per-attempt settings are versioned and database validation rejects incomplete or invalid waits", async () => {
+  const f = await fixture(2, [3, 7]);
+  const snapshot = await db.query<{ followUps: unknown }>(
+    "select configuration->'followUps' as \"followUps\" from public.agent_versions where agent_id=$1 and version=1",
+    [f.agent],
+  );
+  assert.deepEqual(snapshot.rows[0].followUps, f.config.followUps);
+  for (const waitDays of [
+    [],
+    [3],
+    [3, 4, 5],
+    [0, 4],
+    [3, 366],
+    [1.5, 4],
+    ["3", 4],
+    [null, 4],
+    null,
+    {},
+  ]) {
+    await assert.rejects(
+      db.query("select public.save_agent($1,$2,1,$3)", [
+        f.workspace,
+        f.agent,
+        JSON.stringify({
+          ...f.config,
+          followUps: { ...f.config.followUps, waitDays },
+        }),
+      ]),
+      /follow_ups_check/,
+    );
+  }
 });
 
 test("one draft per attempt, dismissal does not count, confirmed delivery counts exactly once, and exhaustion waits for a reply", async () => {
