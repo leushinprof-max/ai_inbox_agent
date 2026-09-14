@@ -549,12 +549,13 @@
 .agent-follow-up-waits {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px 24px;
+  gap: 16px;
 }
 .agent-follow-up-wait {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 .agent-follow-up-wait > label {
   color: var(--muted);
