@@ -2,7 +2,10 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import { renderDraftNotification } from "@/domain/notifications";
+import {
+  renderDraftNotification,
+  renderTestDraftNotification,
+} from "@/domain/notifications";
 import {
   createTelegramClient,
   TelegramError,
@@ -50,22 +53,7 @@ export async function runNextNotification(
     n.kind === "test"
       ? {
           approvalAllowed: false,
-          message: {
-            text: `Telegram is connected to ${n.workspaceName.slice(0, 200)}. New drafts will appear here when notifications are enabled.`,
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "↗ Open in platform",
-                    url: new URL(
-                      `/w/${n.workspaceId}/settings/notifications`,
-                      origin,
-                    ).toString(),
-                  },
-                ],
-              ],
-            },
-          },
+          message: renderTestDraftNotification(n, origin),
         }
       : renderDraftNotification(
           {

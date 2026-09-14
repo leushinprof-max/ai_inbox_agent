@@ -248,3 +248,85 @@ test("Webhook rejects missing secrets and oversized payloads before processing",
   assert.equal(tooLarge.status, 413);
   assert.equal(providerSends, 1);
 });
+
+test("Send test delivers a realistic draft whose approval never accesses the database or provider", async () => {
+  must(
+    await owner.rpc("test_telegram_notification", {
+      p_workspace: workspace,
+      p_bot: botId,
+    }),
+  );
+  await runNextNotification(admin, {
+    botId,
+    client: telegram,
+    origin: "https://inbox.example",
+  });
+  const card = messages.at(-1)!;
+  assert.match(card.text, /Test notification/);
+  assert.match(card.text, /Lead’s reply:/);
+  assert.match(card.text, /Prepared reply:/);
+  const buttons = card.reply_markup!.inline_keyboard.flat();
+  assert.equal(buttons[0].callback_data, `test_approve:${workspace}`);
+  assert.ok(Buffer.byteLength(buttons[0].callback_data!) <= 64);
+  assert.equal(buttons[1].url, `https://inbox.example/w/${workspace}/drafts`);
+  const callback = {
+    update_id: 5,
+    callback_query: {
+      id: "demo-callback",
+      data: buttons[0].callback_data,
+      from: { id: telegramId, is_bot: false, first_name: "Local owner" },
+      message: {
+        message_id: messages.length,
+        text: card.text,
+        chat: { id: telegramId, type: "private" },
+        from: { id: botId, is_bot: true, first_name: "Fixture bot" },
+      },
+    },
+  };
+  const noDatabase = new Proxy(admin, {
+    get() {
+      throw new Error("Demo approval accessed the database");
+    },
+  });
+  const noProvider = () => {
+    throw new Error("Demo approval accessed the provider");
+  };
+  await handleTelegramUpdate(noDatabase, telegram, botId, callback, noProvider);
+  const approved = edits.at(-1)!;
+  assert.match(
+    approved.text,
+    /Test approved\. No message was sent to the lead\./,
+  );
+  assert.ok(
+    approved
+      .reply_markup!.inline_keyboard.flat()
+      .every((button) => !button.callback_data),
+  );
+  assert.equal(
+    providerSends,
+    1,
+    "Only the earlier real-draft fixture dispatched",
+  );
+  const editCount = edits.length;
+  await handleTelegramUpdate(
+    noDatabase,
+    telegram,
+    botId,
+    {
+      ...callback,
+      callback_query: {
+        ...callback.callback_query,
+        message: {
+          ...callback.callback_query.message,
+          chat: { id: telegramId, type: "group" },
+        },
+      },
+    },
+    noProvider,
+  );
+  assert.equal(
+    edits.length,
+    editCount,
+    "Demo actions still require a private bot message",
+  );
+});

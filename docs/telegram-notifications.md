@@ -34,6 +34,8 @@ Keep the token and secret out of browser variables, URLs in user-facing logs, Gi
 
 Email and group destinations are not enabled in this version.
 
+Send test delivers an explicitly marked example lead reply and prepared draft. Its Approve & send (test) button confirms the simulation and never enters the provider send path. Open in platform opens the workspace draft queue; the example creates no conversation or draft records.
+
 ## Verification
 
 `npm test` covers complete migration replay, scoped links, data access, notification eligibility, stale drafts, revocation, one-operation reservation and full-text buttons. `tests/integration/telegram-notifications.test.mts` exercises the real isolated local Supabase RPCs from `/start` through delivery and concurrent approvals using synthetic Telegram and HeyReach transports. It also checks webhook authentication and payload limits. Stop the standalone worker before running the integration suite, as documented in operations.md.

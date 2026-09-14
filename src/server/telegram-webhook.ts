@@ -35,7 +35,12 @@ export const telegramUpdateSchema = z.object({
       from: user,
       data: z.string().max(64).optional(),
       message: z
-        .object({ message_id: id, chat, from: user.optional() })
+        .object({
+          message_id: id,
+          chat,
+          from: user.optional(),
+          text: z.string().max(4096).optional(),
+        })
         .optional(),
     })
     .optional(),
@@ -111,10 +116,12 @@ export async function handleTelegramUpdate(
   const callback = update.callback_query;
   if (!callback) return;
   const actionId = /^approve:([0-9a-f-]{36})$/.exec(callback.data ?? "")?.[1];
+  const testWorkspace = /^test_approve:([0-9a-f-]{36})$/.exec(
+    callback.data ?? "",
+  )?.[1];
   const callbackMessage = callback.message;
   if (
-    !actionId ||
-    !z.uuid().safeParse(actionId).success ||
+    !z.uuid().safeParse(actionId ?? testWorkspace).success ||
     callback.from.is_bot ||
     callbackMessage?.chat.type !== "private" ||
     callbackMessage.chat.id !== callback.from.id ||
@@ -128,13 +135,40 @@ export async function handleTelegramUpdate(
       .catch(() => {});
     return;
   }
+  if (testWorkspace) {
+    // Demo callbacks never read provider credentials or enter the send path.
+    const confirmation = "✅ Test approved. No message was sent to the lead.";
+    await client.answer(callback.id, confirmation).catch(() => {});
+    const original = callbackMessage.text ?? "🧪 Test notification";
+    await client
+      .edit(callbackMessage.chat.id, callbackMessage.message_id, {
+        text: original.endsWith(confirmation)
+          ? original
+          : `${original.slice(0, 3800)}\n\n${confirmation}`,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "↗ Open in platform",
+                url: new URL(
+                  `/w/${testWorkspace}/drafts`,
+                  inboxOrigin(),
+                ).toString(),
+              },
+            ],
+          ],
+        },
+      })
+      .catch(() => {});
+    return;
+  }
   await client.answer(callback.id, "Checking the draft…").catch(() => {});
   let resultText: string;
   let renderedText: string | null = null;
   let platformUrl: string | undefined;
   try {
     const context = await db.rpc("server_telegram_action", {
-      p_id: actionId,
+      p_id: actionId!,
       p_bot: botId,
       p_telegram: callback.from.id,
       p_chat: callbackMessage.chat.id,
@@ -161,7 +195,7 @@ export async function handleTelegramUpdate(
     const { apiKey } = decryptConnection(workspaceId, record.ciphertext);
     const outcome = await sendReply(
       durableSendRepository(db, db, record.revision, {
-        notificationId: actionId,
+        notificationId: actionId!,
         botId,
         telegramUserId: callback.from.id,
         chatId: callbackMessage.chat.id,
