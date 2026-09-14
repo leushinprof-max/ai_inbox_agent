@@ -1,0 +1,351 @@
+/* Phone workflow only. Keep the existing desktop and admin layouts. */
+.mobile-inbox-nav,
+.mobile-action-label {
+  display: none;
+}
+
+@media (max-width: 680px) {
+  .shell.shell-mobile-inbox {
+    --sidebar: 0px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding-top: env(safe-area-inset-top);
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
+  .shell-mobile-inbox > .sidebar {
+    padding: 2px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .shell-mobile-inbox > .workspace-main {
+    height: auto;
+    min-height: 0;
+  }
+  .shell-mobile-inbox > .sidebar > :not(.workspace-switcher) {
+    display: none;
+  }
+  .shell-mobile-inbox .sidebar .workspace-switcher {
+    margin: 0;
+    padding: 0;
+  }
+  .shell-mobile-inbox .sidebar .workspace-button {
+    min-height: 48px;
+    justify-content: flex-start;
+    padding: 4px;
+  }
+  .shell-mobile-inbox .sidebar .workspace-label,
+  .shell-mobile-inbox .sidebar .workspace-button > .icon {
+    display: block;
+  }
+  .shell-mobile-inbox .workspace-popover {
+    inset: calc(58px + env(safe-area-inset-top)) 12px auto;
+    width: auto;
+    max-height: calc(100dvh - 130px);
+  }
+  .shell-mobile-inbox .mobile-inbox-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line-strong);
+    background: var(--side);
+  }
+  .mobile-inbox-nav > a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 8px;
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .mobile-inbox-nav > a[aria-current="page"] {
+    background: var(--soft);
+    color: var(--accent-text);
+  }
+  .mobile-inbox-nav svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .mobile-draft-count {
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--soft);
+    font-size: 11px;
+  }
+  .shell-mobile-inbox :is(input, textarea, select) {
+    font-size: 16px;
+  }
+  .shell-mobile-inbox
+    :is(
+      .btn,
+      .icon-only,
+      .read-button,
+      .filter-select-trigger,
+      .filter-select-option
+    ) {
+    min-height: 44px;
+  }
+  .shell-mobile-inbox .icon-only,
+  .shell-mobile-inbox .read-button {
+    min-width: 44px;
+  }
+  .shell-mobile-inbox .workspace-search input,
+  .shell-mobile-inbox .workspace-option,
+  .shell-mobile-inbox .workspace-popover-actions a {
+    min-height: 44px;
+  }
+  .shell-mobile-inbox .conversation-search {
+    height: 44px;
+  }
+  .shell-mobile-inbox .conversation-tabs {
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .shell-mobile-inbox .conversation-tabs > * {
+    flex-shrink: 0;
+  }
+  .shell-mobile-inbox .conversation-tabs button {
+    min-height: 44px;
+  }
+  .shell-mobile-inbox .conv-name {
+    font-size: 15px;
+  }
+  .shell-mobile-inbox .conv-snippet {
+    font-size: 14px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+  .shell-mobile-inbox .conversations-toolbar {
+    position: relative;
+  }
+  .shell-mobile-inbox .conversation-filter-wrap {
+    position: static;
+  }
+  .shell-mobile-inbox .conversation-filters {
+    left: 12px;
+    right: 12px;
+    top: calc(100% + 4px);
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - 260px);
+  }
+  .shell-mobile-inbox .filter-condition {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
+  }
+  .shell-mobile-inbox .filter-remove {
+    width: 44px;
+    min-height: 44px;
+  }
+  .shell-mobile-inbox .filter-footer,
+  .shell-mobile-inbox .filter-footer-actions {
+    flex-wrap: wrap;
+  }
+  .shell-mobile-inbox .filter-footer {
+    position: sticky;
+    bottom: -14px;
+    padding-block: 12px;
+    background: var(--raised);
+    z-index: 2;
+  }
+  .shell-mobile-inbox .filter-calendar-heading button {
+    width: 44px;
+    height: 44px;
+  }
+  .shell-mobile-inbox .filter-calendar-days button {
+    height: 40px;
+  }
+  .shell-mobile-inbox .draft-layout {
+    position: relative;
+  }
+  .shell-mobile-inbox .draft-layout > .thread {
+    min-height: 0;
+  }
+  .shell-mobile-inbox .draft-layout:not(.mobile-thread) > .thread-empty {
+    display: none;
+  }
+  .shell-mobile-inbox .queue-head .search input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .shell-mobile-inbox .draft-lead-card {
+    padding: 18px 16px;
+  }
+  .shell-mobile-inbox .draft-lead-card .name {
+    font-size: 15px;
+  }
+  .shell-mobile-inbox .draft-lead-card .snippet {
+    font-size: 14px;
+  }
+  .shell-mobile-inbox .queue-footer {
+    flex-wrap: wrap;
+  }
+  .shell-mobile-inbox .kimi-thread .thread-header {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px 44px 44px;
+    min-height: 76px;
+    height: auto;
+    gap: 4px;
+    padding: 8px;
+  }
+  .shell-mobile-inbox .thread-header > .thread-participants {
+    display: none;
+  }
+  .shell-mobile-inbox .thread-header > .grow {
+    min-width: 0;
+  }
+  .shell-mobile-inbox .thread-header h2 {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .shell-mobile-inbox .thread-header p {
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+  .shell-mobile-inbox .kimi-thread .thread-header .thread-refresh,
+  .shell-mobile-inbox .kimi-thread .thread-header .read-button,
+  .shell-mobile-inbox .kimi-thread .thread-header > .icon-only {
+    width: 44px;
+    height: 44px;
+  }
+  .shell-mobile-inbox .kimi-thread .thread-scroll {
+    padding: 16px 12px;
+  }
+  .shell-mobile-inbox .kimi-thread .message {
+    max-width: 100%;
+    padding-left: 0;
+  }
+  .shell-mobile-inbox .kimi-thread .message-meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .shell-mobile-inbox .kimi-thread .message-meta .avatar {
+    position: static;
+    width: 24px;
+    height: 24px;
+  }
+  .shell-mobile-inbox .kimi-thread .message-meta > span:not(.avatar) {
+    max-width: calc(100% - 36px);
+  }
+  .shell-mobile-inbox .kimi-thread .bubble {
+    font-size: 15px;
+  }
+  .shell-mobile-inbox .kimi-thread .composer-wrap {
+    max-height: 60%;
+    padding: 0 8px 8px;
+  }
+  .shell-mobile-inbox .kimi-thread .composer {
+    padding: 12px;
+  }
+  .shell-mobile-inbox .kimi-thread .draft-text {
+    font-size: 16px;
+    line-height: 1.6;
+    max-height: 22dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .shell-mobile-inbox .kimi-thread .composer textarea {
+    font-size: 16px;
+  }
+  /* Drafts are now edited directly; constrain the editor, not the old preview. */
+  .shell-mobile-inbox .kimi-thread .composer textarea.reply-input {
+    max-height: clamp(80px, 22dvh, 180px);
+    overscroll-behavior: contain;
+    flex-shrink: 0;
+  }
+  .shell-mobile-inbox .composer-menu summary {
+    width: 44px;
+    height: 44px;
+  }
+  .shell-mobile-inbox .composer-menu-items {
+    top: 48px;
+    max-width: min(260px, calc(100vw - 56px));
+  }
+  .shell-mobile-inbox .composer-menu-items .btn {
+    white-space: normal;
+    text-align: left;
+  }
+  .shell-mobile-inbox .kimi-thread .composer .btn {
+    font-size: 13px;
+  }
+  .shell-mobile-inbox .kimi-thread .composer-actions {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .shell-mobile-inbox .kimi-thread .composer > .composer-actions,
+  .shell-mobile-inbox .kimi-thread .composer > .modal-actions {
+    position: sticky;
+    bottom: -12px;
+    padding-block: 8px;
+    background: var(--raised);
+  }
+  .shell-mobile-inbox .kimi-thread .composer-actions > .row {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+  .shell-mobile-inbox .kimi-thread .composer-secondary-actions {
+    width: 100%;
+  }
+  .shell-mobile-inbox .kimi-thread .composer-decision-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .shell-mobile-inbox .composer-decision-actions > .primary {
+    flex: 1;
+  }
+  .shell-mobile-inbox .mobile-action-label {
+    display: inline;
+  }
+  .shell-mobile-inbox .desktop-action-label {
+    display: none;
+  }
+  .shell-mobile-inbox
+    :is(.draft-layout, .conversation-detail-layout)
+    > .kimi-context {
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    border-left: 0;
+    box-shadow: none;
+  }
+  .shell-mobile-inbox .kimi-context .context-profile {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .shell-mobile-inbox .native-dialog {
+    width: calc(100% - 24px);
+    max-height: calc(100dvh - 32px);
+    padding: 20px;
+  }
+  .shell-mobile-inbox .native-dialog .modal-actions {
+    flex-wrap: wrap;
+  }
+  .shell-mobile-inbox .native-dialog .modal-actions > .btn {
+    flex: 1;
+  }
+  @media (max-height: 540px) {
+    .shell-mobile-inbox:has(.composer textarea:focus) > .sidebar,
+    .shell-mobile-inbox:has(.composer textarea:focus) > .mobile-inbox-nav {
+      display: none;
+    }
+    .shell.shell-mobile-inbox:has(.composer textarea:focus) {
+      grid-template-rows: minmax(0, 1fr);
+    }
+  }
+}

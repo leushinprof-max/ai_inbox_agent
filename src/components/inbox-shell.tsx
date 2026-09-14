@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar } from "./ui";
 import { SidebarIcon, type SidebarIconName } from "./sidebar-icon";
@@ -15,6 +15,7 @@ import { sectionRoute } from "@/lib/section-route";
 import "@/features/conversations/conversations.css";
 import "@/features/agents/agents.css";
 import "./sidebar.css";
+import "./mobile-inbox.css";
 
 const navigation: { route: string; title: string; icon: SidebarIconName }[] = [
   { route: "conversations", title: "Conversations", icon: "conversations" },
@@ -31,7 +32,31 @@ export function InboxShell({
   workspaceAppearance?: WorkspaceAppearance;
 }) {
   const path = usePathname();
-  const { framed } = sectionRoute(path);
+  const { framed, section } = sectionRoute(path);
+  const mobileInbox = section === "conversations" || section === "drafts";
+  const shell = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!mobileInbox || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+    const media = window.matchMedia("(max-width: 680px)");
+    const update = () => {
+      // Mobile keyboards resize the visual viewport, including on Safari.
+      // Ignore pinch zoom so magnification does not rearrange the application.
+      if (viewport.scale !== 1) return;
+      if (media.matches)
+        shell.current?.style.setProperty("height", `${viewport.height}px`);
+      else shell.current?.style.removeProperty("height");
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    media.addEventListener("change", update);
+    const element = shell.current;
+    return () => {
+      viewport.removeEventListener("resize", update);
+      media.removeEventListener("change", update);
+      element?.style.removeProperty("height");
+    };
+  }, [mobileInbox]);
   const { state, workspace, scope, basePath, mode } = useInbox();
   const member = state.memberships.find(
     (m) => m.workspaceId === workspace.id && m.userId === scope.userId,
@@ -46,7 +71,10 @@ export function InboxShell({
           ["ready", "needs_input", "snoozed"].includes(d.status),
       ).length;
   return (
-    <div className={`shell${framed ? " shell-framed" : ""}`}>
+    <div
+      ref={shell}
+      className={`shell${framed ? " shell-framed" : ""}${mobileInbox ? " shell-mobile-inbox" : ""}`}
+    >
       <aside className="sidebar">
         <WorkspaceSwitcher appearance={workspaceAppearance} />
         <nav className="nav" aria-label="Main navigation">
@@ -112,6 +140,23 @@ export function InboxShell({
       <main className="workspace-main" key={workspace.id}>
         {framed ? <div className="workspace-frame">{children}</div> : children}
       </main>
+      {mobileInbox ? (
+        <nav className="mobile-inbox-nav" aria-label="Inbox navigation">
+          {navigation.slice(0, 2).map((item) => (
+            <Link
+              key={item.route}
+              href={`${basePath}/${item.route}`}
+              aria-current={section === item.route ? "page" : undefined}
+            >
+              <SidebarIcon name={item.icon} />
+              <span>{item.title}</span>
+              {item.route === "drafts" && count > 0 ? (
+                <span className="mobile-draft-count">{count}</span>
+              ) : null}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
     </div>
   );
 }

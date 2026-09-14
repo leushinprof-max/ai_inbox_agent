@@ -851,7 +851,7 @@ export function Composer({
               </Notice>
             ) : null}
             <div className="composer-actions">
-              <div className="row">
+              <div className="row composer-secondary-actions">
                 {mode === "draft" ? (
                   <>
                     {environment !== "demo" ? (
@@ -897,7 +897,7 @@ export function Composer({
                   </Button>
                 ) : null}
               </div>
-              <div className="row">
+              <div className="row composer-decision-actions">
                 <Button
                   variant="primary"
                   icon="send"
@@ -911,7 +911,18 @@ export function Composer({
                     (stale && mode !== "manual")
                   }
                 >
-                  {sendRejected ? "Try again" : "Send"}
+                  {sendRejected ? (
+                    "Try again"
+                  ) : draft && mode !== "manual" ? (
+                    <>
+                      <span className="desktop-action-label">Send</span>
+                      <span className="mobile-action-label">
+                        Approve & send
+                      </span>
+                    </>
+                  ) : (
+                    "Send"
+                  )}
                 </Button>
               </div>
             </div>
