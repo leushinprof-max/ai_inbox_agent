@@ -16,6 +16,7 @@ import { sendInbox } from "@/server/send-actions";
 import { refreshInboxConversation } from "@/server/refresh-actions";
 import { disconnectHeyReach } from "@/server/connection-actions";
 import type { SendRequest } from "@/domain/send";
+import type { LeadStatus } from "@/domain/follow-ups";
 
 /** Browser snapshot cache. The authenticated server and RLS own all durable state and authority. */
 export class LiveGateway implements InboxGateway {
@@ -36,6 +37,9 @@ export class LiveGateway implements InboxGateway {
   private draftPages = 1;
   private draftSearch = { query: "", status: "", label: "all" };
   private draftSearchVersion = 0;
+  private leadSearch = { query: "", status: "active" };
+  private leadSearchVersion = 0;
+  private leadPages = 0;
   private refreshPromise: Promise<void> | null = null;
   private pendingReads = new Map<
     string,
@@ -132,6 +136,24 @@ export class LiveGateway implements InboxGateway {
       const old = byId.get(item.id);
       byId.set(item.id, {
         ...item,
+        agentEnabled:
+          (old?.agentControlRevision ?? 0) > (item.agentControlRevision ?? 0)
+            ? old?.agentEnabled
+            : item.agentEnabled,
+        agentControlRevision: Math.max(
+          old?.agentControlRevision ?? 0,
+          item.agentControlRevision ?? 0,
+        ),
+        lastReplyAt:
+          item.lastReplyAt !== undefined
+            ? item.lastReplyAt
+            : old?.revision === item.revision
+              ? old.lastReplyAt
+              : undefined,
+        lead:
+          old?.lead && (!item.lead || old.lead.revision > item.lead.revision)
+            ? old.lead
+            : item.lead,
         unread:
           old && old.readStateRevision > item.readStateRevision
             ? old.unread
@@ -162,6 +184,9 @@ export class LiveGateway implements InboxGateway {
         conversations: this.mergeConversations(next.conversations),
         paging: {
           ...next.paging!,
+          leadIds: this.state.paging?.leadIds,
+          leadNext: this.state.paging?.leadNext,
+          leadCounts: this.state.paging?.leadCounts,
           conversationIds: this.state.paging!.conversationIds,
           conversationNext: this.state.paging!.conversationNext,
           draftNext: this.state.paging!.draftNext,
@@ -172,6 +197,9 @@ export class LiveGateway implements InboxGateway {
       await Promise.all([
         this.reloadConversationPages(this.conversationPages),
         this.reloadDraftPages(this.draftPages),
+        this.leadPages
+          ? this.reloadLeadPages(this.leadPages)
+          : Promise.resolve(),
       ]);
       if (this.detailId) await this.loadConversation(this.detailId);
     })().finally(() => {
@@ -314,6 +342,82 @@ export class LiveGateway implements InboxGateway {
         resources: agent.resources ?? [],
       },
     });
+  setLeadStatus = (
+    scope: Scope,
+    id: string,
+    revision: number,
+    status: LeadStatus,
+    until?: string,
+  ) =>
+    this.mutate(scope, {
+      kind: "lead",
+      workspaceId: this.workspaceId,
+      id,
+      revision,
+      status,
+      ...(until ? { until } : {}),
+    });
+
+  setConversationAgent = (
+    scope: Scope,
+    id: string,
+    revision: number,
+    enabled: boolean,
+  ) =>
+    this.mutate(scope, {
+      kind: "conversation_agent",
+      workspaceId: this.workspaceId,
+      id,
+      revision,
+      enabled,
+    });
+
+  searchLeads = async (query: string, status: string) => {
+    this.leadSearchVersion++;
+    this.leadSearch = { query, status };
+    this.leadPages = 1;
+    await this.reloadLeadPages(1);
+  };
+  private async reloadLeadPages(pages: number) {
+    const version = this.leadSearchVersion;
+    const items: Conversation[] = [];
+    let next: PageCursor | null = null;
+    let counts: Record<string, number> = {};
+    for (let page = 0; page < pages; page++) {
+      const result: {
+        items: Conversation[];
+        next: PageCursor | null;
+        counts: Record<string, number>;
+      } = await this.read({
+        view: "leads",
+        q: this.leadSearch.query,
+        status: this.leadSearch.status,
+        ...(next ? { before: JSON.stringify(next) } : {}),
+      });
+      if (version !== this.leadSearchVersion) return;
+      items.push(...result.items);
+      next = result.next;
+      counts = result.counts;
+      if (!next) break;
+    }
+    this.publish({
+      ...this.state,
+      conversations: this.mergeConversations(items),
+      paging: {
+        ...this.state.paging!,
+        leadIds: [...new Set(items.map((c) => c.id))],
+        leadNext: next,
+        leadCounts: counts,
+      },
+    });
+  }
+  moreLeads = async () => {
+    if (!this.state.paging?.leadNext) return;
+    const version = this.leadSearchVersion;
+    const pages = this.leadPages + 1;
+    await this.reloadLeadPages(pages);
+    if (version === this.leadSearchVersion) this.leadPages = pages;
+  };
   saveSenderVoice = async (
     scope: Scope,
     senderId: number,

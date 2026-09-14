@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 
 const artwork = {
+  leads: (
+    <>
+      <circle cx="9" cy="7" r="3" />
+      <path d="M3 21v-3a6 6 0 0 1 12 0v3M17 5h4m-4 5h4m-3 5h3" />
+    </>
+  ),
   conversations: (
     <>
       <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9.3 9.3 0 0 1-4-.9L3 21l1.9-5.5a9.3 9.3 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3h.5a8.5 8.5 0 0 1 8 8v.5Z" />

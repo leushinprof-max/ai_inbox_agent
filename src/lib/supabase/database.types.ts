@@ -8,12 +8,8 @@ export type Json =
 
 export type Database = {
   graphql_public: {
-    Tables: {
-      [_ in never]: never;
-    };
-    Views: {
-      [_ in never]: never;
-    };
+    Tables: { [_ in never]: never };
+    Views: { [_ in never]: never };
     Functions: {
       graphql: {
         Args: {
@@ -25,12 +21,8 @@ export type Database = {
         Returns: Json;
       };
     };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
   public: {
     Tables: {
@@ -71,6 +63,7 @@ export type Database = {
           created_at: string;
           custom_instructions: string;
           description: string;
+          follow_ups: Json;
           goal: string;
           id: string;
           knowledge: string;
@@ -88,6 +81,7 @@ export type Database = {
           created_at?: string;
           custom_instructions?: string;
           description?: string;
+          follow_ups?: Json;
           goal?: string;
           id?: string;
           knowledge?: string;
@@ -105,6 +99,7 @@ export type Database = {
           created_at?: string;
           custom_instructions?: string;
           description?: string;
+          follow_ups?: Json;
           goal?: string;
           id?: string;
           knowledge?: string;
@@ -320,6 +315,8 @@ export type Database = {
       };
       conversations: {
         Row: {
+          agent_control_revision: number;
+          agent_enabled: boolean;
           archived: boolean;
           campaign: string;
           classified_revision: number | null;
@@ -357,6 +354,8 @@ export type Database = {
           workspace_id: string;
         };
         Insert: {
+          agent_control_revision?: number;
+          agent_enabled?: boolean;
           archived?: boolean;
           campaign?: string;
           classified_revision?: number | null;
@@ -394,6 +393,8 @@ export type Database = {
           workspace_id: string;
         };
         Update: {
+          agent_control_revision?: number;
+          agent_enabled?: boolean;
           archived?: boolean;
           campaign?: string;
           classified_revision?: number | null;
@@ -458,6 +459,7 @@ export type Database = {
           error_code: string | null;
           expected_draft_id: string | null;
           expected_draft_revision: number | null;
+          follow_up_revision: number | null;
           generation_mode: string | null;
           id: string;
           instructions: string;
@@ -478,6 +480,7 @@ export type Database = {
           error_code?: string | null;
           expected_draft_id?: string | null;
           expected_draft_revision?: number | null;
+          follow_up_revision?: number | null;
           generation_mode?: string | null;
           id: string;
           instructions?: string;
@@ -498,6 +501,7 @@ export type Database = {
           error_code?: string | null;
           expected_draft_id?: string | null;
           expected_draft_revision?: number | null;
+          follow_up_revision?: number | null;
           generation_mode?: string | null;
           id?: string;
           instructions?: string;
@@ -547,6 +551,8 @@ export type Database = {
           body: string;
           conversation_id: string;
           created_at: string;
+          follow_up_anchor_id: string | null;
+          follow_up_number: number | null;
           id: string;
           missing_knowledge: string | null;
           previous_version: Json | null;
@@ -563,6 +569,8 @@ export type Database = {
           body?: string;
           conversation_id: string;
           created_at?: string;
+          follow_up_anchor_id?: string | null;
+          follow_up_number?: number | null;
           id?: string;
           missing_knowledge?: string | null;
           previous_version?: Json | null;
@@ -579,6 +587,8 @@ export type Database = {
           body?: string;
           conversation_id?: string;
           created_at?: string;
+          follow_up_anchor_id?: string | null;
+          follow_up_number?: number | null;
           id?: string;
           missing_knowledge?: string | null;
           previous_version?: Json | null;
@@ -595,6 +605,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "ai_runs";
             referencedColumns: ["workspace_id", "id"];
+          },
+          {
+            foreignKeyName: "drafts_follow_up_anchor_id_fkey";
+            columns: ["follow_up_anchor_id"];
+            isOneToOne: false;
+            referencedRelation: "messages";
+            referencedColumns: ["id"];
           },
           {
             foreignKeyName: "drafts_workspace_id_agent_id_fkey";
@@ -668,6 +685,66 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "workspaces";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      leads: {
+        Row: {
+          anchor_id: string | null;
+          conversation_id: string;
+          due_at: string | null;
+          entered_at: string;
+          error_code: string | null;
+          later_until: string | null;
+          revision: number;
+          sent_count: number;
+          series_revision: number;
+          state: string;
+          status: string;
+          workspace_id: string;
+        };
+        Insert: {
+          anchor_id?: string | null;
+          conversation_id: string;
+          due_at?: string | null;
+          entered_at?: string;
+          error_code?: string | null;
+          later_until?: string | null;
+          revision?: number;
+          sent_count?: number;
+          series_revision?: number;
+          state?: string;
+          status?: string;
+          workspace_id: string;
+        };
+        Update: {
+          anchor_id?: string | null;
+          conversation_id?: string;
+          due_at?: string | null;
+          entered_at?: string;
+          error_code?: string | null;
+          later_until?: string | null;
+          revision?: number;
+          sent_count?: number;
+          series_revision?: number;
+          state?: string;
+          status?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "leads_anchor_id_fkey";
+            columns: ["anchor_id"];
+            isOneToOne: false;
+            referencedRelation: "messages";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "leads_workspace_id_conversation_id_fkey";
+            columns: ["workspace_id", "conversation_id"];
+            isOneToOne: true;
+            referencedRelation: "conversations";
+            referencedColumns: ["workspace_id", "id"];
           },
         ];
       };
@@ -978,6 +1055,19 @@ export type Database = {
         Args: { p_role: string; p_user: string; p_workspace: string };
         Returns: undefined;
       };
+      conversation_count_v3: {
+        Args: {
+          p_before?: string;
+          p_before_id?: string;
+          p_filters?: Json;
+          p_label?: string;
+          p_limit?: number;
+          p_query?: string;
+          p_read?: string;
+          p_workspace: string;
+        };
+        Returns: number;
+      };
       conversation_counts: { Args: { p_workspace: string }; Returns: Json };
       conversation_page: {
         Args: {
@@ -989,6 +1079,8 @@ export type Database = {
           p_workspace: string;
         };
         Returns: {
+          agent_control_revision: number;
+          agent_enabled: boolean;
           archived: boolean;
           campaign: string;
           classified_revision: number | null;
@@ -1043,6 +1135,8 @@ export type Database = {
           p_workspace: string;
         };
         Returns: {
+          agent_control_revision: number;
+          agent_enabled: boolean;
           archived: boolean;
           campaign: string;
           classified_revision: number | null;
@@ -1086,19 +1180,6 @@ export type Database = {
           isSetofReturn: true;
         };
       };
-      conversation_count_v3: {
-        Args: {
-          p_before?: string;
-          p_before_id?: string;
-          p_filters?: Json;
-          p_label?: string;
-          p_limit?: number;
-          p_query?: string;
-          p_read?: string;
-          p_workspace: string;
-        };
-        Returns: number;
-      };
       conversation_page_v3: {
         Args: {
           p_before?: string;
@@ -1111,6 +1192,8 @@ export type Database = {
           p_workspace: string;
         };
         Returns: {
+          agent_control_revision: number;
+          agent_enabled: boolean;
           archived: boolean;
           campaign: string;
           classified_revision: number | null;
@@ -1208,6 +1291,8 @@ export type Database = {
           body: string;
           conversation_id: string;
           created_at: string;
+          follow_up_anchor_id: string | null;
+          follow_up_number: number | null;
           id: string;
           missing_knowledge: string | null;
           previous_version: Json | null;
@@ -1225,6 +1310,69 @@ export type Database = {
         };
       };
       is_platform_owner: { Args: never; Returns: boolean };
+      lead_counts: { Args: { p_workspace: string }; Returns: Json };
+      lead_last_replies: {
+        Args: { p_ids: string[]; p_workspace: string };
+        Returns: {
+          conversation_id: string;
+          replied_at: string;
+        }[];
+      };
+      lead_page: {
+        Args: {
+          p_before?: string;
+          p_before_id?: string;
+          p_limit?: number;
+          p_query?: string;
+          p_status?: string;
+          p_workspace: string;
+        };
+        Returns: {
+          agent_control_revision: number;
+          agent_enabled: boolean;
+          archived: boolean;
+          campaign: string;
+          classified_revision: number | null;
+          contact_company: string;
+          contact_name: string;
+          contact_photo_url: string | null;
+          contact_position: string;
+          contact_profile_url: string | null;
+          contact_stopped: boolean;
+          created_at: string;
+          evidence_message_id: string | null;
+          evidence_quote: string;
+          id: string;
+          inbound_revision: number;
+          label_assignment_revision: number;
+          label_id: string | null;
+          label_source: string | null;
+          label_state: string;
+          labels: string[];
+          last_message_at: string | null;
+          no_reply_reason: string;
+          notes: string;
+          notes_revision: number;
+          provider_conversation_id: string;
+          read_state_revision: number;
+          reply_agent_id: string | null;
+          reply_agent_version: number | null;
+          reply_catalog_revision: number | null;
+          reply_config_version: number | null;
+          reply_decision_revision: number | null;
+          sender_id: number;
+          sender_name: string;
+          sender_photo_url: string | null;
+          unread: boolean;
+          workspace_id: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "conversations";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       list_workspace_invites: {
         Args: { p_workspace: string };
         Returns: {
@@ -1384,6 +1532,7 @@ export type Database = {
       server_apply_intent: {
         Args: {
           p_agent: string;
+          p_agent_control_revision?: number;
           p_agent_version: number;
           p_assignment: number;
           p_catalog: number;
@@ -1398,6 +1547,36 @@ export type Database = {
         Returns: boolean;
       };
       server_claim_job: { Args: never; Returns: Json };
+      server_complete_follow_up: {
+        Args: {
+          p_agent: string;
+          p_agent_version: number;
+          p_body: string;
+          p_catalog: number;
+          p_config: number;
+          p_conversation: string;
+          p_draft?: string;
+          p_draft_revision?: number;
+          p_missing: string;
+          p_revision: number;
+          p_run_id: string;
+          p_source_revision: number;
+          p_workspace: string;
+        };
+        Returns: string;
+      };
+      server_complete_follow_up_generation: {
+        Args: {
+          p_body: string;
+          p_catalog: number;
+          p_config: number;
+          p_id: string;
+          p_missing: string;
+          p_run_id: string;
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
       server_complete_generation: {
         Args: {
           p_body: string;
@@ -1505,6 +1684,16 @@ export type Database = {
         Args: { p_conversation: string; p_workspace: string };
         Returns: string;
       };
+      server_schedule_follow_ups: { Args: never; Returns: number };
+      set_conversation_agent: {
+        Args: {
+          p_enabled: boolean;
+          p_id: string;
+          p_revision: number;
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
       set_conversation_read_state: {
         Args: {
           p_id: string;
@@ -1516,6 +1705,16 @@ export type Database = {
       };
       set_default_agent: {
         Args: { p_agent: string; p_workspace: string };
+        Returns: undefined;
+      };
+      set_lead_status: {
+        Args: {
+          p_conversation: string;
+          p_revision: number;
+          p_status: string;
+          p_until?: string;
+          p_workspace: string;
+        };
         Returns: undefined;
       };
       start_history_import: {
@@ -1662,9 +1861,7 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
+  graphql_public: { Enums: {} },
   public: {
     Enums: {},
   },

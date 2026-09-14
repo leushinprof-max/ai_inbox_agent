@@ -5,6 +5,8 @@ import { ThreadParticipants, ThreadMessage } from "./thread-presentation";
 import { ReadStateControl } from "./read-state-control";
 import { RefreshConversationControl } from "./refresh-control";
 import { ConversationClassification } from "./conversation-classification";
+import { LeadStatusControl } from "@/features/leads/lead-status-control";
+import { ConversationAgentSwitch } from "./conversation-agent-switch";
 import {
   useEffect,
   useLayoutEffect,
@@ -267,8 +269,12 @@ export function ContactContext({
       if (previous?.isConnected) previous.focus();
     };
   }, [overlay]);
-  const [notes, setNotes] = useState(conversation.notes);
-  const noteRevision = useRef(conversation.notesRevision);
+  const [noteDraft, setNoteDraft] = useState<{
+    text: string;
+    revision?: number;
+  } | null>(null);
+  const notes = noteDraft?.text ?? conversation.notes;
+  const [noteSaving, setNoteSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const sender = state.senders?.find(
@@ -353,7 +359,7 @@ export function ContactContext({
           </div>
         ))}
       </div>
-      <div className="context-section">
+      <div className="context-section context-automation">
         <ConversationClassification
           key={conversation.id}
           conversation={conversation}
@@ -371,16 +377,34 @@ export function ContactContext({
             <p className="muted">No agent assigned</p>
           )}
         </div>
+        <div className="details-row">
+          <span>
+            Agent {conversation.agentEnabled === false ? "off" : "on"}
+          </span>
+          <ConversationAgentSwitch conversation={conversation} />
+        </div>
+        {conversation.lead ? (
+          <div className="details-row context-outcome">
+            <span>Outcome</span>
+            <LeadStatusControl conversation={conversation} />
+          </div>
+        ) : null}
       </div>
       <div className="context-notes">
         <label className="eyebrow" htmlFor="contact-notes">
-          Notes
+          Note
         </label>
         <textarea
           id="contact-notes"
           value={notes}
+          disabled={noteSaving}
           onChange={(e) => {
-            setNotes(e.target.value);
+            setNoteDraft({
+              text: e.target.value,
+              revision: noteDraft
+                ? noteDraft.revision
+                : conversation.notesRevision,
+            });
             setSaved(false);
           }}
           placeholder="Add context for your team…"
@@ -389,29 +413,29 @@ export function ContactContext({
         {(notes !== conversation.notes || saved) && (
           <Button
             variant="ghost small"
+            disabled={noteSaving}
             onClick={async () => {
+              setNoteSaving(true);
               try {
                 await repository.note(
                   scope,
                   conversation.id,
                   notes,
-                  noteRevision.current,
+                  noteDraft ? noteDraft.revision : conversation.notesRevision,
                 );
-                noteRevision.current = repository
-                  .getSnapshot()
-                  .conversations.find(
-                    (c) => c.id === conversation.id,
-                  )?.notesRevision;
+                setNoteDraft(null);
                 setSaved(true);
                 setError("");
               } catch (e) {
                 setError(
                   e instanceof Error ? e.message : "Could not save note.",
                 );
+              } finally {
+                setNoteSaving(false);
               }
             }}
           >
-            {saved ? "Saved" : "Save note"}
+            {noteSaving ? "Saving…" : saved ? "Saved" : "Save note"}
           </Button>
         )}
         {error ? (
@@ -420,8 +444,7 @@ export function ContactContext({
             <Button
               variant="ghost small"
               onClick={() => {
-                setNotes(conversation.notes);
-                noteRevision.current = conversation.notesRevision;
+                setNoteDraft(null);
                 setError("");
                 setSaved(false);
               }}

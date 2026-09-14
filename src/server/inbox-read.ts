@@ -18,6 +18,12 @@ import { InboxError } from "@/domain/inbox";
 import { intentGroup } from "@/domain/labels";
 import { loadLabelCatalog, publishedAI } from "./ai-context";
 import { databaseError } from "./session";
+import {
+  followUpSettings,
+  followUpState,
+  leadStatus,
+  type Lead,
+} from "@/domain/follow-ups";
 
 export const uuid = z.uuid();
 export const cursor = z.object({
@@ -45,8 +51,10 @@ export function conversationDto(
   c: Tables<"conversations">,
   messages: Tables<"messages">[] = [],
   aiMessageIds: ReadonlySet<string> = new Set(),
+  lead: Lead | null = null,
 ): Conversation {
   return {
+    lead,
     id: c.id,
     workspaceId: c.workspace_id,
     providerConversationId: c.provider_conversation_id,
@@ -87,6 +95,8 @@ export function conversationDto(
       configVersion: c.reply_config_version,
     },
     revision: c.inbound_revision,
+    agentEnabled: c.agent_enabled,
+    agentControlRevision: c.agent_control_revision,
     notes: c.notes,
     notesRevision: c.notes_revision,
     archived: c.archived,
@@ -104,6 +114,7 @@ export function conversationDto(
 }
 export function agentDto(a: Tables<"agents">): Agent {
   return {
+    followUps: followUpSettings.parse(a.follow_ups ?? {}),
     ...agentGuidance.parse({
       customInstructions: a.custom_instructions,
       meetingInstructions: a.meeting_instructions,
@@ -123,6 +134,7 @@ export function agentDto(a: Tables<"agents">): Agent {
 }
 export function draftDto(d: Tables<"drafts">): Draft {
   return {
+    followUpNumber: d.follow_up_number ?? null,
     id: d.id,
     workspaceId: d.workspace_id,
     conversationId: d.conversation_id,
@@ -290,13 +302,102 @@ export async function withPreviews(
   rows: Tables<"conversations">[],
 ) {
   if (!rows.length) return [];
-  const { data, error } = await db.rpc("conversation_previews", {
-    p_workspace: workspaceId,
-    p_ids: rows.map((c) => c.id),
-  });
-  databaseError(error);
-  const aiMessageIds = await aiGeneratedMessageIds(db, workspaceId, data ?? []);
-  return rows.map((c) => conversationDto(c, data ?? [], aiMessageIds));
+  const [previews, leads] = await Promise.all([
+    db.rpc("conversation_previews", {
+      p_workspace: workspaceId,
+      p_ids: rows.map((c) => c.id),
+    }),
+    db
+      .from("leads")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .in(
+        "conversation_id",
+        rows.map((c) => c.id),
+      ),
+  ]);
+  databaseError(previews.error);
+  databaseError(leads.error);
+  const aiMessageIds = await aiGeneratedMessageIds(
+    db,
+    workspaceId,
+    previews.data ?? [],
+  );
+  const byId = new Map(
+    (leads.data ?? []).map((l) => [l.conversation_id, leadDto(l)]),
+  );
+  return rows.map((c) =>
+    conversationDto(
+      c,
+      previews.data ?? [],
+      aiMessageIds,
+      byId.get(c.id) ?? null,
+    ),
+  );
+}
+
+export function leadDto(l: Tables<"leads">): Lead {
+  return {
+    status: leadStatus.parse(l.status),
+    enteredAt: l.entered_at,
+    revision: l.revision,
+    sent: l.sent_count,
+    dueAt: l.due_at,
+    laterUntil: l.later_until,
+    state: followUpState.parse(l.state),
+    error: l.error_code,
+  };
+}
+
+export async function leadPage(
+  db: DB,
+  workspaceId: string,
+  query = "",
+  status = "active",
+  before?: PageCursor,
+) {
+  z.enum(["all", "active", "completed", ...leadStatus.options]).parse(status);
+  const [page, counts] = await Promise.all([
+    db.rpc("lead_page", {
+      p_workspace: workspaceId,
+      p_query: query.slice(0, 200),
+      p_status: status,
+      p_limit: 51,
+      ...(before ? { p_before: before.at, p_before_id: before.id } : {}),
+    }),
+    db.rpc("lead_counts", { p_workspace: workspaceId }),
+  ]);
+  databaseError(page.error);
+  databaseError(counts.error);
+  const rows = (page.data ?? []).slice(0, 50);
+  const last = rows.at(-1);
+  const [items, replies] = await Promise.all([
+    withPreviews(db, workspaceId, rows),
+    rows.length
+      ? db.rpc("lead_last_replies", {
+          p_workspace: workspaceId,
+          p_ids: rows.map((row) => row.id),
+        })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  databaseError(replies.error);
+  const replyDates = new Map(
+    (replies.data ?? []).map((reply) => [
+      reply.conversation_id,
+      reply.replied_at,
+    ]),
+  );
+  return {
+    items: items.map((item) => ({
+      ...item,
+      lastReplyAt: replyDates.get(item.id) ?? null,
+    })),
+    counts: counts.data as Record<string, number>,
+    next:
+      (page.data?.length ?? 0) > 50 && last
+        ? { at: last.last_message_at ?? last.created_at, id: last.id }
+        : null,
+  };
 }
 export async function readWorkspace(
   db: DB,
@@ -553,22 +654,34 @@ export async function readConversation(
     .eq("conversation_id", id)
     .in("status", ["ready", "needs_input", "snoozed"])
     .maybeSingle();
-  const [conversation, messages, draft] = await Promise.all([
+  const [conversation, messages, draft, lead] = await Promise.all([
     timed("conversation", conversationQuery),
     timed("messages", request),
     timed("draft", draftQuery),
+    db
+      .from("leads")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("conversation_id", id)
+      .maybeSingle(),
   ]);
   databaseError(conversation.error);
   if (!conversation.data)
     throw new InboxError("not_found", "Conversation not found.");
   databaseError(draft.error);
   databaseError(messages.error);
+  databaseError(lead.error);
   const rows = messages.data ?? [];
   const items = rows.slice(0, 50);
   const aiMessageIds = await aiGeneratedMessageIds(db, workspaceId, items);
   const last = items.at(-1);
   return {
-    conversation: conversationDto(conversation.data, items, aiMessageIds),
+    conversation: conversationDto(
+      conversation.data,
+      items,
+      aiMessageIds,
+      lead.data ? leadDto(lead.data) : null,
+    ),
     draft: draft.data ? draftDto(draft.data) : null,
     next:
       rows.length > 50 && last ? { at: last.occurred_at, id: last.id } : null,

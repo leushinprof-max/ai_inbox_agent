@@ -1,6 +1,7 @@
 export const sectionTitles = {
   drafts: "Drafts",
   conversations: "Conversations",
+  leads: "Leads",
   agents: "Agents",
   settings: "Settings",
   "product-admin": "Product admin",
@@ -33,6 +34,7 @@ export function sectionRoute(pathname: string) {
       : Boolean(parts[index + 1]),
     framed:
       section === "drafts" ||
+      section === "leads" ||
       section === "conversations" ||
       section === "agents" ||
       section === "settings",

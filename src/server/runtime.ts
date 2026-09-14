@@ -12,12 +12,21 @@ import { loadAIContext } from "./ai-context";
 import { decryptConnection } from "./credentials";
 import { databaseError } from "./session";
 import { agentModelConfig as agentConfig } from "@/domain/agent-guidance";
+import { runFollowUp } from "./follow-up-run";
+import { defaultFollowUps } from "@/domain/follow-ups";
 import { generationTask } from "@/domain/draft-generation";
 
 const jobSchema = z.object({
   id: z.uuid(),
   workspace_id: z.uuid(),
-  kind: z.enum(["sync", "import", "classify", "reconcile_send", "generate"]),
+  kind: z.enum([
+    "sync",
+    "import",
+    "classify",
+    "reconcile_send",
+    "generate",
+    "follow_up",
+  ]),
   payload: z.record(z.string(), z.unknown()),
   lease_token: z.uuid(),
   attempts: z.number().int(),
@@ -50,13 +59,13 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
     if (
       !connection.data ||
       (connection.data.status !== "connected" &&
-        !["generate", "classify"].includes(job.kind))
+        !["generate", "classify", "follow_up"].includes(job.kind))
     )
       throw new Error("connection_unavailable");
     const revision = connection.data.revision;
     connectionRevision = revision;
     if (
-      !["generate", "classify"].includes(job.kind) &&
+      !["generate", "classify", "follow_up"].includes(job.kind) &&
       job.payload.connectionRevision !== undefined &&
       job.payload.connectionRevision !== revision
     )
@@ -156,6 +165,8 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         ).error,
       );
     }
+    if (job.kind === "follow_up")
+      await runFollowUp(deps, job.workspace_id, job.payload);
     if (job.kind === "generate") {
       const { generationId } = z
         .object({ generationId: z.uuid() })
@@ -168,7 +179,20 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         .single();
       databaseError(generation.error);
       const g = generation.data;
-      if (g?.status === "queued") {
+      const generationConversation =
+        g?.status === "queued"
+          ? await db
+              .from("conversations")
+              .select("agent_enabled")
+              .eq("workspace_id", job.workspace_id)
+              .eq("id", g.conversation_id)
+              .single()
+          : { data: null, error: null };
+      databaseError(generationConversation.error);
+      if (
+        g?.status === "queued" &&
+        generationConversation.data?.agent_enabled !== false
+      ) {
         const [version, messages, draft] = await Promise.all([
           db
             .from("agent_versions")
@@ -188,7 +212,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           g.expected_draft_id
             ? db
                 .from("drafts")
-                .select("body")
+                .select("body,follow_up_number")
                 .eq("workspace_id", job.workspace_id)
                 .eq("id", g.expected_draft_id)
                 .single()
@@ -224,6 +248,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             ]
               .join("\n\n")
               .slice(-16000);
+        const configuredAgent = agentConfig.parse(version.data?.configuration);
         const task = generationTask(
           {
             mode: z
@@ -241,8 +266,17 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
           deps.model,
           {
             ...ai,
-            scenario: task.scenario,
-            agent: agentConfig.parse(version.data?.configuration),
+            scenario:
+              g.follow_up_revision != null ? "follow_up" : task.scenario,
+            agent: configuredAgent,
+            ...(g.follow_up_revision != null
+              ? {
+                  followUp: {
+                    settings: configuredAgent.followUps ?? defaultFollowUps,
+                    attempt: draft.data?.follow_up_number ?? 1,
+                  },
+                }
+              : {}),
             historyTruncated: (messages.data?.length ?? 0) > 50,
             messages: (messages.data ?? [])
               .slice(0, 50)
@@ -269,33 +303,43 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
         );
         databaseError(
           (
-            await ((ai.configuration.schemaVersion === 2 ||
-              (g.generation_mode !== null &&
-                output.shouldReply &&
-                !output.contactStopped)) &&
-            output.runId
-              ? db.rpc("server_complete_generation_v3", {
+            await (g.follow_up_revision != null
+              ? db.rpc("server_complete_follow_up_generation", {
                   p_workspace: job.workspace_id,
                   p_id: g.id,
                   p_body: output.draft,
                   p_missing: output.missingKnowledge,
                   p_config: ai.configurationVersion,
                   p_catalog: ai.catalogRevision,
-                  p_assignment: ai.assignmentRevision,
-                  p_run_id: output.runId,
+                  p_run_id: output.runId!,
                 })
-              : db.rpc("server_complete_generation_v2", {
-                  p_workspace: job.workspace_id,
-                  p_id: g.id,
-                  p_body: output.draft,
-                  p_missing: output.missingKnowledge,
-                  p_should_reply: output.shouldReply,
-                  p_config: ai.configurationVersion,
-                  p_catalog: ai.catalogRevision,
-                  p_assignment: ai.assignmentRevision,
-                  p_reason: output.noReplyReason,
-                  p_stopped: output.contactStopped,
-                }))
+              : (ai.configuration.schemaVersion === 2 ||
+                    (g.generation_mode !== null &&
+                      output.shouldReply &&
+                      !output.contactStopped)) &&
+                  output.runId
+                ? db.rpc("server_complete_generation_v3", {
+                    p_workspace: job.workspace_id,
+                    p_id: g.id,
+                    p_body: output.draft,
+                    p_missing: output.missingKnowledge,
+                    p_config: ai.configurationVersion,
+                    p_catalog: ai.catalogRevision,
+                    p_assignment: ai.assignmentRevision,
+                    p_run_id: output.runId,
+                  })
+                : db.rpc("server_complete_generation_v2", {
+                    p_workspace: job.workspace_id,
+                    p_id: g.id,
+                    p_body: output.draft,
+                    p_missing: output.missingKnowledge,
+                    p_should_reply: output.shouldReply,
+                    p_config: ai.configurationVersion,
+                    p_catalog: ai.catalogRevision,
+                    p_assignment: ai.assignmentRevision,
+                    p_reason: output.noReplyReason,
+                    p_stopped: output.contactStopped,
+                  }))
           ).error,
         );
       }
@@ -314,7 +358,7 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
       const [conversation, routing, messages] = await Promise.all([
         db
           .from("conversations")
-          .select("inbound_revision")
+          .select("inbound_revision,agent_enabled,agent_control_revision")
           .eq("workspace_id", job.workspace_id)
           .eq("id", payload.conversationId)
           .single(),
@@ -388,7 +432,10 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
                 agent: config,
                 messages: transcript,
                 historyTruncated: (messages.data?.length ?? 0) > 50,
-                generateDraft: payload.generateDraft && !!config,
+                generateDraft:
+                  payload.generateDraft &&
+                  !!config &&
+                  conversation.data?.agent_enabled !== false,
               },
               {
                 workspaceId: job.workspace_id,
@@ -396,9 +443,11 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
                 catalogRevision: ai.catalogRevision,
                 agentId,
                 agentVersion,
-                scenario: payload.generateDraft
-                  ? "classify_and_reply"
-                  : "classify_only",
+                scenario:
+                  payload.generateDraft &&
+                  conversation.data?.agent_enabled !== false
+                    ? "classify_and_reply"
+                    : "classify_only",
               },
             )
           : {
@@ -424,6 +473,8 @@ export async function runNextJob(deps: RuntimeDependencies): Promise<boolean> {
             p_agent: agentId!,
             p_agent_version: agentVersion,
             p_generate: payload.generateDraft,
+            p_agent_control_revision:
+              conversation.data?.agent_control_revision ?? 0,
             ...(payload.runId ? { p_run: payload.runId } : {}),
           })
         ).error,

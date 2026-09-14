@@ -4,7 +4,7 @@ Owner-approved on 2026-09-05, after reviewing the hosted prototype.
 
 ## Product boundary
 
-Only four top-level sections: Conversations, Drafts, Agents and Settings. No Overview, Pulse, standalone Knowledge, LeadFleet admin navigation, client assignments or billing coupling.
+The top-level sections are Conversations, Drafts, Leads, Agents and Settings. Leads and scheduled follow-up drafts were added in the September 14 interview; their [behavior and rollout](leads-and-follow-ups.md) extend the original September 5 scope. No Overview, Pulse, standalone Knowledge, LeadFleet admin navigation, client assignments or billing coupling.
 
 The platform owner additionally has Product admin → AI configuration. This permission is independent of a client's workspace role. The [single-label contract](labels-and-ai-configuration.md) defines the September 6 classification update: one current intent, three groups, custom workspace labels and versioned product instructions.
 
@@ -36,7 +36,7 @@ Timeouts and ambiguous failures are different from successful acknowledgements: 
 
 ## Agents
 
-Basics, Knowledge, Follow-ups, Test and Launch stay inside the agent editor. Knowledge belongs to the agent. Model-backed tests and generated drafts must use explicit agent/version context. Human approval is required for outbound messages. Automatic follow-ups are outside the initial release.
+Background, Communication, Follow-ups, Test and sender assignment stay inside the agent editor. Knowledge belongs to the agent. Model-backed tests and generated drafts must use explicit agent/version context. Positive replies enter Leads automatically; follow-ups are prepared after our reply when the conversation agent and its Follow-ups settings are enabled. Human approval is required for every outbound message.
 
 ## Workspace onboarding
 
@@ -48,4 +48,4 @@ Historical import reads a bounded period and classifies the latest conversation 
 
 ## Initial exclusions
 
-Automatic outbound sends, scheduled follow-ups, native outbound attachments, billing, client portals and organization analytics are out of scope for the first release. Error states remain visible and actionable; unsupported features must not simulate live success.
+Automatic outbound sends, native outbound attachments, billing, client portals and organization analytics remain out of scope. Error states remain visible and actionable; unsupported features must not simulate live success.
