@@ -15,7 +15,9 @@
     "test:integration": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/integration/*.test.mts",
     "seed:local": "tsx tools/seed-local.mts",
     "worker": "node --conditions=react-server --import tsx tools/worker.mts",
-    "worker:local": "node --env-file=.env.local --conditions=react-server --import tsx tools/worker.mts"
+    "worker:local": "node --env-file=.env.local --conditions=react-server --import tsx tools/worker.mts",
+    "telegram:check": "node --conditions=react-server --import tsx tools/configure-telegram.mts",
+    "telegram:setup": "node --conditions=react-server --import tsx tools/configure-telegram.mts --apply"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.6",

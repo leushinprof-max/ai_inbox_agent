@@ -27,6 +27,16 @@ export default async function WorkspacePage({
     ) : (
       <AgentsScreen />
     );
+  if (section[0] === "drafts" && section[1])
+    return (
+      <ConversationsScreen
+        key={section[1]}
+        initialId={section[1]}
+        reviewDraft
+      />
+    );
+  if (section[0] === "settings" && section[1] === "notifications")
+    return <SettingsScreen initialTab="notifications" />;
   if (section.length > 1) notFound();
   if (section[0] === "product-admin") {
     const { db } = await authenticatedClient();

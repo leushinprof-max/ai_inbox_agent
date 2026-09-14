@@ -21,23 +21,37 @@ export function durableSendRepository(
   db: SupabaseClient<Database>,
   admin: SupabaseClient<Database>,
   connectionRevision: number,
+  telegram?: {
+    notificationId: string;
+    botId: number;
+    telegramUserId: number;
+    chatId: number;
+  },
 ): SendRepository {
   return {
     async reserve(scope: Scope, request: SendRequest) {
-      const result = await db.rpc("reserve_send", {
-        p_workspace: scope.workspaceId,
-        p_id: request.operationId,
-        p_conversation: request.conversationId,
-        p_body: request.body,
-        p_connection_revision: connectionRevision,
-        ...(request.draft
-          ? {
-              p_draft: request.draft.id,
-              p_revision: request.draft.revision,
-              p_source_revision: request.draft.sourceRevision,
-            }
-          : {}),
-      });
+      const result = telegram
+        ? await admin.rpc("server_reserve_telegram_send", {
+            p_id: telegram.notificationId,
+            p_bot: telegram.botId,
+            p_telegram: telegram.telegramUserId,
+            p_chat: telegram.chatId,
+            p_connection_revision: connectionRevision,
+          })
+        : await db.rpc("reserve_send", {
+            p_workspace: scope.workspaceId,
+            p_id: request.operationId,
+            p_conversation: request.conversationId,
+            p_body: request.body,
+            p_connection_revision: connectionRevision,
+            ...(request.draft
+              ? {
+                  p_draft: request.draft.id,
+                  p_revision: request.draft.revision,
+                  p_source_revision: request.draft.sourceRevision,
+                }
+              : {}),
+          });
       databaseError(result.error);
       const data = z
         .discriminatedUnion("kind", [reserved, existing])

@@ -1622,6 +1622,73 @@ export type Database = {
         };
         Returns: undefined;
       };
+      get_notification_settings: {
+        Args: { p_bot: number; p_workspace: string };
+        Returns: Json;
+      };
+      create_telegram_link: {
+        Args: { p_bot: number; p_hash: string; p_workspace: string };
+        Returns: undefined;
+      };
+      set_notification_subscription: {
+        Args: { p_bot: number; p_enabled: boolean; p_workspace: string };
+        Returns: undefined;
+      };
+      disconnect_telegram: { Args: never; Returns: undefined };
+      test_telegram_notification: {
+        Args: { p_bot: number; p_workspace: string };
+        Returns: undefined;
+      };
+      server_connect_telegram: {
+        Args: {
+          p_bot: number;
+          p_chat: number;
+          p_hash: string;
+          p_name?: string;
+          p_telegram: number;
+          p_username?: string;
+        };
+        Returns: boolean;
+      };
+      server_claim_notification: { Args: { p_bot: number }; Returns: Json };
+      server_prepare_notification: {
+        Args: {
+          p_approve: boolean;
+          p_id: string;
+          p_lease: string;
+          p_text: string;
+        };
+        Returns: boolean;
+      };
+      server_finish_notification: {
+        Args: {
+          p_error?: string;
+          p_id: string;
+          p_lease: string;
+          p_message?: number;
+          p_retry?: number;
+        };
+        Returns: undefined;
+      };
+      server_telegram_action: {
+        Args: {
+          p_bot: number;
+          p_chat: number;
+          p_id: string;
+          p_telegram: number;
+        };
+        Returns: Json;
+      };
+      server_reserve_telegram_send: {
+        Args: {
+          p_bot: number;
+          p_chat: number;
+          p_connection_revision: number;
+          p_id: string;
+          p_telegram: number;
+        };
+        Returns: Json;
+      };
       server_complete_send: {
         Args: {
           p_id: string;

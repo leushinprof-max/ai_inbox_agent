@@ -3,6 +3,7 @@ import { setTimeout } from "node:timers/promises";
 import { adminClient } from "../src/server/admin";
 import { runNextJob } from "../src/server/runtime";
 import { createInboxModel } from "../src/integrations/ai/classify";
+import { runNextNotification } from "../src/server/notification-runtime";
 
 const db = adminClient();
 const model = createInboxModel(
@@ -44,6 +45,18 @@ for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => {
     stopping = true;
   });
+// Notifications should not wait behind a long model request. Both loops share
+// this worker process; database leases still coordinate multiple replicas.
+const notifications = (async () => {
+  while (!stopping) {
+    try {
+      await runNextNotification(db);
+    } catch {
+      console.error("Notification cycle failed; retrying database access.");
+    }
+    await setTimeout(1500);
+  }
+})();
 while (!stopping) {
   try {
     if (Date.now() - lastFollowUpScan >= 30_000) {
@@ -62,4 +75,5 @@ while (!stopping) {
     await setTimeout(5000);
   }
 }
+await notifications;
 server.close();
