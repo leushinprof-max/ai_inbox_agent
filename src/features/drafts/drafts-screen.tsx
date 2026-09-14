@@ -246,9 +246,17 @@ export function DraftsScreen() {
                   conversation={conversation}
                   draft={selected}
                   onDone={() => {
-                    setSelected(null);
-                    setAwaitingSelection(!preferences.autoNext);
-                    setMobileThread(false);
+                    const index = visible.findIndex(
+                      (item) => item.id === selected.id,
+                    );
+                    const next =
+                      visible[index + 1] ??
+                      visible.find((item) => item.id !== selected.id);
+                    setSelected(
+                      preferences.autoNext ? (next?.id ?? null) : null,
+                    );
+                    setAwaitingSelection(!preferences.autoNext || !next);
+                    setMobileThread(preferences.autoNext && !!next);
                   }}
                 />
               )}
