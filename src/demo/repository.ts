@@ -12,7 +12,7 @@ import {
   defaultFollowUps,
   followUpSettings,
   leadStatus,
-  sampleFollowUpDate,
+  followUpDate,
   type LeadStatus,
 } from "@/domain/follow-ups";
 import { resolveSenderAgent } from "@/domain/sender-agent";
@@ -151,7 +151,7 @@ export class DemoRepository implements SendRepository {
                     : "disabled",
                 dueAt:
                   settings.enabled && c.agentEnabled !== false
-                    ? sampleFollowUpDate(settings, anchor)
+                    ? followUpDate(settings, anchor, (sent ?? c.lead!.sent) + 1)
                     : null,
                 sent: sent ?? c.lead!.sent,
                 revision: c.lead!.revision + 1,
@@ -369,7 +369,7 @@ export class DemoRepository implements SendRepository {
                     state: c.lead.status === "follow_up" ? next : c.lead.state,
                     dueAt:
                       c.lead.status === "follow_up" && next === "scheduled"
-                        ? sampleFollowUpDate(settings, new Date())
+                        ? followUpDate(settings, new Date(), c.lead.sent + 1)
                         : null,
                     error: null,
                   }
@@ -443,7 +443,13 @@ export class DemoRepository implements SendRepository {
                 state,
                 dueAt:
                   state === "scheduled"
-                    ? sampleFollowUpDate(settings, new Date(last!.createdAt))
+                    ? followUpDate(
+                        settings,
+                        new Date(last!.createdAt),
+                        conversation.lead!.status === "follow_up"
+                          ? conversation.lead!.sent + 1
+                          : 1,
+                      )
                     : null,
                 laterUntil: status === "later" ? until! : null,
                 sent:

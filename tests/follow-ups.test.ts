@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   defaultFollowUps,
   followUpSettings,
-  sampleFollowUpDate,
+  followUpDate,
 } from "../src/domain/follow-ups";
 import { demoLabels } from "../src/domain/labels";
 import {
@@ -21,25 +21,42 @@ import {
 } from "../src/integrations/ai/configuration";
 import { runModelPipeline } from "../src/integrations/ai/pipeline";
 
-test("follow-up settings validate the range and sample both endpoints without per-step intervals", () => {
+test("legacy ranges become fixed waits without rewriting the stored settings", () => {
   const anchor = new Date("2026-09-14T09:00:00Z");
+  const legacy = { attempts: 3, minDays: 2, maxDays: 4 };
+  const settings = followUpSettings.parse(legacy);
+  assert.deepEqual(settings.waitDays, [3, 3, 3]);
+  assert.equal("waitDays" in legacy, false);
+  assert.equal(followUpDate(settings, anchor), "2026-09-17T09:00:00.000Z");
   assert.equal(
-    sampleFollowUpDate(defaultFollowUps, anchor, () => 0),
-    "2026-09-16T09:00:00.000Z",
-  );
-  assert.equal(
-    sampleFollowUpDate(defaultFollowUps, anchor, () => 0.999),
-    "2026-09-18T09:00:00.000Z",
-  );
-  assert.equal(
-    sampleFollowUpDate({ ...defaultFollowUps, minDays: 7, maxDays: 7 }, anchor),
+    followUpDate(followUpSettings.parse({ minDays: 7, maxDays: 7 }), anchor),
     "2026-09-21T09:00:00.000Z",
   );
+  assert.deepEqual(
+    followUpSettings.parse({ minDays: 2, maxDays: 3 }).waitDays,
+    [3, 3, 3, 3, 3],
+  );
+});
+
+test("follow-up waits use the current attempt and the last wait for the final reply window", () => {
+  const settings = followUpSettings.parse({ attempts: 3, waitDays: [2, 5, 9] });
+  const anchor = new Date("2026-09-14T09:00:00Z");
+  assert.equal(followUpDate(settings, anchor, 1), "2026-09-16T09:00:00.000Z");
+  assert.equal(followUpDate(settings, anchor, 2), "2026-09-19T09:00:00.000Z");
+  assert.equal(followUpDate(settings, anchor, 3), "2026-09-23T09:00:00.000Z");
+  assert.equal(followUpDate(settings, anchor, 4), "2026-09-23T09:00:00.000Z");
   for (const settings of [
     { minDays: 8, maxDays: 4 },
     { attempts: 0 },
     { attempts: 6 },
     { minDays: 1.5 },
+    { attempts: 2, waitDays: [3] },
+    { attempts: 1, waitDays: [3, 5] },
+    { attempts: 1, waitDays: [0] },
+    { attempts: 1, waitDays: [366] },
+    { attempts: 1, waitDays: [1.5] },
+    { attempts: 1, waitDays: ["3"] },
+    { waitDays: null },
     { examples: [""] },
   ])
     assert.equal(followUpSettings.safeParse(settings).success, false);
