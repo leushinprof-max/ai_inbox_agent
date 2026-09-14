@@ -14,6 +14,51 @@ export interface DraftNotification {
   canApprove: boolean;
 }
 
+export function renderTestDraftNotification(
+  workspace: { workspaceId: string; workspaceName: string },
+  origin: string,
+): TelegramMessage {
+  const { message } = renderDraftNotification(
+    {
+      ...workspace,
+      id: "test",
+      conversationId: "test",
+      contactName: "Alex Morgan (example)",
+      senderName: "Example sender",
+      inboundBody:
+        "Hi, thanks for reaching out. We’re planning to hire two developers. Could you share how your team can help?",
+      draftBody:
+        "Hi Alex, thanks for your reply. Happy to learn more about the roles. Which tech stack and seniority levels are you looking for, and when would you like the developers to start?",
+      missingKnowledge: null,
+      status: "ready",
+      canApprove: false,
+    },
+    origin,
+  );
+  return {
+    text: `🧪 Test notification — example lead and draft. Approve only simulates approval.\n\n${message.text}`,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "✅ Approve & send (test)",
+            callback_data: `test_approve:${workspace.workspaceId}`,
+          },
+        ],
+        [
+          {
+            text: "↗ Open in platform",
+            url: new URL(
+              `/w/${workspace.workspaceId}/drafts`,
+              origin,
+            ).toString(),
+          },
+        ],
+      ],
+    },
+  };
+}
+
 function shorten(text: string, length: number) {
   return text.length > length ? `${text.slice(0, length - 1)}…` : text;
 }
