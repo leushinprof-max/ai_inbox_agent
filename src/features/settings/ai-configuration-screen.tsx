@@ -10,7 +10,6 @@ import { systemLabels } from "@/domain/labels";
 import {
   initialAIConfiguration,
   validateConfiguration,
-  upgradeConfiguration,
   createSplitReplyConfiguration,
   createFollowUpConfiguration,
   type AIConfiguration,
@@ -82,7 +81,7 @@ export function AIConfigurationScreen() {
           setData(next);
           setSelected(next.release.version_id);
           setConfig(
-            upgradeConfiguration(
+            createFollowUpConfiguration(
               validateConfiguration(
                 next.versions.find((v) => v.id === next.release.version_id)!
                   .configuration,
@@ -149,7 +148,7 @@ export function AIConfigurationScreen() {
   function loadVersion(id: number) {
     setSelected(id);
     update(
-      upgradeConfiguration(
+      createFollowUpConfiguration(
         validateConfiguration(
           data!.versions.find((v) => v.id === id)!.configuration,
         ),
@@ -329,19 +328,10 @@ export function AIConfigurationScreen() {
                   {section === "followUp" && (
                     <div className="admin-reply-format">
                       <p className="help">
-                        {config.followUp
-                          ? "Separate follow-up instructions. Conversation data is supplied automatically. Uses the same agent settings and Agent switch as replies."
-                          : "This version uses Reply agent with legacy follow-up instructions. Review the separate prompt below, then save and publish a new version to activate it."}
+                        Follow-up instructions. Uses the agent background,
+                        communication settings and follow-up examples. The Agent
+                        switch controls replies and follow-ups together.
                       </p>
-                      {!config.followUp && (
-                        <Button
-                          onClick={() =>
-                            update(createFollowUpConfiguration(config))
-                          }
-                        >
-                          Use separate Follow-up agent
-                        </Button>
-                      )}
                     </div>
                   )}
                   <textarea
