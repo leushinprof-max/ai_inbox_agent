@@ -3,6 +3,8 @@ import { intentGroup, systemLabels } from "@/domain/labels";
 import { assertReasoningSupported, reasoningEfforts } from "./model-catalog";
 import {
   defaultReplyPrompt,
+  defaultFollowUpPrompt,
+  followUpVariables,
   defaultSplitReplyPrompt,
   migrateClassificationPrompt,
   validateTemplate,
@@ -40,6 +42,7 @@ export const aiConfiguration = z
     replyPromptFormat: z.literal("split_v1").optional(),
     classification: instruction,
     reply: instruction.optional(),
+    followUp: instruction.optional(),
     replyDecision: legacyInstruction,
     draft: legacyInstruction,
     rewrite: legacyInstruction,
@@ -131,6 +134,7 @@ export function serializeConfiguration(config: AIConfiguration) {
     reasoning,
     classification,
     reply,
+    ...(config.followUp !== undefined ? { followUp: config.followUp } : {}),
     labels,
     defaults,
   };
@@ -143,6 +147,14 @@ export function validateConfiguration(value: unknown) {
     if (model !== null) assertReasoningSupported(model, config.reasoning[task]);
   }
   if (config.schemaVersion === 2) {
+    if (config.followUp !== undefined)
+      validateTemplate(config.followUp, followUpVariables, [
+        "runtime_context",
+        "follow_up_attempt",
+        "follow_up_limit",
+        "follow_up_instructions",
+        "follow_up_examples",
+      ]);
     if (!config.reply) throw new Error("Reply agent prompt is required.");
     if (config.replyPromptFormat === "split_v1")
       validateTemplate(config.reply, splitReplyVariables, ["runtime_context"]);
@@ -150,7 +162,7 @@ export function validateConfiguration(value: unknown) {
     validateTemplate(config.classification, classificationVariables);
     return config;
   }
-  if (config.reply || config.replyPromptFormat)
+  if (config.reply || config.replyPromptFormat || config.followUp)
     throw new Error("A reply prompt requires configuration format v2.");
   if (
     [
@@ -183,5 +195,15 @@ export function resolveModels(
   return {
     classification: configuration.models.classification ?? fallback,
     draft: configuration.models.draft ?? fallback,
+  };
+}
+
+/** Prepare an editable candidate; historical publications retain their behavior. */
+export function createFollowUpConfiguration(
+  config: AIConfiguration,
+): AIConfiguration {
+  return {
+    ...upgradeConfiguration(config),
+    followUp: config.followUp ?? defaultFollowUpPrompt,
   };
 }

@@ -12,6 +12,7 @@ import {
   validateConfiguration,
   upgradeConfiguration,
   createSplitReplyConfiguration,
+  createFollowUpConfiguration,
   type AIConfiguration,
 } from "@/integrations/ai/configuration";
 import {
@@ -21,6 +22,8 @@ import {
 } from "@/server/ai-admin-actions";
 import "./ai-admin.css";
 import {
+  followUpVariables,
+  defaultFollowUpPrompt,
   replyVariables,
   splitReplyVariables,
   defaultSplitReplyPrompt,
@@ -30,6 +33,7 @@ import {
 const sections = [
   ["classification", "Classification"],
   ["reply", "Reply agent"],
+  ["followUp", "Follow-up agent"],
 ] as const;
 const pages: { id: string; label: string; icon: IconName }[] = [
   { id: "models", label: "Models", icon: "agent" },
@@ -123,7 +127,9 @@ export function AIConfigurationScreen() {
   const instructionValue =
     section === "labels"
       ? config.labels[selectedLabel.key]
-      : (config[section as (typeof sections)[number][0]] ?? "");
+      : section === "followUp"
+        ? (config.followUp ?? defaultFollowUpPrompt)
+        : (config[section as (typeof sections)[number][0]] ?? "");
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -320,6 +326,24 @@ export function AIConfigurationScreen() {
                       )}
                     </div>
                   )}
+                  {section === "followUp" && (
+                    <div className="admin-reply-format">
+                      <p className="help">
+                        {config.followUp
+                          ? "Separate follow-up instructions. Conversation data is supplied automatically. Uses the same agent settings and Agent switch as replies."
+                          : "This version uses Reply agent with legacy follow-up instructions. Review the separate prompt below, then save and publish a new version to activate it."}
+                      </p>
+                      {!config.followUp && (
+                        <Button
+                          onClick={() =>
+                            update(createFollowUpConfiguration(config))
+                          }
+                        >
+                          Use separate Follow-up agent
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   <textarea
                     id="prompt-editor"
                     aria-label={instructionTitle}
@@ -349,11 +373,13 @@ export function AIConfigurationScreen() {
                         <summary>Template variables</summary>
                         <dl>
                           {Object.entries(
-                            section === "reply"
-                              ? config.replyPromptFormat === "split_v1"
-                                ? splitReplyVariables
-                                : replyVariables
-                              : classificationVariables,
+                            section === "followUp"
+                              ? followUpVariables
+                              : section === "reply"
+                                ? config.replyPromptFormat === "split_v1"
+                                  ? splitReplyVariables
+                                  : replyVariables
+                                : classificationVariables,
                           )
                             .filter(
                               ([name]) =>

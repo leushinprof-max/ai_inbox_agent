@@ -139,7 +139,13 @@ export function buildModelRequest(
   const scenario = input.scenario ?? "classify";
   const v2 = config.schemaVersion === 2;
   const classifying = scenario === "classify";
-  const split = v2 && !classifying && config.replyPromptFormat === "split_v1";
+  const separateFollowUp = scenario === "follow_up" && !!config.followUp;
+  const split =
+    v2 &&
+    !classifying &&
+    (separateFollowUp || config.replyPromptFormat === "split_v1");
+  if (separateFollowUp && !input.followUp)
+    throw new Error("Follow-up settings and attempt are required.");
   const models = resolveModels(config, model);
   const selectedModel = classifying ? models.classification : models.draft;
   const effort = config.reasoning[classifying ? "classification" : "draft"];
@@ -272,7 +278,17 @@ export function buildModelRequest(
             messages,
           }),
         })
-      : renderTemplate(config.reply!, {
+      : renderTemplate(separateFollowUp ? config.followUp! : config.reply!, {
+          ...(separateFollowUp
+            ? {
+                follow_up_attempt: String(input.followUp!.attempt),
+                follow_up_limit: String(input.followUp!.settings.attempts),
+                follow_up_instructions: quoted(
+                  input.followUp!.settings.instructions,
+                ),
+                follow_up_examples: quoted(input.followUp!.settings.examples),
+              }
+            : {}),
           sender_name: quoted(input.sender?.name),
           sender_grammatical_form: quoted(input.sender?.grammaticalForm),
           agent_goal: quoted(agent?.goal),
@@ -389,7 +405,7 @@ export function buildModelRequest(
               { role: "user", content: JSON.stringify(data) },
             ]
       ).concat(
-        scenario === "follow_up" && input.followUp
+        scenario === "follow_up" && input.followUp && !separateFollowUp
           ? [
               {
                 role: split ? "developer" : "system",
@@ -433,6 +449,13 @@ export function buildModelRequest(
         ),
       configurationVersion: input.configurationVersion ?? null,
       promptFormat: v2 ? 2 : 1,
+      ...(scenario === "follow_up"
+        ? {
+            followUpPromptSource: separateFollowUp
+              ? "follow_up"
+              : "legacy_reply",
+          }
+        : {}),
       ...(!classifying
         ? {
             replyPromptFormat: split
