@@ -500,6 +500,24 @@ export function Composer({
         <Icon name="more" />
       </summary>
       <div className="composer-menu-items">
+        {mode === "draft" && draft.status !== "needs_input" ? (
+          <Button
+            className="mobile-draft-action"
+            variant="ghost small"
+            icon="chat"
+            disabled={
+              locked || generating || !writable || !text.trim() || stale
+            }
+            onClick={() => {
+              if (menuElement.current) menuElement.current.open = false;
+              preserveSize();
+              setRedrafting(true);
+              setError("");
+            }}
+          >
+            Redraft with instructions
+          </Button>
+        ) : null}
         {draft.previousSourceRevision === conversation.revision ? (
           <Button
             variant="ghost small"
@@ -562,7 +580,7 @@ export function Composer({
       <div
         ref={composerElement}
         style={composerHeight ? { minHeight: composerHeight } : undefined}
-        className={`composer ${!generating && !redrafting && !needsInput ? "composer-reply" : ""}`}
+        className={`composer ${!generating && !redrafting && !needsInput ? `composer-reply ${mode === "manual" ? "composer-manual" : "composer-draft"}` : ""}`}
       >
         {generating ? (
           <>
@@ -644,6 +662,7 @@ export function Composer({
               <Button
                 variant="primary"
                 disabled={
+                  environment === "demo" ||
                   !instructions.trim() ||
                   !text.trim() ||
                   !writable ||
@@ -866,6 +885,17 @@ export function Composer({
               <div className="row composer-secondary-actions">
                 {mode === "draft" ? (
                   <>
+                    {environment === "demo" ? (
+                      <Button
+                        className="mobile-draft-action"
+                        variant="ghost small"
+                        icon="refresh"
+                        disabled
+                        title="AI generation is unavailable in demo"
+                      >
+                        Redraft
+                      </Button>
+                    ) : null}
                     {environment !== "demo" ? (
                       <>
                         <Button
@@ -877,6 +907,7 @@ export function Composer({
                           Redraft
                         </Button>
                         <Button
+                          className="composer-redraft-instructions"
                           variant="ghost small"
                           icon="chat"
                           disabled={
@@ -913,6 +944,9 @@ export function Composer({
                 <Button
                   variant="primary"
                   icon="send"
+                  className="composer-send"
+                  aria-label={sendRejected ? "Try again" : "Send"}
+                  title={sendRejected ? "Try again" : "Send"}
                   onClick={send}
                   disabled={
                     !text.trim() ||
@@ -923,18 +957,9 @@ export function Composer({
                     (stale && mode !== "manual")
                   }
                 >
-                  {sendRejected ? (
-                    "Try again"
-                  ) : draft && mode !== "manual" ? (
-                    <>
-                      <span className="desktop-action-label">Send</span>
-                      <span className="mobile-action-label">
-                        Approve & send
-                      </span>
-                    </>
-                  ) : (
-                    "Send"
-                  )}
+                  <span className="composer-send-label">
+                    {sendRejected ? "Try again" : "Send"}
+                  </span>
                 </Button>
               </div>
             </div>
