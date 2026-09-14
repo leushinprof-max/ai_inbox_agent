@@ -60,8 +60,9 @@ Leads notes are edited in a non-modal cell-anchored editor. It expands above the
 ## Follow-up agent prompt
 
 Product admin > Instructions > Follow-up agent provides an independent developer
-prompt. Select Use separate Follow-up agent, review or edit it, then save and
-publish a configuration version. Existing publications keep their original reply
+prompt. Review or edit it, then save and publish a configuration version.
+Opening an older version prepares the separate prompt for saving automatically,
+without an extra activation button. Existing publications keep their original reply
 prompt plus follow-up suffix until a version containing `followUp` is published;
 restoring an older version restores that behavior.
 
