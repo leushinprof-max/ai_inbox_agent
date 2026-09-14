@@ -214,6 +214,11 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
         </div>
         <div className="conversation-filter-wrap" ref={filterWrap}>
           <Button
+            className="conversation-filter-trigger"
+            aria-label={
+              hasFilters ? `Filters, ${filters.length} active` : "Filters"
+            }
+            title="Filters"
             aria-expanded={filtersOpen}
             aria-controls="conversation-filters"
             onClick={() => setFiltersOpen(!filtersOpen)}
@@ -221,7 +226,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 6h8m4 0h6M3 12h3m4 0h11M3 18h12m4 0h2M11 3v6M6 9v6m9 0v6" />
             </svg>
-            Filters{" "}
+            <span className="conversation-filter-label">Filters</span>
             {hasFilters ? (
               <span className="filter-count">{filters.length}</span>
             ) : null}
