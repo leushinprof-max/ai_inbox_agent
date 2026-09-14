@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ConversationsScreen } from "@/features/conversations/conversations-screen";
+import { useConversationNavigation } from "@/lib/use-conversation-navigation";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar, Button, Empty, Icon, Notice } from "@/components/ui";
 import { LeadNote } from "./lead-note";
@@ -21,6 +23,7 @@ const isCompleted = (c: Conversation) =>
 
 export function LeadsScreen() {
   const { state, scope, repository, basePath, workspace } = useInbox();
+  const navigation = useConversationNavigation(`${basePath}/leads`);
   const [query, setQuery] = useState("");
   const searchInput = useRef<HTMLInputElement>(null);
   const [group, setGroup] = useState<"active" | "completed">("active");
@@ -107,6 +110,15 @@ export function LeadsScreen() {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(value));
+  if (navigation.selectedId)
+    return (
+      <ConversationsScreen
+        initialId={navigation.selectedId}
+        onBack={navigation.close}
+        backLabel="Back to leads"
+        onUnreadError={setError}
+      />
+    );
   return (
     <section className="leads-screen" aria-label="Leads">
       <div className="leads-toolbar">
@@ -245,7 +257,12 @@ export function LeadsScreen() {
                     <td>
                       <Link
                         className="leads-person"
-                        href={`${basePath}/conversations/${conversation.id}`}
+                        href={navigation.href(conversation.id)}
+                        prefetch={false}
+                        onNavigate={(event) => {
+                          event.preventDefault();
+                          navigation.open(conversation.id);
+                        }}
                         title={`${conversation.contact.name} · ${conversation.contact.company || conversation.contact.position || "View conversation"}`}
                         onMouseEnter={() => {
                           void repository
@@ -376,6 +393,7 @@ function NextFollowUp({
   fullDate: (value: string) => string;
 }) {
   const { basePath } = useInbox();
+  const navigation = useConversationNavigation(`${basePath}/leads`);
   const lead = conversation.lead!;
   if (conversation.agentEnabled === false)
     return <span className="lead-next-label">Agent off</span>;
@@ -397,7 +415,12 @@ function NextFollowUp({
     return (
       <Link
         className="lead-review"
-        href={`${basePath}/conversations/${conversation.id}`}
+        href={navigation.href(conversation.id)}
+        prefetch={false}
+        onNavigate={(event) => {
+          event.preventDefault();
+          navigation.open(conversation.id);
+        }}
       >
         Review draft
       </Link>

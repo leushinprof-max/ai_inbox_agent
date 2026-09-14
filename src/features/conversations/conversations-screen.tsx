@@ -21,13 +21,20 @@ import {
 } from "@/domain/conversation-filters";
 import "./conversations.css";
 import { useRouter } from "next/navigation";
+import { useConversationNavigation } from "@/lib/use-conversation-navigation";
 
 export function ConversationsScreen({
   initialId,
   reviewDraft = false,
+  onBack,
+  backLabel,
+  onUnreadError,
 }: {
   initialId?: string;
   reviewDraft?: boolean;
+  onBack?: () => void;
+  backLabel?: string;
+  onUnreadError?: (message: string) => void;
 }) {
   const { state, scope, repository, workspace, basePath } = useInbox();
   const router = useRouter();
@@ -37,7 +44,13 @@ export function ConversationsScreen({
     id: string;
     name: string;
   } | null>(null);
-  const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
+  const { selectedId, open, close } = useConversationNavigation(
+    `${basePath}/conversations`,
+    initialId,
+  );
+  const back =
+    onBack ??
+    (() => (reviewDraft ? router.push(`${basePath}/drafts`) : close()));
   const [reviewLoaded, setReviewLoaded] = useState(!reviewDraft);
   const [query, setQuery] = useState("");
   const [storedFilters, setFilters] = useState<ConversationFilter[]>([]);
@@ -119,9 +132,9 @@ export function ConversationsScreen({
   }, [query, filters, repository]);
   useEffect(() => {
     let active = true;
-    if (initialId && repository.openConversation)
+    if (selectedId && repository.openConversation)
       void repository
-        .openConversation(initialId)
+        .openConversation(selectedId)
         .then(() => {
           if (active) setReviewLoaded(true);
         })
@@ -134,7 +147,7 @@ export function ConversationsScreen({
     return () => {
       active = false;
     };
-  }, [initialId, repository]);
+  }, [selectedId, repository]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (
@@ -203,15 +216,19 @@ export function ConversationsScreen({
           active={!details || wideDetails}
           key={`thread-${selected.id}`}
           conversation={selected}
-          onBack={() =>
-            reviewDraft ? router.push(`${basePath}/drafts`) : setSelected(null)
-          }
+          onBack={back}
+          backLabel={backLabel}
           onMarkedUnread={(save) => {
             const { id, contact } = selected;
             setUnreadFailure(null);
-            setSelected(null);
-            if (reviewDraft) router.push(`${basePath}/drafts`);
-            void save.catch(() => setUnreadFailure({ id, name: contact.name }));
+            back();
+            void save.catch(() => {
+              if (onUnreadError)
+                onUnreadError(
+                  `Could not mark ${contact.name} as unread. Try again.`,
+                );
+              else setUnreadFailure({ id, name: contact.name });
+            });
           }}
           onToggleDetails={() => setDetails(!details)}
         >
@@ -360,7 +377,7 @@ export function ConversationsScreen({
           to retry.
           <Button
             onClick={() => {
-              setSelected(unreadFailure.id);
+              open(unreadFailure.id);
               setUnreadFailure(null);
             }}
           >
@@ -410,7 +427,7 @@ export function ConversationsScreen({
                 onBlur={cancelPrefetch}
                 onClick={() => {
                   cancelPrefetch();
-                  setSelected(c.id);
+                  open(c.id);
                 }}
                 aria-label={`Open conversation with ${c.contact.name}${c.unread ? ", unread" : ""}`}
               >

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import { Avatar } from "./ui";
@@ -34,7 +34,11 @@ export function InboxShell({
 }) {
   const path = usePathname();
   const { framed, section } = sectionRoute(path);
-  const mobileInbox = section === "conversations" || section === "drafts";
+  const searchParams = useSearchParams();
+  const mobileInbox =
+    section === "conversations" ||
+    section === "drafts" ||
+    (section === "leads" && searchParams.has("conversation"));
   const shell = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!mobileInbox || !window.visualViewport) return;
