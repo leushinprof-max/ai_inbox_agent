@@ -90,14 +90,17 @@ export function Composer({
     conversation.senderId,
   );
   const eligible =
-    !!workspaceAgent &&
-    !conversation.contactStopped &&
-    conversation.messages.at(-1)?.direction === "inbound" &&
-    replyAllowed(
-      state.labelCatalog ?? [],
-      conversation.labelId,
-      workspaceAgent.replyGroups,
-    );
+    (Boolean(draft?.followUpNumber) &&
+      conversation.lead?.status === "follow_up" &&
+      Boolean(workspaceAgent?.followUps?.enabled)) ||
+    (!!workspaceAgent &&
+      !conversation.contactStopped &&
+      conversation.messages.at(-1)?.direction === "inbound" &&
+      replyAllowed(
+        state.labelCatalog ?? [],
+        conversation.labelId,
+        workspaceAgent.replyGroups,
+      ));
   const decision = conversation.replyDecision;
   const noReplyReason =
     decision?.revision === conversation.revision &&
@@ -384,6 +387,12 @@ export function Composer({
     generationMode: "reply" | "rewrite" = "reply",
     approvedAnswer = "",
   ) {
+    if (conversation.agentEnabled === false) {
+      setError(
+        "Turn on the agent for this conversation before generating a draft.",
+      );
+      return;
+    }
     if (generating || lock.current || locked || !writable) return;
     if (
       generationMode === "rewrite" &&
@@ -529,7 +538,7 @@ export function Composer({
             });
           }}
         >
-          No reply needed
+          {draft.followUpNumber ? "Skip this follow-up" : "No reply needed"}
         </Button>
       </div>
     </details>
@@ -735,7 +744,10 @@ export function Composer({
           <>
             {mode !== "manual" ? (
               <div className="composer-title">
-                <Spark /> AI draft
+                <Spark />{" "}
+                {draft?.followUpNumber
+                  ? `Follow-up ${draft.followUpNumber}`
+                  : "AI draft"}
                 {draft && state.platformOwner && environment !== "demo" ? (
                   <DraftRequest
                     workspaceId={scope.workspaceId}

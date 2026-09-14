@@ -96,7 +96,7 @@ export function DraftsScreen() {
             </Link>
           }
         >
-          New drafts will appear here when a lead replies.
+          Replies and scheduled follow-up drafts will appear here for review.
         </Empty>
       ) : (
         <div
@@ -142,6 +142,11 @@ export function DraftsScreen() {
                       <span className="snippet">{leadMessage?.body}</span>
                       <span className="draft-lead-footer">
                         <ConversationLabel conversation={c} />
+                        {draft.followUpNumber ? (
+                          <span className="draft-follow-up-label">
+                            Follow-up {draft.followUpNumber}
+                          </span>
+                        ) : null}
                         {draft.status === "needs_input" ? (
                           <span
                             className="draft-input-indicator"

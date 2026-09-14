@@ -8,6 +8,10 @@ import {
 import { renderTemplate } from "./prompt-templates";
 import type { AgentResource, GrammaticalForm } from "@/domain/agent-guidance";
 import { replyGuidance } from "./agent-guidance";
+import {
+  followUpInstructions,
+  type FollowUpSettings,
+} from "@/domain/follow-ups";
 import { boundedJson } from "@/integrations/heyreach/client";
 import { assertReasoningSupported } from "./model-catalog";
 import {
@@ -92,7 +96,8 @@ export interface ModelInput {
   configuration?: AIConfiguration;
   configurationVersion?: number;
   historyTruncated?: boolean;
-  scenario?: "classify" | "reply" | "rewrite" | "needs_input";
+  scenario?: "classify" | "reply" | "rewrite" | "needs_input" | "follow_up";
+  followUp?: { settings: FollowUpSettings; attempt: number };
   generateDraft: boolean;
   operator?: {
     instructions: string;
@@ -148,7 +153,8 @@ export function buildModelRequest(
   const generateDraft =
     !classifying &&
     input.generateDraft &&
-    input.messages.at(-1)?.direction === "inbound";
+    (scenario === "follow_up" ||
+      input.messages.at(-1)?.direction === "inbound");
   let budget = 48000;
   const messages: ModelInput["messages"] = [];
   for (const m of transcript.slice(-50).reverse()) {
@@ -201,9 +207,9 @@ export function buildModelRequest(
     ...(classifying
       ? [config.classification, classificationInvariant]
       : [
-          replyInvariant,
+          ...(scenario === "follow_up" ? [] : [replyInvariant]),
           replyGuidance,
-          config.replyDecision,
+          ...(scenario === "follow_up" ? [] : [config.replyDecision]),
           ...(generateDraft ? [config.draft, config.needsInput] : []),
           ...(scenario === "rewrite" ? [config.rewrite] : []),
         ]),
@@ -339,7 +345,7 @@ export function buildModelRequest(
         },
         contactStopped: { type: "boolean" },
       }
-    : v2
+    : v2 || scenario === "follow_up"
       ? {
           draft: { type: "string" },
           missingKnowledge: { type: "string" },
@@ -357,7 +363,7 @@ export function buildModelRequest(
       ...(effort !== null ? { reasoning: { effort } } : {}),
       store: false,
       max_output_tokens: 4000,
-      input: split
+      input: (split
         ? [
             { role: "developer", content: renderedPrompt! },
             {
@@ -381,7 +387,22 @@ export function buildModelRequest(
           : [
               { role: "system", content: blocks.join("\n\n") },
               { role: "user", content: JSON.stringify(data) },
-            ],
+            ]
+      ).concat(
+        scenario === "follow_up" && input.followUp
+          ? [
+              {
+                role: split ? "developer" : "system",
+                content:
+                  followUpInstructions(
+                    input.followUp.settings,
+                    input.followUp.attempt,
+                  ) +
+                  "\nReturn exactly one of draft or missingKnowledge. Preserve the saved classification. If currentDraft is supplied, revise it using the operator's instructions and approved information.",
+              },
+            ]
+          : [],
+      ),
       text: {
         format: {
           type: "json_schema",
@@ -466,6 +487,7 @@ export function validateModelResult(
     throw new Error("Label changed during reply generation");
   if (result.labelId !== null) {
     if (
+      input.scenario !== "follow_up" &&
       !input.labels.some(
         (l) => l.id === result.labelId && l.enabled && !l.archived,
       )
@@ -505,11 +527,16 @@ export function validateModelResult(
   if (
     !input.generateDraft ||
     !input.agent ||
-    input.messages.at(-1)?.direction !== "inbound" ||
-    result.contactStopped ||
-    input.contactStopped ||
-    (!input.replyPreview &&
-      !replyAllowed(input.labels, result.labelId, input.agent.replyGroups))
+    (input.scenario !== "follow_up" &&
+      (input.messages.at(-1)?.direction !== "inbound" ||
+        result.contactStopped ||
+        input.contactStopped ||
+        (!input.replyPreview &&
+          !replyAllowed(
+            input.labels,
+            result.labelId,
+            input.agent.replyGroups,
+          ))))
   ) {
     return {
       ...result,
@@ -594,7 +621,8 @@ export function createInboxModel(
           );
         }
         if (
-          (input.configuration ?? initialAIConfiguration).schemaVersion === 2
+          (input.configuration ?? initialAIConfiguration).schemaVersion === 2 ||
+          input.scenario === "follow_up"
         ) {
           return validateModelResult(input, {
             ...writerOutput.parse(value),

@@ -2,9 +2,25 @@ import type { ConversationFilter } from "./conversation-filters";
 import type { GrammaticalForm } from "./agent-guidance";
 import type { Agent, InboxState, Scope } from "./inbox";
 import type { SendOutcome, SendRequest } from "./send";
+import type { LeadStatus } from "./follow-ups";
 
 /** UI-facing application boundary. Implementations own persistence and transport. */
 export interface InboxGateway {
+  setConversationAgent(
+    scope: Scope,
+    id: string,
+    revision: number,
+    enabled: boolean,
+  ): Promise<void>;
+  searchLeads?(query: string, status: string): Promise<void>;
+  moreLeads?(): Promise<void>;
+  setLeadStatus(
+    scope: Scope,
+    id: string,
+    revision: number,
+    status: LeadStatus,
+    until?: string,
+  ): Promise<void>;
   refresh?(): Promise<void>;
   searchConversations?(
     query: string,

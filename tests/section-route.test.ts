@@ -4,9 +4,13 @@ import { sectionRoute, sectionTitles } from "../src/lib/section-route";
 
 test("loading and loaded routes share a frame decision for every section", () => {
   for (const section of Object.keys(sectionTitles)) {
-    const framed = ["drafts", "conversations", "agents", "settings"].includes(
-      section,
-    );
+    const framed = [
+      "drafts",
+      "conversations",
+      "leads",
+      "agents",
+      "settings",
+    ].includes(section);
     for (const path of [
       `/w/workspace-id/${section}`,
       `/demo/${section}`,

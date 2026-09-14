@@ -1,5 +1,6 @@
 import type { IntentGroup, LabelDefinition } from "./labels";
 import type { AgentResource, GrammaticalForm } from "./agent-guidance";
+import type { FollowUpSettings, Lead } from "./follow-ups";
 export type Role = "owner" | "admin" | "member" | "viewer";
 export type DraftStatus =
   "ready" | "needs_input" | "snoozed" | "sent" | "dismissed";
@@ -37,6 +38,7 @@ export interface Agent {
   customInstructions?: string;
   meetingInstructions?: string;
   resources?: AgentResource[];
+  followUps?: FollowUpSettings;
   version: number;
 }
 export interface Contact {
@@ -59,6 +61,11 @@ export interface Message {
   aiGenerated?: boolean;
 }
 export interface Conversation {
+  agentEnabled?: boolean;
+  agentControlRevision?: number;
+  /** Latest inbound reply across the full history, independent of list previews. */
+  lastReplyAt?: string | null;
+  lead?: Lead | null;
   id: string;
   workspaceId: string;
   providerConversationId: string;
@@ -93,6 +100,7 @@ export interface Conversation {
   loadedRevision?: number;
 }
 export interface Draft {
+  followUpNumber?: number | null;
   id: string;
   workspaceId: string;
   conversationId: string;
@@ -153,6 +161,9 @@ export interface InboxState {
     createdAt: string;
   }[];
   paging?: {
+    leadIds?: string[];
+    leadNext?: PageCursor | null;
+    leadCounts?: Record<string, number>;
     conversationIds: string[];
     conversationNext: PageCursor | null;
     draftIds?: string[];

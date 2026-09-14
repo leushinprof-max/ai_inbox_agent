@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { followUpSettings } from "./follow-ups";
 
 export const grammaticalForm = z.enum(["unspecified", "feminine", "masculine"]);
 export type GrammaticalForm = z.infer<typeof grammaticalForm>;
@@ -44,6 +45,7 @@ export const agentGuidance = z.object({
   resources: z.array(agentResource).max(20).default([]),
 });
 export const agentModelConfig = agentGuidance.extend({
+  followUps: followUpSettings.optional(),
   name: z.string(),
   goal: z.string(),
   language: z.string(),

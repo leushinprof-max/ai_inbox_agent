@@ -12,6 +12,7 @@ const model = createInboxModel(
 let stopping = false;
 let lastCycle = Date.now();
 let healthy = true;
+let lastFollowUpScan = 0;
 const port = Number(process.env.PORT ?? 43601);
 const server = createServer(async (req, res) => {
   if (req.url !== "/health" && req.url !== "/ready") {
@@ -45,6 +46,11 @@ for (const signal of ["SIGINT", "SIGTERM"] as const)
   });
 while (!stopping) {
   try {
+    if (Date.now() - lastFollowUpScan >= 30_000) {
+      const scheduled = await db.rpc("server_schedule_follow_ups");
+      if (scheduled.error) throw scheduled.error;
+      lastFollowUpScan = Date.now();
+    }
     const worked = await runNextJob({ db, model });
     healthy = true;
     lastCycle = Date.now();

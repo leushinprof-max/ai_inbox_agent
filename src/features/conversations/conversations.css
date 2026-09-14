@@ -719,55 +719,6 @@
   }
 }
 
-/* Labels retain the live catalog colors, with the filled chips from the reference. */
-.conversations-page .conv-preview .pill,
-.queue-item .pill,
-.kimi-context .pill {
-  border: 0;
-  border-radius: 6px;
-  padding: 1px 6px;
-  font-size: 11.5px;
-  line-height: 18px;
-  font-weight: 500;
-  color: #181821;
-  background: #9a9aa6;
-  width: fit-content;
-}
-.conversations-page .pill.green,
-.queue-item .pill.green,
-.kimi-context .pill.green {
-  background: #34d399;
-}
-.conversations-page .pill.blue,
-.queue-item .pill.blue,
-.kimi-context .pill.blue {
-  background: #6aa6ff;
-}
-.conversations-page .pill.purple,
-.queue-item .pill.purple,
-.kimi-context .pill.purple {
-  background: #a79bff;
-}
-.conversations-page .pill.teal,
-.queue-item .pill.teal,
-.kimi-context .pill.teal {
-  background: #5bd6c2;
-}
-.conversations-page .pill.amber,
-.queue-item .pill.amber,
-.kimi-context .pill.amber {
-  background: #fbbf24;
-}
-.conversations-page .pill.pink,
-.queue-item .pill.pink,
-.kimi-context .pill.pink {
-  background: #ef9fce;
-}
-.conversations-page .pill.red,
-.queue-item .pill.red,
-.kimi-context .pill.red {
-  background: #f87171;
-}
 .kimi-context .details-row > .stack {
   min-width: 0;
   gap: 8px;
@@ -849,20 +800,37 @@
   position: relative;
   overflow: hidden;
 }
-.composer-loading-lines > span:nth-child(2) { width: 100%; }
-.composer-loading-lines > span:nth-child(3) { width: 77%; }
-.composer-loading-lines > span:nth-child(4) { width: 84%; grid-row: 5; }
-.composer-loading-lines > span:nth-child(5) { width: 53%; grid-row: 6; }
+.composer-loading-lines > span:nth-child(2) {
+  width: 100%;
+}
+.composer-loading-lines > span:nth-child(3) {
+  width: 77%;
+}
+.composer-loading-lines > span:nth-child(4) {
+  width: 84%;
+  grid-row: 5;
+}
+.composer-loading-lines > span:nth-child(5) {
+  width: 53%;
+  grid-row: 6;
+}
 .composer-loading-lines > span::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  background: linear-gradient(
+    100deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent
+  );
   transform: translateX(-100%);
   animation: composer-draft-shimmer 1.8s ease-in-out infinite;
 }
 @keyframes composer-draft-shimmer {
-  to { transform: translateX(100%); }
+  to {
+    transform: translateX(100%);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .composer-loading-lines > span::after {
@@ -977,6 +945,13 @@
 }
 .reference-context .context-field-label {
   margin: 0;
+}
+.context-automation .conversation-agent-control {
+  justify-self: end;
+}
+.context-outcome .lead-status-control {
+  justify-content: flex-end;
+  min-width: 0;
 }
 .reference-context .context-agent-link {
   font-weight: 500;

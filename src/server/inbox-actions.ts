@@ -6,9 +6,25 @@ import { authorizeWorkspace, uuid } from "./inbox-read";
 import { InboxError } from "@/domain/inbox";
 import { agentGuidance } from "@/domain/agent-guidance";
 import { validateResourceFiles } from "./resource-validation";
+import { followUpSettings, leadStatus } from "@/domain/follow-ups";
 
 const revision = z.number().int().nonnegative();
 const mutation = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("conversation_agent"),
+    workspaceId: uuid,
+    id: uuid,
+    revision,
+    enabled: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal("lead"),
+    workspaceId: uuid,
+    id: uuid,
+    revision,
+    status: leadStatus,
+    until: z.iso.datetime({ offset: true }).optional(),
+  }),
   z.object({
     kind: z.literal("read"),
     workspaceId: uuid,
@@ -39,6 +55,7 @@ const mutation = z.discriminatedUnion("kind", [
     id: uuid,
     revision,
     config: agentGuidance.extend({
+      followUps: followUpSettings.optional(),
       name: z.string().trim().min(1).max(100),
       description: z.string().max(1000),
       goal: z.string().max(8000),
@@ -71,6 +88,29 @@ export async function mutateInbox(
       throw new InboxError(
         "forbidden",
         "This workspace is read-only for your account.",
+      );
+    if (value.kind === "conversation_agent")
+      databaseError(
+        (
+          await db.rpc("set_conversation_agent", {
+            p_workspace: value.workspaceId,
+            p_id: value.id,
+            p_revision: value.revision,
+            p_enabled: value.enabled,
+          })
+        ).error,
+      );
+    if (value.kind === "lead")
+      databaseError(
+        (
+          await db.rpc("set_lead_status", {
+            p_workspace: value.workspaceId,
+            p_conversation: value.id,
+            p_revision: value.revision,
+            p_status: value.status,
+            ...(value.until ? { p_until: value.until } : {}),
+          })
+        ).error,
       );
     if (value.kind === "read")
       databaseError(

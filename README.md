@@ -27,6 +27,8 @@ npm run dev
 
 Open `http://127.0.0.1:43600/demo/drafts`. The demo needs no credentials or database and sends nothing externally. Its synthetic changes reset on reload. Authenticated routes never substitute demo data after a database failure.
 
+The local [Leads demo](http://127.0.0.1:43600/demo/leads) includes follow-up progress and shared status controls. Open an agent's Follow-ups tab to configure the attempt limit, random interval range and writing instructions. See [Leads and follow-ups](docs/leads-and-follow-ups.md) for behavior and deployment requirements.
+
 The deployed [design demo](https://ai-inbox-dev.vercel.app/demo/drafts) and [state catalogue](https://ai-inbox-dev.vercel.app/demo/states) use synthetic data. The approved prototype remains the design reference. See [hosted development](docs/dev-environment.md) for the live environment and [development and operations](docs/operations.md) for the independent local stack.
 
 ## Verify
@@ -59,4 +61,4 @@ design/reference/         Unmodified approved prototype
 docs/                     Product, architecture, operations and acceptance evidence
 ```
 
-See [documentation](docs/README.md), [implementation status](docs/implementation.md) and [visual acceptance](docs/visual-acceptance.md). Automatic outbound messages, follow-ups and outbound attachments are outside this release.
+See [documentation](docs/README.md), [implementation status](docs/implementation.md) and [visual acceptance](docs/visual-acceptance.md). Follow-ups are prepared as drafts for human review. Automatic outbound messages and outbound attachments remain outside this release.

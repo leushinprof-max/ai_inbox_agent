@@ -12,6 +12,7 @@ import {
   readConversation,
   readWorkspace,
   withPreviews,
+  leadPage,
 } from "@/server/inbox-read";
 import { InboxError } from "@/domain/inbox";
 import { databaseError } from "@/server/session";
@@ -42,6 +43,8 @@ export async function GET(
       ? cursor.parse(JSON.parse(q.get("before")!))
       : undefined;
     switch (q.get("view")) {
+      case "leads":
+        return NextResponse.json(await leadPage(db, workspaceId, q.get("q") ?? "", q.get("status") ?? "active", before), { headers });
       case "read-state": {
         const result = await db
           .from("conversations")

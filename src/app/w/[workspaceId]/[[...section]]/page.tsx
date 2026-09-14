@@ -7,6 +7,7 @@ import { AgentsScreen } from "@/features/agents/agents-screen";
 import { AgentEditor } from "@/features/agents/agent-editor";
 import { SettingsScreen } from "@/features/settings/settings-screen";
 import { LiveSetupScreen } from "@/features/workspaces/live-setup-screen";
+import { LeadsScreen } from "@/features/leads/leads-screen";
 
 export default async function WorkspacePage({
   params,
@@ -35,6 +36,7 @@ export default async function WorkspacePage({
     return <AIConfigurationScreen />;
   }
   if (section[0] === "drafts") return <DraftsScreen />;
+  if (section[0] === "leads") return <LeadsScreen />;
   if (section[0] === "settings") return <SettingsScreen />;
   if (section[0] === "setup") return <LiveSetupScreen />;
   notFound();

@@ -3,6 +3,7 @@ import { Badge } from "./ui";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation } from "@/domain/inbox";
 import type { LabelDefinition } from "@/domain/labels";
+import "./label-badge.css";
 export function LabelBadge({
   label,
 }: {

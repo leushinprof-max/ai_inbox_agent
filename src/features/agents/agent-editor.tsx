@@ -31,15 +31,19 @@ import { AgentChoice } from "./agent-choice";
 import { AgentMark } from "./agent-mark";
 import { AgentReferenceFields } from "./agent-reference-fields";
 import { LiveAgentTest } from "./live-agent-test";
+import { AgentFollowUps } from "./agent-follow-ups";
+import { defaultFollowUps, followUpSettings } from "@/domain/follow-ups";
 
 const steps = [
   "Background",
   "Communication",
   "References",
+  "Follow-ups",
   "Test",
   "Settings",
 ] as const;
 const testStep = steps.indexOf("Test");
+const followUpStep = steps.indexOf("Follow-ups");
 const settingsStep = steps.indexOf("Settings");
 function editable(agent: Agent): Agent {
   return {
@@ -150,6 +154,11 @@ export function AgentEditor({ id }: { id: string }) {
     let persisted = agent;
     try {
       agentGuidance.parse(agent);
+      const followUps = followUpSettings.safeParse(
+        agent.followUps ?? defaultFollowUps,
+      );
+      if (!followUps.success)
+        throw new Error(followUps.error.issues[0].message);
       if (!agent.name.trim()) throw new Error("Give the agent a name.");
       if (agent.knowledge.length > 64000)
         throw new Error(
@@ -416,6 +425,12 @@ export function AgentEditor({ id }: { id: string }) {
                     onBackground={information}
                     onResources={(value) => field("resources", value)}
                     disabled={disabled}
+                  />
+                ) : null}
+                {step === followUpStep ? (
+                  <AgentFollowUps
+                    value={agent.followUps ?? defaultFollowUps}
+                    onChange={(value) => field("followUps", value)}
                   />
                 ) : null}
                 {step === settingsStep ? (
