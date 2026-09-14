@@ -272,8 +272,8 @@ test("Send test delivers a realistic draft whose approval never accesses the dat
   });
   const card = messages.at(-1)!;
   assert.match(card.text, /Test notification/);
-  assert.match(card.text, /Lead’s reply:/);
-  assert.match(card.text, /Prepared reply:/);
+  assert.match(card.text, /Lead's Reply:\n\n/);
+  assert.match(card.text, /Prepared Draft:\n\n/);
   const buttons = card.reply_markup!.inline_keyboard.flat();
   assert.equal(buttons[0].callback_data, `test_approve:${workspace}`);
   assert.ok(Buffer.byteLength(buttons[0].callback_data!) <= 64);
