@@ -13,6 +13,7 @@ type Preview = Awaited<ReturnType<typeof previewAIAdmin>>;
 const modes = [
   { value: "classify", label: "Classification" },
   { value: "reply", label: "Reply agent" },
+  { value: "follow_up", label: "Follow-up agent" },
 ] as const;
 type Mode = (typeof modes)[number]["value"];
 
@@ -35,6 +36,7 @@ export function AIPlayground({
   const [transcript, setTranscript] = useState(
     "Team: Would you like to hear more about our service?\nLead: Yes, please send me the details.",
   );
+  const [followUpAttempt, setFollowUpAttempt] = useState(1);
   const [instructions, setInstructions] = useState("");
   const [approvedAnswer, setAnswer] = useState("");
   const [currentDraft, setDraft] = useState("");
@@ -45,8 +47,11 @@ export function AIPlayground({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [testedKey, setTestedKey] = useState("");
   const [previewKey, setPreviewKey] = useState("");
-  const fixedLabel =
-    configuration.schemaVersion !== 2 && mode === "reply";
+  const fixedLabel = configuration.schemaVersion !== 2 && mode === "reply";
+  const attemptLimit =
+    state.agents.find((agent) => agent.id === agentId)?.followUps?.attempts ??
+    5;
+  const selectedAttempt = Math.min(followUpAttempt, attemptLimit);
   const conversation = state.conversations.find((c) => c.id === conversationId);
   const sample = {
     workspaceId: scope.workspaceId,
@@ -59,10 +64,11 @@ export function AIPlayground({
         : mode === "reply" && approvedAnswer.trim()
           ? ("needs_input" as const)
           : mode,
-    generateDraft: mode === "reply",
-    instructions: mode === "reply" ? instructions : "",
-    approvedAnswer: mode === "reply" ? approvedAnswer : "",
-    currentDraft: mode === "reply" ? currentDraft : "",
+    generateDraft: mode !== "classify",
+    followUpAttempt: selectedAttempt,
+    instructions: mode !== "classify" ? instructions : "",
+    approvedAnswer: mode !== "classify" ? approvedAnswer : "",
+    currentDraft: mode !== "classify" ? currentDraft : "",
   };
   const inputKey = JSON.stringify([configuration, sample, source, version]);
   const visibleResults = testedKey === inputKey ? results : [];
@@ -127,10 +133,7 @@ export function AIPlayground({
               disabled={disabled}
               onChange={(value) => {
                 setMode(value as Mode);
-                if (
-                  configuration.schemaVersion !== 2 &&
-                  value === "reply"
-                )
+                if (configuration.schemaVersion !== 2 && value === "reply")
                   setSource("saved");
                 setError("");
               }}
@@ -156,8 +159,32 @@ export function AIPlayground({
         <small className="muted">
           {mode === "classify"
             ? "Uses the classification prompt and active system and workspace labels."
-            : "Uses the Reply agent prompt. Add operator input below when you want to revise a draft or supply more information."}
+            : mode === "follow_up"
+              ? "Uses the Follow-up agent scenario with the selected agent's follow-up instructions and examples. Preview does not schedule or send messages."
+              : "Uses the Reply agent prompt. Add operator input below when you want to revise a draft or supply more information."}
         </small>
+        {mode === "follow_up" && (
+          <div className="field">
+            <label htmlFor="test-follow-up-attempt">Follow-up attempt</label>
+            <AdminSelect
+              id="test-follow-up-attempt"
+              label="Follow-up attempt"
+              value={String(selectedAttempt)}
+              options={Array.from({ length: attemptLimit }, (_, i) => ({
+                value: String(i + 1),
+                label: String(i + 1),
+              }))}
+              onChange={(value) => setFollowUpAttempt(Number(value))}
+            />
+            {!configuration.followUp && (
+              <small className="muted">
+                This version still uses Reply agent with legacy follow-up
+                instructions. Enable the separate prompt in Instructions to test
+                it.
+              </small>
+            )}
+          </div>
+        )}
         <div className="admin-source-tabs" aria-label="Conversation source">
           {[
             { value: "example", label: "Example" },
@@ -234,14 +261,14 @@ export function AIPlayground({
             </small>
           </div>
         )}
-        {mode === "reply" && (
+        {mode !== "classify" && (
           <details className="admin-details admin-operator-input">
             <summary>
               Operator input <span className="muted">Optional</span>
             </summary>
             <p className="muted">
-              Fill any fields that apply to this reply. Leave them empty to
-              generate a new reply from the conversation alone.
+              Fill any fields that apply to this draft. Leave them empty to
+              generate a new message from the conversation alone.
             </p>
             <div className="admin-test-extra">
               <div className="field">

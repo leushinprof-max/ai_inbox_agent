@@ -7,6 +7,7 @@ import {
   initialAIConfiguration,
   serializeConfiguration,
   createSplitReplyConfiguration,
+  createFollowUpConfiguration,
   legacyInitialAIConfiguration,
 } from "../src/integrations/ai/configuration";
 import {
@@ -59,7 +60,9 @@ test("Split configuration publication is explicit and reversible; resource descr
     )
   ).rows;
   const candidate = serializeConfiguration(
-    createSplitReplyConfiguration(initialAIConfiguration),
+    createFollowUpConfiguration(
+      createSplitReplyConfiguration(initialAIConfiguration),
+    ),
   );
   const saved = (
     await db.query<{ id: number }>(

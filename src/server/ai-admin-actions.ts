@@ -17,6 +17,7 @@ import {
   createInboxModel,
   type ModelInput,
 } from "@/integrations/ai/classify";
+import { followUpSettings } from "@/domain/follow-ups";
 import { intentGroup } from "@/domain/labels";
 
 async function ownerClient() {
@@ -117,8 +118,15 @@ const previewSchema = z.object({
   agentId: z.uuid().nullable(),
   conversationId: z.uuid().nullable(),
   transcript: z.string().max(48000),
-  scenario: z.enum(["classify", "reply", "rewrite", "needs_input"]),
+  scenario: z.enum([
+    "classify",
+    "reply",
+    "rewrite",
+    "needs_input",
+    "follow_up",
+  ]),
   generateDraft: z.boolean(),
+  followUpAttempt: z.number().int().min(1).max(5).default(1),
   instructions: z.string().max(2000),
   approvedAnswer: z.string().max(8000),
   currentDraft: z.string().max(8000),
@@ -136,6 +144,7 @@ async function adminInput(value: unknown, configValue: unknown) {
   const configuration = validateConfiguration(configValue);
   let agent: ModelInput["agent"] = null;
   let agentVersion: number | undefined;
+  let followUp: ModelInput["followUp"];
   if (agentId) {
     const a = await db
       .from("agents")
@@ -145,6 +154,14 @@ async function adminInput(value: unknown, configValue: unknown) {
       .single();
     databaseError(a.error);
     agentVersion = a.data!.version;
+    if (valueParsed.scenario === "follow_up") {
+      const settings = followUpSettings.parse(a.data!.follow_ups ?? {});
+      if (valueParsed.followUpAttempt > settings.attempts)
+        throw new Error(
+          `This agent allows at most ${settings.attempts} follow-up attempts.`,
+        );
+      followUp = { settings, attempt: valueParsed.followUpAttempt };
+    }
     agent = {
       ...agentGuidance.parse({
         customInstructions: a.data!.custom_instructions,
@@ -158,6 +175,8 @@ async function adminInput(value: unknown, configValue: unknown) {
       replyGroups: z.array(intentGroup).parse(a.data!.reply_groups),
     };
   }
+  if (valueParsed.scenario === "follow_up" && !agent)
+    throw new Error("Select an agent to test follow-ups.");
   let messages: ModelInput["messages"];
   let historyTruncated = false;
   if (conversationId) {
@@ -202,6 +221,7 @@ async function adminInput(value: unknown, configValue: unknown) {
       ...ai,
       configuration,
       agent,
+      followUp,
       messages,
       historyTruncated,
       scenario: valueParsed.scenario,

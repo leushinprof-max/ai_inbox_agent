@@ -56,3 +56,23 @@ Feature checks cover durable admission, classification independence, random rang
 Column widths are saved in browser storage, scoped by user and workspace, separately for Active and Completed. They survive navigation and reload. Double-clicking a resize handle resets that view only. Invalid stored layouts fall back to the default widths; blocked storage falls back to in-memory resizing.
 
 Leads notes are edited in a non-modal cell-anchored editor. It expands above the row for longer text, stays within the viewport, and keeps table row heights unchanged. Enter saves without restoring the cell focus highlight; Tab/blur or an outside click also saves; Shift+Enter inserts a newline; Escape discards the current edit. Saves retain the opening revision, and failures preserve the draft with Retry and Discard actions. Viewers can read existing notes but cannot edit. The shared conversation note remains the only stored entity.
+
+## Follow-up agent prompt
+
+Product admin > Instructions > Follow-up agent provides an independent developer
+prompt. Select Use separate Follow-up agent, review or edit it, then save and
+publish a configuration version. Existing publications keep their original reply
+prompt plus follow-up suffix until a version containing `followUp` is published;
+restoring an older version restores that behavior.
+
+The separate prompt receives shared agent background, communication settings and
+resources, plus the follow-up attempt, limit, instructions and examples. The
+transcript and current draft are separate user data. No hidden follow-up suffix
+is appended to the separate prompt. Replies and classification keep their own
+prompts. Both writer scenarios use the configured draft model and reasoning.
+
+Preview & test includes Follow-up agent, an attempt selector, existing or sample
+conversations, and operator input for revisions. Tests use the selected agent's
+follow-up settings without scheduling or sending messages. The conversation
+Agent switch continues to control automatic replies and follow-ups together;
+follow-ups additionally require their existing enablement and scheduling rules.
