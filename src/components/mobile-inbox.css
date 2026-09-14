@@ -229,7 +229,8 @@
     gap: 6px;
   }
   .shell-mobile-inbox .kimi-thread .message-meta .avatar {
-    position: static;
+    /* Keep next/image fill anchored to the avatar while it stays in flow. */
+    position: relative;
     width: 24px;
     height: 24px;
   }
