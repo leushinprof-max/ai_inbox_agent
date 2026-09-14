@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseConfig } from "@/lib/supabase/config";
 import { safeAuthNext } from "@/lib/auth-navigation";
+import { signInFailure } from "@/lib/sign-in-error";
 import { z } from "zod";
 
 export type FormResult = { error: string };
@@ -20,9 +21,21 @@ export async function signIn(
   if (!email || !password || email.length > 254 || password.length > 1024)
     return { error: "Enter your email and password." };
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error)
-    return { error: "Could not sign in. Check your email and password." };
+  let failure: unknown;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    failure = error;
+  } catch (error) {
+    failure = error;
+  }
+  if (failure) {
+    const result = signInFailure(failure);
+    console.error("Sign-in failed", result.diagnostic);
+    return { error: result.error };
+  }
   redirect(safeAuthNext(form.get("next")));
 }
 export async function signOut() {
