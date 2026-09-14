@@ -1,0 +1,57 @@
+/* Labels retain the live catalog colors, with the filled chips from the reference. */
+.conversations-page .conv-preview .pill,
+.queue-item .pill,
+.lead-label-cell .pill,
+.kimi-context .pill {
+  border: 0;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+  line-height: 18px;
+  font-weight: 500;
+  color: #181821;
+  background: #9a9aa6;
+  width: fit-content;
+}
+.conversations-page .pill.green,
+.queue-item .pill.green,
+.lead-label-cell .pill.green,
+.kimi-context .pill.green {
+  background: #34d399;
+}
+.conversations-page .pill.blue,
+.queue-item .pill.blue,
+.lead-label-cell .pill.blue,
+.kimi-context .pill.blue {
+  background: #6aa6ff;
+}
+.conversations-page .pill.purple,
+.queue-item .pill.purple,
+.lead-label-cell .pill.purple,
+.kimi-context .pill.purple {
+  background: #a79bff;
+}
+.conversations-page .pill.teal,
+.queue-item .pill.teal,
+.lead-label-cell .pill.teal,
+.kimi-context .pill.teal {
+  background: #5bd6c2;
+}
+.conversations-page .pill.amber,
+.queue-item .pill.amber,
+.lead-label-cell .pill.amber,
+.kimi-context .pill.amber {
+  background: #fbbf24;
+}
+.conversations-page .pill.pink,
+.queue-item .pill.pink,
+.lead-label-cell .pill.pink,
+.kimi-context .pill.pink {
+  background: #ef9fce;
+}
+.conversations-page .pill.red,
+.queue-item .pill.red,
+.lead-label-cell .pill.red,
+.kimi-context .pill.red {
+  background: #f87171;
+}

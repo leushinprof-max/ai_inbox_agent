@@ -40,6 +40,7 @@ export async function runModelPipeline(
   const plan = planModelRun(input, fallback);
   if (
     (input.scenario ?? "classify") !== "classify" &&
+    input.scenario !== "follow_up" &&
     (input.configuration ?? initialAIConfiguration).schemaVersion === 2 &&
     (!input.generateDraft ||
       !input.agent ||

@@ -8,6 +8,14 @@ import {
   type Scope,
 } from "@/domain/inbox";
 import type { SendOutcome, SendRepository, SendRequest } from "@/domain/send";
+import {
+  defaultFollowUps,
+  followUpSettings,
+  leadStatus,
+  sampleFollowUpDate,
+  type LeadStatus,
+} from "@/domain/follow-ups";
+import { resolveSenderAgent } from "@/domain/sender-agent";
 import { grammaticalForm, type GrammaticalForm } from "@/domain/agent-guidance";
 
 interface Operation {
@@ -29,7 +37,10 @@ export class DemoRepository implements SendRepository {
       draft.status === "snoozed" &&
       draft.snoozedUntil !== null &&
       Date.parse(draft.snoozedUntil) <= now.getTime();
-    if (!this.state.drafts.some(due)) return;
+    if (!this.state.drafts.some(due)) {
+      this.wakeFollowUps(scope, now);
+      return;
+    }
     this.publish({
       ...this.state,
       drafts: this.state.drafts.map((draft) =>
@@ -41,6 +52,112 @@ export class DemoRepository implements SendRepository {
               revision: draft.revision + 1,
             }
           : draft,
+      ),
+    });
+    this.wakeFollowUps(scope, now);
+  }
+  private wakeFollowUps(scope: Scope, now: Date) {
+    const state = structuredClone(this.state);
+    let changed = false;
+    for (const c of state.conversations) {
+      const lead = c.lead;
+      if (
+        c.workspaceId !== scope.workspaceId ||
+        !lead ||
+        c.agentEnabled === false
+      )
+        continue;
+      const returning =
+        lead.status === "later" &&
+        lead.laterUntil &&
+        Date.parse(lead.laterUntil) <= now.getTime();
+      const scheduled =
+        lead.status === "follow_up" &&
+        lead.state === "scheduled" &&
+        lead.dueAt &&
+        Date.parse(lead.dueAt) <= now.getTime();
+      if (!returning && !scheduled) continue;
+      const agent = resolveSenderAgent(state, scope.workspaceId, c.senderId);
+      const settings = agent?.followUps ?? defaultFollowUps;
+      if (returning) {
+        lead.status = "follow_up";
+        lead.laterUntil = null;
+        lead.sent = 0;
+      }
+      lead.revision++;
+      lead.dueAt = null;
+      changed = true;
+      if (!agent || !settings.enabled) {
+        lead.state = "disabled";
+        continue;
+      }
+      if (
+        state.drafts.some(
+          (d) =>
+            d.workspaceId === c.workspaceId &&
+            d.conversationId === c.id &&
+            ["ready", "needs_input", "snoozed"].includes(d.status),
+        )
+      ) {
+        lead.state = "draft";
+        continue;
+      }
+      if (lead.sent >= settings.attempts) {
+        lead.status = "no_reply";
+        lead.state = "finished";
+        continue;
+      }
+      state.drafts.push({
+        id: crypto.randomUUID(),
+        workspaceId: c.workspaceId,
+        conversationId: c.id,
+        agentId: agent.id,
+        revision: 1,
+        sourceRevision: c.revision,
+        status: "ready",
+        followUpNumber: lead.sent + 1,
+        missingKnowledge: null,
+        snoozedUntil: null,
+        body: `Hi ${c.contact.name.split(" ")[0]} — checking back on our conversation. Would it be useful to pick this up?`,
+      });
+      lead.state = "draft";
+    }
+    if (changed) this.publish(state);
+  }
+  private planLead(
+    scope: Scope,
+    id: string,
+    anchor = new Date(),
+    sent?: number,
+  ) {
+    const c = this.state.conversations.find(
+      (item) => item.workspaceId === scope.workspaceId && item.id === id,
+    );
+    if (c?.lead?.status !== "follow_up") return;
+    const settings =
+      resolveSenderAgent(this.state, scope.workspaceId, c.senderId)
+        ?.followUps ?? defaultFollowUps;
+    this.publish({
+      ...this.state,
+      conversations: this.state.conversations.map((item) =>
+        item === c
+          ? {
+              ...c,
+              lead: {
+                ...c.lead!,
+                state:
+                  settings.enabled && c.agentEnabled !== false
+                    ? "scheduled"
+                    : "disabled",
+                dueAt:
+                  settings.enabled && c.agentEnabled !== false
+                    ? sampleFollowUpDate(settings, anchor)
+                    : null,
+                sent: sent ?? c.lead!.sent,
+                revision: c.lead!.revision + 1,
+              },
+            }
+          : item,
       ),
     });
   }
@@ -81,6 +198,9 @@ export class DemoRepository implements SendRepository {
     );
   }
   dismiss(scope: Scope, id: string, revision: number) {
+    const draft = this.state.drafts.find(
+      (d) => d.id === id && d.workspaceId === scope.workspaceId,
+    );
     this.publish(
       updateDraft(
         this.state,
@@ -91,6 +211,7 @@ export class DemoRepository implements SendRepository {
         new Date(),
       ),
     );
+    if (draft?.followUpNumber) this.planLead(scope, draft.conversationId);
   }
   snooze(scope: Scope, id: string, revision: number, until: string) {
     this.publish(
@@ -199,7 +320,154 @@ export class DemoRepository implements SendRepository {
       ),
     });
   }
+  async setConversationAgent(
+    scope: Scope,
+    id: string,
+    revision: number,
+    enabled: boolean,
+  ) {
+    assertMember(this.state, scope, true);
+    const c = this.state.conversations.find(
+      (item) => item.workspaceId === scope.workspaceId && item.id === id,
+    );
+    if (!c) throw new InboxError("not_found", "Conversation not found.");
+    if ((c.agentControlRevision ?? 0) !== revision)
+      throw new InboxError(
+        "conflict",
+        "Agent control changed. Reload before continuing.",
+      );
+    if ((c.agentEnabled !== false) === enabled) return;
+    const settings =
+      resolveSenderAgent(this.state, scope.workspaceId, c.senderId)
+        ?.followUps ?? defaultFollowUps;
+    const hasDraft = this.state.drafts.some(
+      (d) =>
+        d.workspaceId === scope.workspaceId &&
+        d.conversationId === id &&
+        ["ready", "needs_input", "snoozed"].includes(d.status),
+    );
+    const next =
+      !enabled || !settings.enabled
+        ? "disabled"
+        : c.messages.at(-1)?.direction !== "outbound"
+          ? "waiting_reply"
+          : hasDraft
+            ? "draft"
+            : "scheduled";
+    this.publish({
+      ...this.state,
+      conversations: this.state.conversations.map((item) =>
+        item === c
+          ? {
+              ...c,
+              agentEnabled: enabled,
+              agentControlRevision: revision + 1,
+              lead: c.lead
+                ? {
+                    ...c.lead,
+                    revision: c.lead.revision + 1,
+                    state: c.lead.status === "follow_up" ? next : c.lead.state,
+                    dueAt:
+                      c.lead.status === "follow_up" && next === "scheduled"
+                        ? sampleFollowUpDate(settings, new Date())
+                        : null,
+                    error: null,
+                  }
+                : c.lead,
+            }
+          : item,
+      ),
+      generations: this.state.generations?.map((g) =>
+        g.conversationId === id && g.status === "queued"
+          ? { ...g, status: "cancelled" }
+          : g,
+      ),
+    });
+  }
+  async setLeadStatus(
+    scope: Scope,
+    id: string,
+    revision: number,
+    status: LeadStatus,
+    until?: string,
+  ) {
+    assertMember(this.state, scope, true);
+    leadStatus.parse(status);
+    const conversation = this.state.conversations.find(
+      (c) => c.id === id && c.workspaceId === scope.workspaceId,
+    );
+    if (!conversation?.lead)
+      throw new InboxError("not_found", "Lead not found.");
+    if (conversation.lead.revision !== revision)
+      throw new InboxError(
+        "conflict",
+        "Lead changed. Reload before continuing.",
+      );
+    if (
+      conversation.lead.status === status &&
+      status !== "later" &&
+      conversation.lead.state !== "error"
+    )
+      return;
+    if (
+      status === "later" &&
+      (!until ||
+        !Number.isFinite(Date.parse(until)) ||
+        Date.parse(until) <= Date.now())
+    )
+      throw new InboxError("invalid", "Choose a future time.");
+    const settings =
+      resolveSenderAgent(this.state, scope.workspaceId, conversation.senderId)
+        ?.followUps ?? defaultFollowUps;
+    const last = conversation.messages.at(-1);
+    const state =
+      status === "follow_up"
+        ? !settings.enabled || conversation.agentEnabled === false
+          ? "disabled"
+          : last?.direction === "outbound"
+            ? "scheduled"
+            : "waiting_reply"
+        : status === "new_interest" || status === "later"
+          ? "idle"
+          : "finished";
+    this.publish({
+      ...this.state,
+      conversations: this.state.conversations.map((c) =>
+        c.id === id && c.workspaceId === scope.workspaceId
+          ? {
+              ...c,
+              lead: {
+                ...conversation.lead!,
+                status,
+                revision: revision + 1,
+                state,
+                dueAt:
+                  state === "scheduled"
+                    ? sampleFollowUpDate(settings, new Date(last!.createdAt))
+                    : null,
+                laterUntil: status === "later" ? until! : null,
+                sent:
+                  status === "follow_up" &&
+                  conversation.lead!.status !== "follow_up"
+                    ? 0
+                    : conversation.lead!.sent,
+                error: null,
+              },
+            }
+          : c,
+      ),
+      drafts: this.state.drafts.map((d) =>
+        d.workspaceId === scope.workspaceId &&
+        d.conversationId === id &&
+        d.followUpNumber &&
+        ["ready", "needs_input", "snoozed"].includes(d.status)
+          ? { ...d, status: "dismissed", revision: d.revision + 1 }
+          : d,
+      ),
+    });
+  }
   saveAgent(scope: Scope, agent: Agent) {
+    if (agent.followUps) followUpSettings.parse(agent.followUps);
     const member = assertMember(this.state, scope, true);
     if (
       !["owner", "admin"].includes(member.role) ||
@@ -438,6 +706,21 @@ export class DemoRepository implements SendRepository {
     if (operation.outcome.status !== "sending") return;
     operation.outcome = outcome;
     if (outcome.status !== "sent") return;
+    const conversation = this.state.conversations.find(
+      (c) =>
+        c.id === operation.request.conversationId &&
+        c.workspaceId === scope.workspaceId,
+    );
+    const number = this.state.drafts.find(
+      (d) =>
+        d.id === operation.request.draft?.id &&
+        d.workspaceId === scope.workspaceId,
+    )?.followUpNumber;
+    const count =
+      number ??
+      (conversation?.messages.at(-1)?.direction === "inbound"
+        ? 0
+        : (conversation?.lead?.sent ?? 0));
     this.publish({
       ...this.state,
       conversations: this.state.conversations.map((c) =>
@@ -467,5 +750,6 @@ export class DemoRepository implements SendRepository {
           : d,
       ),
     });
+    this.planLead(scope, operation.request.conversationId, new Date(), count);
   }
 }

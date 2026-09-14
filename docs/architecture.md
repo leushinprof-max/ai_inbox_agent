@@ -46,6 +46,8 @@ Timeouts and ambiguous responses retain Unknown. Read-only recovery or an operat
 
 Provider readback correlates exactly one same-body, time-bounded operation and converts the acknowledgement into a provider message without duplication. Ambiguous matches are not guessed. Late completion only closes drafts based on inbound state no newer than the original send reservation.
 
+HeyReach can later revise a sent message's timestamp by a fraction of a second, changing its fingerprint. Ingestion preserves the message ID linked to the confirmed send when exactly one same-body outbound message is observed within one second, its old key is absent from the provider snapshot, and no nearby send makes the match ambiguous. This also repairs an existing unlinked duplicate identified by that snapshot, preserving the send operation and AI provenance. Inbound messages, external sends, repeated messages present together and ambiguous candidates are retained. The correction does not change inbound revisions or read state; applying the migration lets normal refresh, webhook and import reads repair affected conversations.
+
 ## Provider references
 
 - [Official HeyReach API collection](https://documenter.getpostman.com/view/23808049/2sA2xb5F75): CheckApiKey, GetAll accounts, GetConversationsV2, GetChatroom and SendMessage. The send body includes `message`, `subject`, `conversationId` and `linkedInAccountId`; ordinary text uses an empty subject.

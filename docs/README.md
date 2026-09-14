@@ -1,6 +1,7 @@
 # Documentation
 
 - [Product contract](product.md): approved navigation, workflows and scope.
+- [Leads and follow-ups](leads-and-follow-ups.md): interested leads, manual statuses, scheduled drafts, attempt accounting and rollout.
 - [Labels and AI configuration](labels-and-ai-configuration.md): single intent, custom rules, platform prompt versions, validation and coordinated rollout.
 - [Agent reply context](agent-reply-context.md): sender identity, custom instructions, PDF/link resources and manual meeting coordination through Needs input.
 - [Draft composer](draft-redraft.md): fresh generation, rewriting visible text, previous-version restoration and rollout.

@@ -480,6 +480,20 @@ h3 {
   width: 14px;
   height: 14px;
 }
+/* Search containers own the focus indicator, so nested inputs don't draw a second ring. */
+:is(
+  .search,
+  .conversation-search,
+  .workspace-search,
+  .leads-search
+):focus-within {
+  border-color: var(--accent);
+}
+:is(.search, .conversation-search, .workspace-search, .leads-search)
+  input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
 .shortcut {
   border: 1px solid var(--line);
   border-radius: 3px;

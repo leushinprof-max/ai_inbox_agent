@@ -20,6 +20,7 @@ import "./mobile-inbox.css";
 const navigation: { route: string; title: string; icon: SidebarIconName }[] = [
   { route: "conversations", title: "Conversations", icon: "conversations" },
   { route: "drafts", title: "Drafts", icon: "drafts" },
+  { route: "leads", title: "Leads", icon: "leads" },
   { route: "agents", title: "Agents", icon: "agents" },
   { route: "settings", title: "Settings", icon: "settings" },
 ];
