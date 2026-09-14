@@ -427,6 +427,41 @@ test("Later returns on its chosen date; closed outcomes cancel drafts and stale 
   assert.equal((await f.lead()).status, "meeting_booked");
 });
 
+test("enabling follow-ups reconciles an inbound lead's stale disabled state without scheduling a message", async () => {
+  const f = await fixture();
+  await f.inbound();
+  const disabled = {
+    ...f.config,
+    followUps: { ...f.config.followUps, enabled: false },
+  };
+  await db.query("select public.save_agent($1,$2,1,$3)", [
+    f.workspace,
+    f.agent,
+    JSON.stringify(disabled),
+  ]);
+  await db.query("select app_private.plan_follow_up($1,$2)", [
+    f.workspace,
+    f.conversation,
+  ]);
+  assert.equal((await f.lead()).state, "disabled");
+  await db.query("select public.server_schedule_follow_ups()");
+  assert.equal((await f.lead()).state, "disabled");
+
+  await db.query("select public.save_agent($1,$2,2,$3)", [
+    f.workspace,
+    f.agent,
+    JSON.stringify(f.config),
+  ]);
+  await db.query("select public.server_schedule_follow_ups()");
+  const waiting = await f.lead();
+  assert.equal(waiting.state, "waiting_reply");
+  assert.equal(waiting.due_at, null);
+  assert.equal(waiting.sent_count, 0);
+  assert.equal(await f.draft(), undefined);
+  await db.query("select public.server_schedule_follow_ups()");
+  assert.equal((await f.lead()).revision, waiting.revision);
+});
+
 test("settings are versioned, disabled agents do not draft, and invalid intervals fail", async () => {
   const f = await fixture();
   const snapshot = (
