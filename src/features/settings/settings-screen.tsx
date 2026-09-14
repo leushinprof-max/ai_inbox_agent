@@ -15,6 +15,7 @@ import { Dialog } from "@/components/dialog";
 import { LiveConnectionSettings, LiveImportSettings } from "./live-settings";
 import { LabelsSettings } from "./labels-settings";
 import { MembersSettings } from "./members-settings";
+import { NotificationsSettings } from "./notifications-settings";
 import { usePreferences } from "@/lib/preferences";
 import { ImportRunCard, ImportWindow } from "./import-history";
 
@@ -24,6 +25,7 @@ const tabs: { id: string; label: string; icon: IconName }[] = [
   { id: "connection", label: "HeyReach", icon: "link" },
   { id: "import", label: "Import history", icon: "inbox" },
   { id: "members", label: "Members", icon: "users" },
+  { id: "notifications", label: "Notifications", icon: "inbox" },
   { id: "preferences", label: "Preferences", icon: "settings" },
 ];
 
@@ -57,6 +59,9 @@ export function SettingsScreen({
               </p>
             </div>
             {tab === "labels" ? <LabelsSettings /> : null}
+            {tab === "notifications" ? (
+              <NotificationsSettings key={workspace.id} />
+            ) : null}
             {tab === "general" ? <GeneralSettings key={workspace.id} /> : null}
             {tab === "preferences" ? <PersonalPreferences /> : null}
             {tab === "connection" ? (

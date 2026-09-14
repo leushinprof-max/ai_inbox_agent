@@ -20,9 +20,17 @@ import {
   type ConversationFilter,
 } from "@/domain/conversation-filters";
 import "./conversations.css";
+import { useRouter } from "next/navigation";
 
-export function ConversationsScreen({ initialId }: { initialId?: string }) {
-  const { state, scope, repository, workspace } = useInbox();
+export function ConversationsScreen({
+  initialId,
+  reviewDraft = false,
+}: {
+  initialId?: string;
+  reviewDraft?: boolean;
+}) {
+  const { state, scope, repository, workspace, basePath } = useInbox();
+  const router = useRouter();
   const { preferences } = usePreferences(scope.userId);
   const [error, setError] = useState("");
   const [unreadFailure, setUnreadFailure] = useState<{
@@ -30,6 +38,7 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
     name: string;
   } | null>(null);
   const [selectedId, setSelected] = useState<string | null>(initialId ?? null);
+  const [reviewLoaded, setReviewLoaded] = useState(!reviewDraft);
   const [query, setQuery] = useState("");
   const [storedFilters, setFilters] = useState<ConversationFilter[]>([]);
   const filters = useMemo(
@@ -109,10 +118,22 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
     };
   }, [query, filters, repository]);
   useEffect(() => {
+    let active = true;
     if (initialId && repository.openConversation)
       void repository
         .openConversation(initialId)
-        .catch(() => setError("Conversation could not be loaded."));
+        .then(() => {
+          if (active) setReviewLoaded(true);
+        })
+        .catch(() => {
+          if (active) {
+            setReviewLoaded(true);
+            setError("Conversation could not be loaded.");
+          }
+        });
+    return () => {
+      active = false;
+    };
   }, [initialId, repository]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -161,6 +182,20 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
             .includes(query.trim().toLowerCase()) &&
           matchesConversationFilters(c, filters, undefined, state.labelCatalog),
       );
+  const reviewedDraft =
+    reviewDraft && selected
+      ? state.drafts.find(
+          (draft) =>
+            draft.conversationId === selected.id &&
+            !["sent", "dismissed"].includes(draft.status),
+        )
+      : undefined;
+  if (reviewDraft && !reviewLoaded && !error)
+    return (
+      <div className="content-scroll">
+        <Notice>Loading draft…</Notice>
+      </div>
+    );
   if (selected)
     return (
       <div className="conversation-detail-layout">
@@ -168,18 +203,29 @@ export function ConversationsScreen({ initialId }: { initialId?: string }) {
           active={!details || wideDetails}
           key={`thread-${selected.id}`}
           conversation={selected}
-          onBack={() => setSelected(null)}
+          onBack={() =>
+            reviewDraft ? router.push(`${basePath}/drafts`) : setSelected(null)
+          }
           onMarkedUnread={(save) => {
             const { id, contact } = selected;
             setUnreadFailure(null);
             setSelected(null);
-            void save.catch(() =>
-              setUnreadFailure({ id, name: contact.name }),
-            );
+            if (reviewDraft) router.push(`${basePath}/drafts`);
+            void save.catch(() => setUnreadFailure({ id, name: contact.name }));
           }}
           onToggleDetails={() => setDetails(!details)}
         >
-          <Composer key={selected.id} conversation={selected} />
+          {reviewDraft && !reviewedDraft ? (
+            <Notice>
+              This draft has already been handled. You can continue the
+              conversation below.
+            </Notice>
+          ) : null}
+          <Composer
+            key={`${selected.id}:${reviewedDraft?.id ?? "manual"}`}
+            conversation={selected}
+            draft={reviewedDraft}
+          />
         </ConversationThread>
         {details ? (
           <ContactContext

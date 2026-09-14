@@ -1,0 +1,51 @@
+.notification-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.notification-heading h2 {
+  margin-bottom: 8px;
+}
+.notification-heading .page-description {
+  max-width: 480px;
+}
+.notification-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 0;
+  cursor: pointer;
+}
+.notification-toggle .help {
+  display: block;
+  margin-top: 6px;
+}
+.notification-toggle input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--accent, #0d9488);
+}
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.notification-connect {
+  margin-top: 24px;
+}
+.notification-connect .help {
+  margin-top: 14px;
+}
+.notification-notice {
+  padding: 0 4px;
+}
+@media (max-width: 600px) {
+  .notification-heading {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
