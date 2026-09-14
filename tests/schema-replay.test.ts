@@ -693,3 +693,130 @@ test("The full schema grants neither anonymous data access nor privileged server
     );
   }
 });
+
+test("Version names are owner-only metadata and preserve prompts, publications and rollback", async () => {
+  const owner = randomUUID();
+  const outsider = randomUUID();
+  await db.query(
+    "insert into auth.users(id,email) values($1,'version-owner@example.test'),($2,'version-outsider@example.test')",
+    [owner, outsider],
+  );
+  await db.query(
+    "insert into app_private.platform_owners(user_id) values($1)",
+    [owner],
+  );
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+    owner,
+  ]);
+  const id = (
+    await db.query<{ id: number }>(
+      "select public.save_ai_configuration($1) id",
+      [
+        JSON.stringify(
+          serializeConfiguration(
+            createFollowUpConfiguration(
+              createSplitReplyConfiguration(initialAIConfiguration),
+            ),
+          ),
+        ),
+      ],
+    )
+  ).rows[0].id;
+  const snapshot = async () => ({
+    config: (
+      await db.query(
+        "select configuration from public.ai_config_versions where id=$1",
+        [id],
+      )
+    ).rows,
+    release: (await db.query("select * from public.ai_config_release")).rows,
+    publications: (
+      await db.query("select * from public.ai_config_publications order by id")
+    ).rows,
+  });
+  const beforeName = await snapshot();
+  await db.exec("set role authenticated");
+  try {
+    await db.query("select public.name_ai_configuration($1,$2)", [
+      id,
+      "  Approved - September 14  ",
+    ]);
+    assert.equal(
+      (
+        await db.query<{ name: string }>(
+          "select name from public.ai_config_versions where id=$1",
+          [id],
+        )
+      ).rows[0].name,
+      "Approved - September 14",
+    );
+    await assert.rejects(
+      db.query(
+        "update public.ai_config_versions set configuration='{}' where id=$1",
+        [id],
+      ),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.query("select public.name_ai_configuration($1,$2)", [
+        id,
+        "x".repeat(121),
+      ]),
+      /120 characters/,
+    );
+    await assert.rejects(
+      db.query("select public.name_ai_configuration($1,$2)", [
+        2147483647,
+        "Missing",
+      ]),
+      /not found/,
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      outsider,
+    ]);
+    await assert.rejects(
+      db.query("select public.name_ai_configuration($1,$2)", [
+        id,
+        "Unauthorized",
+      ]),
+      /Forbidden/,
+    );
+  } finally {
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      owner,
+    ]);
+  }
+  assert.deepEqual(await snapshot(), beforeName);
+  const release = (
+    await db.query<{ version_id: number; revision: number }>(
+      "select version_id,revision from public.ai_config_release",
+    )
+  ).rows[0];
+  await db.query("select public.publish_ai_configuration($1,$2)", [
+    id,
+    release.revision,
+  ]);
+  await db.query("select public.publish_ai_configuration($1,$2)", [
+    release.version_id,
+    release.revision + 1,
+  ]);
+  assert.equal(
+    (
+      await db.query<{ version_id: number }>(
+        "select version_id from public.ai_config_release",
+      )
+    ).rows[0].version_id,
+    release.version_id,
+  );
+  await db.query("select public.name_ai_configuration($1,$2)", [id, ""]);
+  assert.equal(
+    (
+      await db.query<{ name: string | null }>(
+        "select name from public.ai_config_versions where id=$1",
+        [id],
+      )
+    ).rows[0].name,
+    null,
+  );
+});

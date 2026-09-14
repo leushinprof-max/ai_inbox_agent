@@ -18,6 +18,7 @@ import {
   readAIAdmin,
   saveAIAdmin,
   publishAIAdmin,
+  nameAIAdmin,
 } from "@/server/ai-admin-actions";
 import "./ai-admin.css";
 import {
@@ -73,6 +74,8 @@ export function AIConfigurationScreen() {
   const [notice, setNotice] = useState("");
   const [pendingVersion, setPendingVersion] = useState<number | null>(null);
   const [reviewSplit, setReviewSplit] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [versionName, setVersionName] = useState("");
   useEffect(() => {
     let active = true;
     readAIAdmin()
@@ -98,6 +101,10 @@ export function AIConfigurationScreen() {
     };
   }, []);
   const baseline = data?.versions.find((v) => v.id === selected);
+  function versionLabel(id: number) {
+    const name = data?.versions.find((version) => version.id === id)?.name;
+    return `Version ${id}${name ? ` · ${name}` : ""}`;
+  }
   const published = data?.versions.find(
     (v) => v.id === data.release.version_id,
   );
@@ -200,8 +207,8 @@ export function AIConfigurationScreen() {
                     : dirty
                       ? "Unsaved changes"
                       : selected === data.release.version_id
-                        ? `Version ${selected} is live`
-                        : `Version ${selected} · unpublished`}
+                        ? `${versionLabel(selected)} · Live`
+                        : `${versionLabel(selected)} · unpublished`}
                 </div>
               </div>
               <div className="admin-publish-actions">
@@ -423,11 +430,20 @@ export function AIConfigurationScreen() {
                   options={
                     data?.versions.map((v) => ({
                       value: String(v.id),
-                      label: `Version ${v.id}${v.id === data.release.version_id ? " · Live" : ""} · ${new Date(v.created_at).toLocaleString()}`,
+                      label: `${versionLabel(v.id)}${v.id === data.release.version_id ? " · Live" : ""} · ${new Date(v.created_at).toLocaleString()}`,
                     })) ?? []
                   }
                   onChange={(value) => chooseVersion(Number(value))}
                 />
+                <Button
+                  disabled={busy || !baseline}
+                  onClick={() => {
+                    setVersionName(baseline?.name ?? "");
+                    setEditingName(true);
+                  }}
+                >
+                  Name version
+                </Button>
               </div>
               <details className="admin-details admin-diff">
                 <summary>
@@ -501,7 +517,7 @@ export function AIConfigurationScreen() {
                 {data?.publications.map((publication) => (
                   <div className="admin-history-row" key={publication.id}>
                     <Icon name="clock" />
-                    <strong>Version {publication.version_id}</strong>
+                    <strong>{versionLabel(publication.version_id)}</strong>
                     <time>
                       {new Date(publication.created_at).toLocaleString()}
                     </time>
@@ -512,6 +528,42 @@ export function AIConfigurationScreen() {
           </section>
         </div>
       </div>
+      {editingName && (
+        <Dialog
+          title={`Name version ${selected}`}
+          onClose={() => setEditingName(false)}
+        >
+          <div className="field">
+            <label htmlFor="version-name">Version name</label>
+            <input
+              id="version-name"
+              value={versionName}
+              maxLength={120}
+              onChange={(event) => setVersionName(event.target.value)}
+              placeholder="For example: Approved · September 14"
+            />
+          </div>
+          <div className="row end">
+            <Button disabled={busy} onClick={() => setEditingName(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await nameAIAdmin(selected, versionName);
+                  setData(await readAIAdmin());
+                  setEditingName(false);
+                  setNotice("Version name saved.");
+                })
+              }
+            >
+              Save name
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {reviewSplit && (
         <Dialog
           title="Review the new reply format"
