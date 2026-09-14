@@ -418,6 +418,7 @@ export async function readWorkspace(
     imports,
     unresolved,
     generations,
+    automaticGenerations,
     activity,
     counts,
     conversationCounts,
@@ -476,6 +477,7 @@ export async function readWorkspace(
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(100),
+    db.rpc("automatic_draft_progress", { p_workspace: workspaceId }),
     db.rpc("agent_activity", { p_workspace: workspaceId }),
     draftCounts(db, workspaceId),
     db.rpc("conversation_counts", { p_workspace: workspaceId }),
@@ -491,6 +493,7 @@ export async function readWorkspace(
     imports,
     unresolved,
     generations,
+    automaticGenerations,
     activity,
     conversationCounts,
   ].forEach((r) => databaseError(r.error));
@@ -505,7 +508,12 @@ export async function readWorkspace(
   const owner = await db.rpc("is_platform_owner");
   databaseError(owner.error);
   const missingIds = [
-    ...new Set(drafts.rows.map((d) => d.conversation_id)),
+    ...new Set([
+      ...drafts.rows.map((d) => d.conversation_id),
+      ...(automaticGenerations.data ?? [])
+        .filter((g) => g.status === "queued")
+        .map((g) => g.conversation_id),
+    ]),
   ].filter((id) => !conversations.rows.some((c) => c.id === id));
   const extra = missingIds.length
     ? await db
@@ -585,14 +593,26 @@ export async function readWorkspace(
     agentActivity: Object.fromEntries(
       (activity.data ?? []).map((a) => [a.agent_id, a.sent]),
     ),
-    generations: (generations.data ?? []).map((g) => ({
-      id: g.id,
-      conversationId: g.conversation_id,
-      status: g.status,
-      error: g.error_code,
-      draftId: g.result_draft_id,
-      resultRevision: (g.expected_draft_revision ?? 0) + 1,
-    })),
+    generations: [
+      ...(generations.data ?? []).map((g) => ({
+        id: g.id,
+        conversationId: g.conversation_id,
+        status: g.status,
+        error: g.error_code,
+        draftId: g.result_draft_id,
+        resultRevision: (g.expected_draft_revision ?? 0) + 1,
+      })),
+      ...(automaticGenerations.data ?? []).map((g) => ({
+        automatic: true,
+        sourceRevision: g.source_revision,
+        id: `automatic:${g.id}`,
+        conversationId: g.conversation_id,
+        status: g.status,
+        error: g.error_code,
+        draftId: g.draft_id,
+        resultRevision: g.result_revision,
+      })),
+    ],
     unresolvedSends: (unresolved.data ?? []).map((o) => ({
       id: o.id,
       conversationId: o.conversation_id,

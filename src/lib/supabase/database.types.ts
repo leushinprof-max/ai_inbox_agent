@@ -1016,6 +1016,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      automatic_draft_progress: {
+        Args: { p_workspace: string };
+        Returns: {
+          id: string;
+          conversation_id: string;
+          source_revision: number;
+          status: string;
+          error_code: string | null;
+          draft_id: string | null;
+          result_revision: number;
+        }[];
+      };
       accept_workspace_invite: { Args: { p_hash: string }; Returns: string };
       act_on_draft: {
         Args: {

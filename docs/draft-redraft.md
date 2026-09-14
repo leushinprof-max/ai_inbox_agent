@@ -4,6 +4,10 @@ The AI reply is directly editable. The card has **Redraft**, **Redraft with inst
 
 ## Generation behavior
 
+Automatic replies to new inbound messages expose the worker job's progress through the workspace-scoped `automatic_draft_progress` RPC. Drafts includes a pending conversation before its draft row exists and shows the existing **Writing a new draft…** skeleton. The conversation keeps its selection when the result arrives; job completion alone does not hide the skeleton before the corresponding draft is loaded. Failed, cancelled and no-reply jobs release it. Classification-only imports and jobs for older inbound revisions do not create placeholders.
+
+Automatic results fill untouched editors, including an empty manual composer saved before generation, while preserving operator edits. Automatic jobs cannot be cancelled with the manual generation action. Apply `20260914115133_automatic_draft_progress.sql` before deploying the web change; the worker needs no update.
+
 | Action                              | Model input                                                                                                                                                      |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Redraft                             | Conversation, latest saved agent version selected when the request is made, and published AI configuration loaded by the worker. The existing draft is excluded. |

@@ -7,6 +7,19 @@ export interface ComposerBuffer {
   generationId: string | null;
 }
 
+/** A new reply may replace an untouched composer, never an operator's edits. */
+export function canAdoptIncomingDraft(
+  buffer: Pick<ComposerBuffer, "text" | "manual" | "reviewedDraft">,
+  draft: Draft,
+) {
+  if (buffer.manual)
+    return (
+      buffer.text === "" &&
+      (!buffer.reviewedDraft || buffer.reviewedDraft.id !== draft.id)
+    );
+  return !!buffer.reviewedDraft && buffer.text === buffer.reviewedDraft.body;
+}
+
 /** Keep unsent edits while navigating. Retain their original revision so a
  * remote edit/new inbound cannot silently turn them into an approved reply. */
 export class ComposerBuffers {
