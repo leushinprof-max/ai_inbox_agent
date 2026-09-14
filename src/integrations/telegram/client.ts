@@ -1,7 +1,14 @@
 import { z } from "zod";
 
+export interface TelegramTextEntity {
+  type: "bold" | "italic" | "blockquote";
+  offset: number;
+  length: number;
+}
+
 export interface TelegramMessage {
   text: string;
+  entities?: TelegramTextEntity[];
   reply_markup?: {
     inline_keyboard: { text: string; url?: string; callback_data?: string }[][];
   };

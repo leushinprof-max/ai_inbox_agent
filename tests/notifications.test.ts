@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   renderDraftNotification,
+  renderTestDraftNotification,
+  withNotificationStatus,
   type DraftNotification,
 } from "../src/domain/notifications";
 import {
@@ -31,12 +33,62 @@ test("Telegram shows the complete approved body and binds the button to a notifi
   );
   assert.equal(approvalAllowed, true);
   assert.ok(message.text.includes(notification.draftBody));
+  assert.equal(message.reply_markup!.inline_keyboard.length, 1);
   const buttons = message.reply_markup!.inline_keyboard.flat();
   assert.equal(buttons[0].callback_data, `approve:${notification.id}`);
   assert.ok(Buffer.byteLength(buttons[0].callback_data!) <= 64);
   assert.equal(
     buttons[1].url,
     `https://inbox.example/w/${notification.workspaceId}/drafts/${notification.conversationId}`,
+  );
+});
+
+test("Formatting keeps literal text and emoji intact, including status updates and test cards", () => {
+  const source = {
+    ...notification,
+    workspaceName: "R&D 🧪 <team>",
+    contactName: "Alina 👋",
+    inboundBody: "Спасибо 😊\nUse <b>literal</b> & *text*",
+    draftBody: "Поняла ✨ — <b>this is still the exact reply</b> & not markup.",
+  };
+  const { message, approvalAllowed } = renderDraftNotification(
+    source,
+    "https://inbox.example",
+  );
+  assert.equal(approvalAllowed, true);
+  assert.ok(message.text.endsWith(source.draftBody));
+  const quoted = message.entities!.find(
+    (entity) => entity.type === "blockquote",
+  )!;
+  assert.equal(
+    message.text.slice(quoted.offset, quoted.offset + quoted.length),
+    source.inboundBody,
+  );
+  assert.ok(
+    message.entities!.some(
+      (entity) =>
+        entity.type === "bold" &&
+        message.text.slice(entity.offset, entity.offset + entity.length) ===
+          "✍️ Prepared reply:",
+    ),
+  );
+  const sent = withNotificationStatus(message, "✅ Sent");
+  assert.deepEqual(sent.entities!.slice(0, -1), message.entities);
+  assert.equal(sent.text.slice(sent.entities!.at(-1)!.offset), "✅ Sent");
+  const demo = renderTestDraftNotification(source, "https://inbox.example");
+  assert.equal(demo.reply_markup!.inline_keyboard.length, 1);
+  for (const entity of demo.entities!) {
+    assert.ok(
+      entity.offset >= 0 && entity.offset + entity.length <= demo.text.length,
+    );
+  }
+  const demoHeading = demo.entities!.find((entity) => entity.type === "bold")!;
+  assert.equal(
+    demo.text.slice(
+      demoHeading.offset,
+      demoHeading.offset + demoHeading.length,
+    ),
+    `📝 Draft ready · ${source.workspaceName}`,
   );
 });
 

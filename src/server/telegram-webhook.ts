@@ -7,6 +7,7 @@ import type { TelegramClient } from "@/integrations/telegram/client";
 import { createHeyReachTransport } from "@/integrations/heyreach/send";
 import { sendReply, type SendTransport } from "@/domain/send";
 import { InboxError } from "@/domain/inbox";
+import { withNotificationStatus } from "@/domain/notifications";
 import { decryptConnection } from "./credentials";
 import { durableSendRepository } from "./delivery";
 import { databaseError } from "./session";
@@ -40,6 +41,16 @@ export const telegramUpdateSchema = z.object({
           chat,
           from: user.optional(),
           text: z.string().max(4096).optional(),
+          entities: z
+            .array(
+              z.object({
+                type: z.string().max(40),
+                offset: z.number().int().nonnegative(),
+                length: z.number().int().positive(),
+              }),
+            )
+            .max(256)
+            .optional(),
         })
         .optional(),
     })
@@ -140,11 +151,15 @@ export async function handleTelegramUpdate(
     const confirmation = "✅ Test approved. No message was sent to the lead.";
     await client.answer(callback.id, confirmation).catch(() => {});
     const original = callbackMessage.text ?? "🧪 Test notification";
+    const base = original.endsWith(confirmation)
+      ? original.slice(0, -(confirmation.length + 2))
+      : original;
     await client
       .edit(callbackMessage.chat.id, callbackMessage.message_id, {
-        text: original.endsWith(confirmation)
-          ? original
-          : `${original.slice(0, 3800)}\n\n${confirmation}`,
+        ...withNotificationStatus(
+          { text: base, entities: callbackMessage.entities },
+          confirmation,
+        ),
         reply_markup: {
           inline_keyboard: [
             [
@@ -221,7 +236,16 @@ export async function handleTelegramUpdate(
   if (renderedText && platformUrl) {
     await client
       .edit(callbackMessage.chat.id, callbackMessage.message_id, {
-        text: `${renderedText.slice(0, 3850)}\n\n${resultText}`,
+        ...withNotificationStatus(
+          {
+            text: renderedText,
+            entities:
+              callbackMessage.text === renderedText
+                ? callbackMessage.entities
+                : undefined,
+          },
+          resultText,
+        ),
         reply_markup: {
           inline_keyboard: [[{ text: "↗ Open in platform", url: platformUrl }]],
         },

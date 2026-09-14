@@ -11,6 +11,7 @@ One product bot serves all users. Users never supply a bot token or a chat ID. T
 - The complete draft must fit in the notification before Approve & send is offered. Needs-input, viewer and truncated previews offer only Open in platform.
 - Approval validates the current bot, private Telegram identity, connection, workspace role, draft body and revision, source inbound revision and sender connection. The UI and Telegram call the same private send reservation. Each notification retains one operation ID; simultaneous callbacks and UI sends cannot dispatch twice. Provider timeouts remain Unknown and are never automatically resent.
 - The card is edited after approval. Draft edits and platform sends also schedule removal of obsolete buttons. Server checks remain authoritative if Telegram cannot update a card.
+- Cards use native Telegram bold headings and quoted lead replies, with Approve & send and Open in platform on one row. Status edits preserve the formatting. Lead and draft text remain literal, including markup characters and emoji.
 - Telegram delivery is at least once: a network timeout or a crash after `sendMessage` may result in a repeated notification. Repeated cards still share the same send operation and cannot resend the lead reply.
 - The platform button opens `/w/{workspace}/drafts/{conversation}`. The return path survives login; a handled draft opens its conversation for continued work.
 

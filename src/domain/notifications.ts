@@ -1,4 +1,7 @@
-import type { TelegramMessage } from "../integrations/telegram/client";
+import type {
+  TelegramMessage,
+  TelegramTextEntity,
+} from "../integrations/telegram/client";
 
 export interface DraftNotification {
   id: string;
@@ -35,8 +38,16 @@ export function renderTestDraftNotification(
     },
     origin,
   );
+  const prefix = "🧪 Test notification · approval is simulated\n\n";
   return {
-    text: `🧪 Test notification — example lead and draft. Approve only simulates approval.\n\n${message.text}`,
+    text: `${prefix}${message.text}`,
+    entities: [
+      { type: "italic", offset: 0, length: prefix.trimEnd().length },
+      ...(message.entities ?? []).map((entity) => ({
+        ...entity,
+        offset: entity.offset + prefix.length,
+      })),
+    ],
     reply_markup: {
       inline_keyboard: [
         [
@@ -44,8 +55,6 @@ export function renderTestDraftNotification(
             text: "✅ Approve & send (test)",
             callback_data: `test_approve:${workspace.workspaceId}`,
           },
-        ],
-        [
           {
             text: "↗ Open in platform",
             url: new URL(
@@ -60,7 +69,35 @@ export function renderTestDraftNotification(
 }
 
 function shorten(text: string, length: number) {
-  return text.length > length ? `${text.slice(0, length - 1)}…` : text;
+  return text.length > length
+    ? `${text.slice(0, length - 1).replace(/[\uD800-\uDBFF]$/u, "")}…`
+    : text;
+}
+
+export function withNotificationStatus(
+  message: {
+    text: string;
+    entities?: { type: string; offset: number; length: number }[];
+  },
+  status: string,
+): TelegramMessage {
+  const text = shorten(message.text, 3800);
+  const entities = (message.entities ?? []).filter(
+    (entity): entity is TelegramTextEntity =>
+      ["bold", "italic", "blockquote"].includes(entity.type) &&
+      Number.isInteger(entity.offset) &&
+      Number.isInteger(entity.length) &&
+      entity.offset >= 0 &&
+      entity.length > 0 &&
+      entity.offset + entity.length <= text.length,
+  );
+  return {
+    text: `${text}\n\n${status}`,
+    entities: [
+      ...entities,
+      { type: "bold", offset: text.length + 2, length: status.length },
+    ],
+  };
 }
 
 export function renderDraftNotification(
@@ -72,45 +109,66 @@ export function renderDraftNotification(
     `/w/${n.workspaceId}/drafts/${n.conversationId}`,
     origin,
   ).toString();
-  const header = [
-    `${n.missingKnowledge ? "Draft needs input" : "Draft ready"} · ${shorten(n.workspaceName, 100)}`,
-    `Lead: ${shorten(n.contactName, 120)}`,
-    `Sender: ${shorten(n.senderName, 120)}`,
-    "",
-    "Lead’s reply:",
+  let message: TelegramMessage = { text: "", entities: [] };
+  const append = (text: string, type?: TelegramTextEntity["type"]) => {
+    if (type && text.length)
+      message.entities!.push({
+        type,
+        offset: message.text.length,
+        length: text.length,
+      });
+    message.text += text;
+  };
+  append(
+    `${n.missingKnowledge ? "⚠️ Draft needs input" : "📝 Draft ready"} · ${shorten(n.workspaceName, 100)}`,
+    "bold",
+  );
+  append("\n\n");
+  append("Lead: ", "bold");
+  append(`${shorten(n.contactName, 120)}\n`);
+  append("Sender: ", "bold");
+  append(`${shorten(n.senderName, 120)}\n\n`);
+  append("💬 Lead’s reply:", "bold");
+  append("\n");
+  append(
     shorten(n.inboundBody || "Open the conversation for context.", 500),
-    "",
-    n.missingKnowledge ? "Input needed:" : "Prepared reply:",
-  ].join("\n");
+    "blockquote",
+  );
+  append("\n\n");
+  append(
+    n.missingKnowledge ? "🧩 Input needed:" : "✍️ Prepared reply:",
+    "bold",
+  );
+  append("\n");
   const body = n.missingKnowledge ?? n.draftBody;
   // Keep the full approved text visible. A truncated preview has no send button.
-  const full = `${header}\n${body}`;
-  const fits = full.length <= 3800;
-  let text = fits
-    ? full
-    : `${shorten(full, 3650)}\n\nOpen in platform to review the full draft.`;
+  const fits = message.text.length + body.length <= 3800;
+  append(fits ? body : shorten(body, 3650 - message.text.length));
+  if (!fits) append("\n\nOpen in platform to review the full draft.", "italic");
   if (n.status === "changed")
-    text +=
-      "\n\nThis draft changed. Review the latest version in the platform.";
-  if (n.status === "sent") text += "\n\n✅ Sent";
+    message = withNotificationStatus(
+      message,
+      "This draft changed. Review the latest version in the platform.",
+    );
+  if (n.status === "sent") message = withNotificationStatus(message, "✅ Sent");
   const approvalAllowed = fits && n.status === "ready" && n.canApprove;
   return {
     approvalAllowed,
     message: {
-      text,
+      ...message,
       reply_markup: {
         inline_keyboard: [
-          ...(approvalAllowed
-            ? [
-                [
+          [
+            ...(approvalAllowed
+              ? [
                   {
                     text: "✅ Approve & send",
                     callback_data: `approve:${n.id}`,
                   },
-                ],
-              ]
-            : []),
-          [{ text: "↗ Open in platform", url }],
+                ]
+              : []),
+            { text: "↗ Open in platform", url },
+          ],
         ],
       },
     },

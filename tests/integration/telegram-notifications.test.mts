@@ -179,6 +179,8 @@ test("Real local RPCs link Telegram, deliver a full draft, dispatch concurrent a
       from: { id: telegramId, is_bot: false, first_name: "Local owner" },
       message: {
         message_id: 2,
+        text: card.text,
+        entities: card.entities,
         chat: { id: telegramId, type: "private" },
         from: { id: botId, is_bot: true, first_name: "Fixture bot" },
       },
@@ -195,6 +197,13 @@ test("Real local RPCs link Telegram, deliver a full draft, dispatch concurrent a
     ),
   ]);
   assert.equal(providerSends, 1);
+  assert.ok(
+    edits.some(
+      (message) =>
+        message.text.includes("✅ Sent") &&
+        message.entities?.some((entity) => entity.type === "blockquote"),
+    ),
+  );
   const operations = must(
     await owner
       .from("send_operations")
@@ -278,6 +287,7 @@ test("Send test delivers a realistic draft whose approval never accesses the dat
       message: {
         message_id: messages.length,
         text: card.text,
+        entities: card.entities,
         chat: { id: telegramId, type: "private" },
         from: { id: botId, is_bot: true, first_name: "Fixture bot" },
       },
@@ -293,6 +303,7 @@ test("Send test delivers a realistic draft whose approval never accesses the dat
   };
   await handleTelegramUpdate(noDatabase, telegram, botId, callback, noProvider);
   const approved = edits.at(-1)!;
+  assert.deepEqual(approved.entities!.slice(0, -1), card.entities);
   assert.match(
     approved.text,
     /Test approved\. No message was sent to the lead\./,
