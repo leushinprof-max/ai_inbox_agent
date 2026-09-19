@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useInbox } from "@/lib/inbox-context";
 import type { Conversation, Draft } from "@/domain/inbox";
 import { Button, Icon, Notice, Spark } from "@/components/ui";
@@ -18,6 +18,7 @@ import { usePreferences } from "@/lib/preferences";
 import { DraftRequest } from "./draft-request";
 import { canAdoptIncomingDraft, composerBuffers } from "@/lib/composer-buffer";
 import { getGenerationProgress } from "@/lib/draft-generation-progress";
+import "./composer.css";
 
 export function Composer({
   conversation,
@@ -53,6 +54,7 @@ export function Composer({
   );
   const [text, setText] = useState(initialBuffer?.text ?? draft?.body ?? "");
   const [answer, setAnswer] = useState("");
+  const questionId = useId();
   const [instructions, setInstructions] = useState("");
   const [redrafting, setRedrafting] = useState(false);
   const [generationId, setGenerationId] = useState<string | null>(
@@ -128,6 +130,7 @@ export function Composer({
     state.drafts,
   );
   const generating = requesting || awaitingGeneration;
+  const needsInput = draft?.status === "needs_input" && mode !== "manual";
   if (observedGenerationId?.startsWith("automatic:") && !generation)
     setObservedGenerationId(null);
   const writable = state.memberships.some(
@@ -291,7 +294,7 @@ export function Composer({
     if (!input) return;
     const resize = () => {
       input.style.height = "0px";
-      input.style.height = `${Math.min(240, Math.max(44, retainedInputHeight.current, input.scrollHeight))}px`;
+      input.style.height = `${Math.min(240, Math.max(needsInput ? 90 : 44, retainedInputHeight.current, input.scrollHeight))}px`;
     };
     resize();
     // Opening lead details changes the available width without a window resize.
@@ -305,7 +308,7 @@ export function Composer({
     });
     observer.observe(input);
     return () => observer.disconnect();
-  }, [text, mode, generating, redrafting, draft?.status]);
+  }, [text, answer, mode, generating, redrafting, needsInput, draft?.status]);
 
   function preserveSize() {
     if (composerElement.current)
@@ -502,7 +505,10 @@ export function Composer({
       className="composer-menu"
       ref={menuElement}
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        if (
+          event.key === "Escape" &&
+          event.currentTarget.contains(event.target as Node)
+        ) {
           event.preventDefault();
           event.currentTarget.open = false;
           event.currentTarget.querySelector("summary")?.focus();
@@ -519,9 +525,21 @@ export function Composer({
         <Icon name="more" />
       </summary>
       <div className="composer-menu-items">
+        {needsInput && environment !== "demo" ? (
+          <Button
+            variant="ghost small"
+            icon="refresh"
+            disabled={!writable || locked || generating}
+            onClick={() => {
+              if (menuElement.current) menuElement.current.open = false;
+              void generate("reply");
+            }}
+          >
+            Retry generation
+          </Button>
+        ) : null}
         {mode === "draft" && draft.status !== "needs_input" ? (
           <Button
-            className="mobile-draft-action"
             variant="ghost small"
             icon="chat"
             disabled={
@@ -577,16 +595,28 @@ export function Composer({
         >
           {draft.followUpNumber ? "Skip this follow-up" : "No reply needed"}
         </Button>
+        {state.platformOwner && environment !== "demo" ? (
+          <DraftRequest
+            workspaceId={scope.workspaceId}
+            draftId={draft.id}
+            onOpen={() => {
+              if (menuElement.current) {
+                menuElement.current.open = false;
+                menuElement.current.querySelector("summary")?.focus();
+              }
+            }}
+          />
+        ) : null}
       </div>
     </details>
   ) : null;
 
-  const needsInput = draft?.status === "needs_input" && mode !== "manual";
   return (
     <div
       className="composer-wrap"
       onKeyDown={(e) => {
         if (
+          e.currentTarget.contains(e.target as Node) &&
           preferences.shortcuts &&
           (e.ctrlKey || e.metaKey) &&
           e.key === "Enter"
@@ -603,7 +633,7 @@ export function Composer({
             ? { minHeight: composerHeight }
             : undefined
         }
-        className={`composer ${!generating && !redrafting && !needsInput ? `composer-reply ${mode === "manual" ? "composer-manual" : "composer-draft"}` : ""}`}
+        className={`composer ${mode === "draft" ? "composer-agent" : ""} ${!generating && !redrafting ? (needsInput ? "composer-needs-input" : `composer-reply ${mode === "manual" ? "composer-manual" : "composer-draft"}`) : ""}`}
       >
         {generating ? (
           <>
@@ -703,101 +733,77 @@ export function Composer({
         ) : needsInput ? (
           <>
             <div className="composer-title">
-              <Spark />
+              <span className="composer-status-dot" aria-hidden="true" />
               Needs your input
               {draftMenu}
-              {state.platformOwner && environment !== "demo" ? (
-                <DraftRequest
-                  workspaceId={scope.workspaceId}
-                  draftId={draft.id}
-                />
-              ) : null}
             </div>
-            <p className="draft-text">
-              The agent needs an approved answer before it can draft a reply.
+            <p className="composer-question" id={questionId}>
+              {draft.missingKnowledge ||
+                "What details should the agent use to draft this reply?"}
             </p>
-            <Notice title={draft.missingKnowledge ?? "Missing information"}>
-              Add the details the agent can use.
-            </Notice>
-            <div className="field" style={{ marginTop: 16, marginBottom: 0 }}>
-              <label htmlFor="knowledge-answer">Your answer</label>
+            <div className="composer-input-area">
               <textarea
-                id="knowledge-answer"
+                ref={messageInput}
+                className="composer-answer-input"
+                aria-label="Your answer to the agent"
+                aria-describedby={questionId}
+                rows={2}
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 maxLength={8000}
-                placeholder="Add the approved details…"
+                disabled={!writable || locked}
+                placeholder="Add the details the agent needs…"
               />
-              <p className="help">
-                Used for this conversation. Edit permanent information in
-                Agents.
-              </p>
-            </div>
-            <div className="composer-actions">
-              {environment !== "demo" ? (
+              <div className="composer-input-actions">
                 <Button
                   variant="ghost"
-                  icon="refresh"
-                  disabled={!writable || locked}
-                  onClick={() => void generate("reply")}
+                  disabled={locked}
+                  onClick={() => {
+                    setMode("manual");
+                    setText("");
+                  }}
                 >
-                  Redraft
+                  Reply manually
                 </Button>
-              ) : null}
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setMode("manual");
-                  setText("");
-                }}
-              >
-                Reply manually
-              </Button>
-              <Button
-                variant="primary"
-                icon="spark"
-                disabled={!answer.trim() || !writable}
-                onClick={() =>
-                  environment !== "demo"
-                    ? void generate("reply", answer)
-                    : run(async () => {
-                        await repository.supplyAnswer(
-                          scope,
-                          draft.id,
-                          answer,
-                          false,
-                          reviewedDraft?.revision,
-                        );
-                        const completed = repository
-                          .getSnapshot()
-                          .drafts.find((d) => d.id === draft.id);
-                        if (completed) {
-                          setReviewedDraft(completed);
-                          setText(completed.body);
-                        }
-                      })
-                }
-              >
-                {environment === "demo"
-                  ? "Use approved answer"
-                  : "Generate draft"}
-              </Button>
+                <Button
+                  variant="primary"
+                  className="composer-create"
+                  disabled={!answer.trim() || !writable || locked}
+                  onClick={() =>
+                    environment !== "demo"
+                      ? void generate("reply", answer)
+                      : run(async () => {
+                          await repository.supplyAnswer(
+                            scope,
+                            draft.id,
+                            answer,
+                            false,
+                            reviewedDraft?.revision,
+                          );
+                          const completed = repository
+                            .getSnapshot()
+                            .drafts.find((d) => d.id === draft.id);
+                          if (completed) {
+                            setReviewedDraft(completed);
+                            setText(completed.body);
+                          }
+                        })
+                  }
+                >
+                  Create draft
+                  <Icon name="arrow" />
+                </Button>
+              </div>
             </div>
           </>
         ) : (
           <>
             {mode !== "manual" ? (
               <div className="composer-title">
-                <Spark />{" "}
+                <span className="composer-status-dot" aria-hidden="true" />
                 {draft?.followUpNumber
                   ? `Follow-up ${draft.followUpNumber}`
-                  : "AI draft"}
-                {draft && state.platformOwner && environment !== "demo" ? (
-                  <DraftRequest
-                    workspaceId={scope.workspaceId}
-                    draftId={draft.id}
-                  />
-                ) : null}
+                  : "Draft ready"}
                 {draftMenu}
               </div>
             ) : null}
@@ -930,21 +936,6 @@ export function Composer({
                           onClick={() => void generate("reply")}
                         >
                           Redraft
-                        </Button>
-                        <Button
-                          className="composer-redraft-instructions"
-                          variant="ghost small"
-                          icon="chat"
-                          disabled={
-                            locked || !writable || !text.trim() || stale
-                          }
-                          onClick={() => {
-                            preserveSize();
-                            setRedrafting(true);
-                            setError("");
-                          }}
-                        >
-                          Redraft with instructions
                         </Button>
                       </>
                     ) : null}

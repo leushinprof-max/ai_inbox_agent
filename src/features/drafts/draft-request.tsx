@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Button, Notice } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { readDraftAIRequest } from "@/server/ai-admin-actions";
@@ -7,9 +8,11 @@ import { readDraftAIRequest } from "@/server/ai-admin-actions";
 export function DraftRequest({
   workspaceId,
   draftId,
+  onOpen,
 }: {
   workspaceId: string;
   draftId: string;
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,6 +25,7 @@ export function DraftRequest({
         variant="ghost small"
         disabled={busy}
         onClick={async () => {
+          onOpen?.();
           setOpen(true);
           setBusy(true);
           setError("");
@@ -37,41 +41,44 @@ export function DraftRequest({
       >
         View request
       </Button>
-      {open ? (
-        <Dialog title="Draft request" onClose={() => setOpen(false)}>
-          {busy ? (
-            <p>Loading request…</p>
-          ) : error ? (
-            <Notice variant="error">{error}</Notice>
-          ) : run?.request_snapshot ? (
-            <>
-              <p className="help">
-                {run.model} · Prompt v{run.configuration_version} · Agent v
-                {run.agent_version}
-              </p>
-              <RequestBody value={run.request_snapshot} />
-              <details className="admin-details">
-                <summary>Context and result</summary>
-                <pre className="request-text">
-                  {JSON.stringify(
-                    {
-                      context: run.request_context,
-                      result: run.result_snapshot,
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </details>
-            </>
-          ) : (
-            <Notice>
-              No request snapshot is available for this draft. Snapshots are
-              recorded for new generations.
-            </Notice>
-          )}
-        </Dialog>
-      ) : null}
+      {open
+        ? createPortal(
+            <Dialog title="Draft request" onClose={() => setOpen(false)}>
+              {busy ? (
+                <p>Loading request…</p>
+              ) : error ? (
+                <Notice variant="error">{error}</Notice>
+              ) : run?.request_snapshot ? (
+                <>
+                  <p className="help">
+                    {run.model} · Prompt v{run.configuration_version} · Agent v
+                    {run.agent_version}
+                  </p>
+                  <RequestBody value={run.request_snapshot} />
+                  <details className="admin-details">
+                    <summary>Context and result</summary>
+                    <pre className="request-text">
+                      {JSON.stringify(
+                        {
+                          context: run.request_context,
+                          result: run.result_snapshot,
+                        },
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  </details>
+                </>
+              ) : (
+                <Notice>
+                  No request snapshot is available for this draft. Snapshots are
+                  recorded for new generations.
+                </Notice>
+              )}
+            </Dialog>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

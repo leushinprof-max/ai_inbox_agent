@@ -1,0 +1,153 @@
+/* Shared frame for an agent's question and the reply it produces. */
+.composer.composer-agent {
+  padding: 16px 20px 12px;
+  border-radius: 14px;
+}
+
+.composer.composer-agent .composer-title {
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.composer-status-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-text);
+}
+
+.composer.composer-needs-input {
+  padding: 0;
+}
+
+.composer.composer-needs-input .composer-title {
+  margin: 0;
+  padding: 16px 20px 0;
+}
+
+.composer-question {
+  margin: 0;
+  padding: 13px 24px 21px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.composer-input-area {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--line-strong);
+  border-radius: 0 0 14px 14px;
+  background: var(--panel);
+}
+
+.composer.composer-needs-input textarea.composer-answer-input {
+  display: block;
+  min-height: 90px;
+  max-height: 240px;
+  padding: 17px 12px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.65;
+  resize: none;
+  overflow-y: auto;
+}
+
+.composer-answer-input:focus-visible {
+  outline-offset: -3px;
+}
+
+.composer-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer.composer-agent .composer-input-actions .btn {
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.composer-agent .btn.composer-create,
+.composer-agent .btn.composer-send {
+  background: var(--text);
+  border-color: transparent;
+  color: var(--bg);
+}
+
+.composer-agent .btn.composer-create:hover:not(:disabled),
+.composer-agent .btn.composer-send:hover:not(:disabled) {
+  background: var(--text);
+  color: var(--bg);
+  filter: brightness(0.94);
+}
+
+.composer-agent .btn.composer-create:disabled,
+.composer-agent .btn.composer-send:disabled {
+  background: var(--hover);
+  color: var(--muted);
+  opacity: 1;
+}
+
+.composer-create {
+  margin-left: auto;
+}
+
+.composer-create > .icon {
+  transform: rotate(-45deg);
+}
+
+.composer-needs-input > .form-error {
+  padding: 0 20px 16px;
+}
+
+.composer.composer-agent .composer-menu summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .shell-mobile-inbox .kimi-thread .composer.composer-agent.composer-reply {
+    border-radius: 14px;
+  }
+
+  .shell-mobile-inbox .kimi-thread .composer.composer-needs-input {
+    padding: 0;
+  }
+
+  .composer.composer-needs-input .composer-title {
+    padding: 10px 12px 0;
+  }
+
+  .composer-question {
+    padding: 12px 16px 18px;
+  }
+
+  .composer-input-area {
+    padding: 0 8px 8px;
+  }
+
+  .composer.composer-needs-input textarea.composer-answer-input {
+    padding-inline: 8px;
+    font-size: 16px;
+  }
+
+  .composer.composer-agent .composer-input-actions .btn {
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+}
