@@ -16,6 +16,7 @@ import {
 import { outgoingStore, useOutgoing } from "@/lib/outgoing-messages";
 import { usePreferences } from "@/lib/preferences";
 import { DraftRequest } from "./draft-request";
+import { ComposerMenu } from "./composer-menu";
 import { canAdoptIncomingDraft, composerBuffers } from "@/lib/composer-buffer";
 import { getGenerationProgress } from "@/lib/draft-generation-progress";
 import "./composer.css";
@@ -67,7 +68,6 @@ export function Composer({
   const [restoring, setRestoring] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const composerElement = useRef<HTMLDivElement>(null);
-  const menuElement = useRef<HTMLDetailsElement>(null);
   const [composerHeight, setComposerHeight] = useState<number>();
   const retainedInputHeight = useRef(0);
   const generation =
@@ -176,17 +176,6 @@ export function Composer({
     unresolved,
     pendingSend,
   ]);
-  useEffect(() => {
-    const close = (event: PointerEvent) => {
-      if (
-        menuElement.current &&
-        !menuElement.current.contains(event.target as Node)
-      )
-        menuElement.current.open = false;
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, []);
   // A first incoming draft can arrive while this conversation is already open.
   // Adopt it only into an untouched empty composer; never replace typed text.
   if (
@@ -468,7 +457,6 @@ export function Composer({
       return;
     lock.current = true;
     setRestoring(true);
-    if (menuElement.current) menuElement.current.open = false;
     preserveSize();
     try {
       const result = await restorePreviousDraft(
@@ -501,114 +489,60 @@ export function Composer({
   }
 
   const draftMenu = draft ? (
-    <details
-      className="composer-menu"
-      ref={menuElement}
-      onKeyDown={(event) => {
-        if (
-          event.key === "Escape" &&
-          event.currentTarget.contains(event.target as Node)
-        ) {
-          event.preventDefault();
-          event.currentTarget.open = false;
-          event.currentTarget.querySelector("summary")?.focus();
-        }
-      }}
-    >
-      <summary
-        aria-label="More draft actions"
-        aria-disabled={locked || generating}
-        onClick={(event) => {
-          if (locked || generating) event.preventDefault();
-        }}
-      >
-        <Icon name="more" />
-      </summary>
-      <div className="composer-menu-items">
-        {needsInput && environment !== "demo" ? (
-          <Button
-            variant="ghost small"
-            icon="refresh"
-            disabled={!writable || locked || generating}
-            onClick={() => {
-              if (menuElement.current) menuElement.current.open = false;
-              void generate("reply");
-            }}
-          >
-            Retry generation
-          </Button>
-        ) : null}
-        {mode === "draft" && draft.status !== "needs_input" ? (
-          <Button
-            variant="ghost small"
-            icon="chat"
-            disabled={
-              locked || generating || !writable || !text.trim() || stale
-            }
-            onClick={() => {
-              if (menuElement.current) menuElement.current.open = false;
-              preserveSize();
-              setRedrafting(true);
-              setError("");
-            }}
-          >
-            Redraft with instructions
-          </Button>
-        ) : null}
-        {draft.previousSourceRevision === conversation.revision ? (
-          <Button
-            variant="ghost small"
-            icon="undo"
-            disabled={locked || generating || stale || !writable}
-            onClick={() => void restorePrevious()}
-          >
-            Restore previous draft
-          </Button>
-        ) : null}
+    <ComposerMenu disabled={locked || generating}>
+      {needsInput && environment !== "demo" ? (
         <Button
           variant="ghost small"
-          icon="check"
-          disabled={locked || generating || stale || !writable}
-          onClick={() => {
-            if (menuElement.current) menuElement.current.open = false;
-            void run(async () => {
-              if (lock.current) return;
-              lock.current = true;
-              setRestoring(true);
-              try {
-                await repository.dismiss(
-                  scope,
-                  draft.id,
-                  reviewedDraft?.revision ?? draft.revision,
-                );
-                buffers.clear(scope, conversation.id);
-                setReviewedDraft(undefined);
-                setText("");
-                setMode("manual");
-                onDone?.();
-              } finally {
-                lock.current = false;
-                setRestoring(false);
-              }
-            });
-          }}
+          icon="refresh"
+          disabled={!writable || locked || generating}
+          onClick={() => void generate("reply")}
         >
-          {draft.followUpNumber ? "Skip this follow-up" : "No reply needed"}
+          Retry generation
         </Button>
-        {state.platformOwner && environment !== "demo" ? (
-          <DraftRequest
-            workspaceId={scope.workspaceId}
-            draftId={draft.id}
-            onOpen={() => {
-              if (menuElement.current) {
-                menuElement.current.open = false;
-                menuElement.current.querySelector("summary")?.focus();
-              }
-            }}
-          />
-        ) : null}
-      </div>
-    </details>
+      ) : null}
+      {draft.previousSourceRevision === conversation.revision ? (
+        <Button
+          variant="ghost small"
+          icon="undo"
+          disabled={locked || generating || stale || !writable}
+          onClick={() => void restorePrevious()}
+        >
+          Restore previous draft
+        </Button>
+      ) : null}
+      <Button
+        variant="ghost small"
+        icon="check"
+        disabled={locked || generating || stale || !writable}
+        onClick={() => {
+          void run(async () => {
+            if (lock.current) return;
+            lock.current = true;
+            setRestoring(true);
+            try {
+              await repository.dismiss(
+                scope,
+                draft.id,
+                reviewedDraft?.revision ?? draft.revision,
+              );
+              buffers.clear(scope, conversation.id);
+              setReviewedDraft(undefined);
+              setText("");
+              setMode("manual");
+              onDone?.();
+            } finally {
+              lock.current = false;
+              setRestoring(false);
+            }
+          });
+        }}
+      >
+        {draft.followUpNumber ? "Skip this follow-up" : "No reply needed"}
+      </Button>
+      {state.platformOwner && environment !== "demo" ? (
+        <DraftRequest workspaceId={scope.workspaceId} draftId={draft.id} />
+      ) : null}
+    </ComposerMenu>
   ) : null;
 
   return (
@@ -733,7 +667,7 @@ export function Composer({
         ) : needsInput ? (
           <>
             <div className="composer-title">
-              <span className="composer-status-dot" aria-hidden="true" />
+              <Spark />
               Needs your input
               {draftMenu}
             </div>
@@ -800,7 +734,7 @@ export function Composer({
           <>
             {mode !== "manual" ? (
               <div className="composer-title">
-                <span className="composer-status-dot" aria-hidden="true" />
+                <Spark />
                 {draft?.followUpNumber
                   ? `Follow-up ${draft.followUpNumber}`
                   : "Draft ready"}
@@ -916,29 +850,31 @@ export function Composer({
               <div className="row composer-secondary-actions">
                 {mode === "draft" ? (
                   <>
-                    {environment === "demo" ? (
-                      <Button
-                        className="mobile-draft-action"
-                        variant="ghost small"
-                        icon="refresh"
-                        disabled
-                        title="AI generation is unavailable in demo"
-                      >
-                        Redraft
-                      </Button>
-                    ) : null}
-                    {environment !== "demo" ? (
-                      <>
-                        <Button
-                          variant="ghost small"
-                          icon="refresh"
-                          disabled={locked || !writable}
-                          onClick={() => void generate("reply")}
-                        >
-                          Redraft
-                        </Button>
-                      </>
-                    ) : null}
+                    <Button
+                      variant="ghost small"
+                      icon="refresh"
+                      disabled={environment === "demo" || locked || !writable}
+                      title={
+                        environment === "demo"
+                          ? "AI generation is unavailable in demo"
+                          : undefined
+                      }
+                      onClick={() => void generate("reply")}
+                    >
+                      Redraft
+                    </Button>
+                    <Button
+                      variant="ghost small"
+                      icon="chat"
+                      disabled={locked || !writable || !text.trim() || stale}
+                      onClick={() => {
+                        preserveSize();
+                        setRedrafting(true);
+                        setError("");
+                      }}
+                    >
+                      Redraft with instructions
+                    </Button>
                   </>
                 ) : null}
                 {mode === "manual" &&
