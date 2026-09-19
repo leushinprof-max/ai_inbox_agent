@@ -294,7 +294,7 @@ export function Composer({
     if (!input) return;
     const resize = () => {
       input.style.height = "0px";
-      input.style.height = `${Math.min(240, Math.max(needsInput ? 90 : 44, retainedInputHeight.current, input.scrollHeight))}px`;
+      input.style.height = `${Math.min(240, Math.max(44, retainedInputHeight.current, input.scrollHeight))}px`;
     };
     resize();
     // Opening lead details changes the available width without a window resize.
@@ -754,46 +754,46 @@ export function Composer({
                 disabled={!writable || locked}
                 placeholder="Add the details the agent needs…"
               />
-              <div className="composer-input-actions">
-                <Button
-                  variant="ghost"
-                  disabled={locked}
-                  onClick={() => {
-                    setMode("manual");
-                    setText("");
-                  }}
-                >
-                  Reply manually
-                </Button>
-                <Button
-                  variant="primary"
-                  className="composer-create"
-                  disabled={!answer.trim() || !writable || locked}
-                  onClick={() =>
-                    environment !== "demo"
-                      ? void generate("reply", answer)
-                      : run(async () => {
-                          await repository.supplyAnswer(
-                            scope,
-                            draft.id,
-                            answer,
-                            false,
-                            reviewedDraft?.revision,
-                          );
-                          const completed = repository
-                            .getSnapshot()
-                            .drafts.find((d) => d.id === draft.id);
-                          if (completed) {
-                            setReviewedDraft(completed);
-                            setText(completed.body);
-                          }
-                        })
-                  }
-                >
-                  Create draft
-                  <Icon name="arrow" />
-                </Button>
-              </div>
+            </div>
+            <div className="composer-actions">
+              <Button
+                variant="ghost"
+                disabled={locked}
+                onClick={() => {
+                  setMode("manual");
+                  setText("");
+                }}
+              >
+                Reply manually
+              </Button>
+              <Button
+                variant="primary"
+                className="composer-create"
+                disabled={!answer.trim() || !writable || locked}
+                onClick={() =>
+                  environment !== "demo"
+                    ? void generate("reply", answer)
+                    : run(async () => {
+                        await repository.supplyAnswer(
+                          scope,
+                          draft.id,
+                          answer,
+                          false,
+                          reviewedDraft?.revision,
+                        );
+                        const completed = repository
+                          .getSnapshot()
+                          .drafts.find((d) => d.id === draft.id);
+                        if (completed) {
+                          setReviewedDraft(completed);
+                          setText(completed.body);
+                        }
+                      })
+                }
+              >
+                Create draft
+                <Icon name="arrow" />
+              </Button>
             </div>
           </>
         ) : (
