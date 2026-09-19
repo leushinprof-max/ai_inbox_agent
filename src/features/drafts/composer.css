@@ -20,65 +20,50 @@
   background: var(--accent-text);
 }
 
-.composer.composer-needs-input {
-  padding: 0;
-}
-
-.composer.composer-needs-input .composer-title {
-  margin: 0;
-  padding: 16px 20px 0;
+.composer.composer-agent:focus-within {
+  border-color: var(--accent);
 }
 
 .composer-question {
   margin: 0;
-  padding: 13px 24px 21px;
   color: var(--text);
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.65;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .composer-input-area {
-  padding: 0 12px 12px;
-  border-top: 1px solid var(--line-strong);
-  border-radius: 0 0 14px 14px;
-  background: var(--panel);
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .composer.composer-needs-input textarea.composer-answer-input {
   display: block;
-  min-height: 90px;
+  min-height: 44px;
   max-height: 240px;
-  padding: 17px 12px 10px;
+  padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: var(--text);
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.65;
   resize: none;
   overflow-y: auto;
 }
 
 .composer-answer-input:focus-visible {
-  outline-offset: -3px;
+  outline: none;
 }
 
-.composer-input-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.composer.composer-agent .composer-input-actions .btn {
-  min-height: 36px;
-  padding: 7px 12px;
-  border-radius: 7px;
-  font-size: 13px;
+.composer.composer-agent .composer-actions .btn {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 500;
 }
 
@@ -111,43 +96,80 @@
   transform: rotate(-45deg);
 }
 
-.composer-needs-input > .form-error {
-  padding: 0 20px 16px;
-}
-
 .composer.composer-agent .composer-menu summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-@media (max-width: 760px) {
-  .shell-mobile-inbox .kimi-thread .composer.composer-agent.composer-reply {
+@media (max-width: 680px) {
+  .shell-mobile-inbox .kimi-thread .composer.composer-agent {
+    padding: 6px;
+    border-color: var(--line-strong);
     border-radius: 14px;
   }
 
-  .shell-mobile-inbox .kimi-thread .composer.composer-needs-input {
-    padding: 0;
+  .shell-mobile-inbox .kimi-thread .composer.composer-agent:focus-within {
+    border-color: var(--accent);
   }
 
-  .composer.composer-needs-input .composer-title {
-    padding: 10px 12px 0;
+  .shell-mobile-inbox .composer.composer-agent .composer-title {
+    padding-left: 10px;
+    padding-right: 4px;
+    margin-bottom: 0;
   }
 
-  .composer-question {
-    padding: 12px 16px 18px;
-  }
-
-  .composer-input-area {
-    padding: 0 8px 8px;
-  }
-
-  .composer.composer-needs-input textarea.composer-answer-input {
-    padding-inline: 8px;
+  .shell-mobile-inbox .composer-question {
+    padding: 10px;
     font-size: 16px;
+    line-height: 24px;
   }
 
-  .composer.composer-agent .composer-input-actions .btn {
+  .shell-mobile-inbox .composer-input-area {
+    margin: 0 10px;
+    padding-top: 10px;
+  }
+
+  .shell-mobile-inbox
+    .composer.composer-needs-input
+    textarea.composer-answer-input {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .shell-mobile-inbox
+    .kimi-thread
+    .composer.composer-agent
+    > .composer-actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin-top: 4px;
+    padding: 0;
+    bottom: 0;
+  }
+
+  .shell-mobile-inbox .composer.composer-agent .composer-actions .btn {
     min-height: 44px;
     padding-inline: 10px;
+    font-size: 13px;
+  }
+
+  .shell-mobile-inbox .kimi-thread .composer.composer-agent .composer-send {
+    flex: 0 0 auto;
+    width: auto;
+    border-radius: 8px;
+  }
+
+  .shell-mobile-inbox .composer.composer-agent .composer-send-label {
+    display: inline;
+  }
+
+  .shell-mobile-inbox .composer.composer-agent .composer-send > .icon {
+    width: 16px;
+    height: 16px;
+    transform: none;
+  }
+
+  .shell-mobile-inbox .composer-needs-input > .form-error {
+    margin-inline: 10px;
   }
 }
