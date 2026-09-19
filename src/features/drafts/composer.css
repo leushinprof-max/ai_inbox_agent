@@ -12,12 +12,12 @@
   font-weight: 500;
 }
 
-.composer-status-dot {
-  width: 6px;
-  height: 6px;
+.kimi-thread .composer.composer-agent .composer-title .sparkbox {
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--accent-text);
+  border: 1px solid #7c6cf840;
+  background: #7c6cf81f;
 }
 
 .composer.composer-agent:focus-within {
@@ -96,12 +96,48 @@
   transform: rotate(-45deg);
 }
 
-.composer.composer-agent .composer-menu summary:focus-visible {
+.composer-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+
+.composer-menu-trigger:hover:not(:disabled),
+.composer-menu-trigger[aria-expanded="true"] {
+  background: var(--hover);
+}
+
+.composer-menu-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.composer-menu-trigger:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
+/* The top layer escapes the composer's scroll container. */
+.composer-menu .composer-menu-items[popover] {
+  position: fixed;
+  inset: auto;
+  width: min(260px, calc(100vw - 24px));
+  min-width: 0;
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  margin: 0;
+  color: var(--text);
+}
+
 @media (max-width: 680px) {
+  .composer-menu-trigger {
+    width: 44px;
+    height: 44px;
+  }
+
   .shell-mobile-inbox .kimi-thread .composer.composer-agent {
     padding: 6px;
     border-color: var(--line-strong);
@@ -151,6 +187,22 @@
     min-height: 44px;
     padding-inline: 10px;
     font-size: 13px;
+  }
+
+  .shell-mobile-inbox
+    .kimi-thread
+    .composer.composer-draft
+    > .composer-actions {
+    flex-wrap: wrap;
+  }
+
+  .shell-mobile-inbox
+    .kimi-thread
+    .composer.composer-draft
+    .composer-secondary-actions {
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0;
   }
 
   .shell-mobile-inbox .kimi-thread .composer.composer-agent .composer-send {
