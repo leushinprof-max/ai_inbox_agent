@@ -30,7 +30,8 @@ export function withDemoLeads(
     const label = (state.labelCatalog ?? demoLabels(c.workspaceId)).find(
       (l) => l.id === c.labelId,
     );
-    if (!c.lead && label?.group === "positive") c.lead = lead();
+    if (!c.lead && label && (label.addToLeads ?? label.group === "positive"))
+      c.lead = lead();
   }
   if (!examples || !state.conversations.length) return state;
   const agent = state.agents.find((a) => a.workspaceId === "aster");

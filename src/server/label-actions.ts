@@ -66,6 +66,34 @@ export async function assignConversationLabel(input: unknown) {
   }
 }
 
+export async function setLabelLeadAdmission(input: unknown) {
+  try {
+    const value = z
+      .object({
+        workspaceId: z.uuid(),
+        labelId: z.uuid(),
+        revision: z.number().int().positive(),
+        enabled: z.boolean(),
+      })
+      .parse(input);
+    const { db, user } = await authenticatedClient();
+    await authorizeWorkspace(db, user.id, value.workspaceId);
+    const result = await db.rpc("set_label_lead_admission", {
+      p_workspace: value.workspaceId,
+      p_label: value.labelId,
+      p_revision: value.revision,
+      p_enabled: value.enabled,
+    });
+    databaseError(result.error);
+    return { ok: true as const, added: result.data ?? 0 };
+  } catch (e) {
+    return {
+      ok: false as const,
+      error: e instanceof Error ? e.message : "Could not save Leads rule.",
+    };
+  }
+}
+
 export async function saveLabel(workspaceId: string, value: unknown) {
   try {
     const label = editableLabel.parse(value);

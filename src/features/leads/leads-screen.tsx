@@ -184,14 +184,14 @@ export function LeadsScreen() {
                 ? "No leads match your search"
                 : group === "completed"
                   ? "No completed leads yet"
-                  : "Interested leads will appear here"
+                  : "Leads will appear here"
             }
           >
             {query
               ? "Try another name or company."
               : group === "completed"
                 ? "Set an outcome when your work with a lead is finished."
-                : "Positive replies appear here automatically. After you reply, the agent prepares follow-ups for review."}
+                : "Conversations with a reply appear here according to Add to Leads in Settings → Labels. After you reply, the agent prepares follow-ups for review."}
           </Empty>
         ) : (
           <table

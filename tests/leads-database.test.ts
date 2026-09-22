@@ -209,6 +209,91 @@ async function fixture(attempts = 2, waitDays?: number[]) {
   };
 }
 
+test("label admission backfills replies, preserves outcomes and is independent of intent", async () => {
+  const f = await fixture();
+  const neutral = await f.label("not_now");
+  const positive = await f.label("interested");
+  const set = async (id: string, enabled: boolean, revision?: number) => {
+    const row = (
+      await db.query<{ revision: number }>(
+        "select revision from public.workspace_labels where workspace_id=$1 and id=$2",
+        [f.workspace, id],
+      )
+    ).rows[0];
+    return (
+      await db.query<{ added: number }>(
+        "select public.set_label_lead_admission($1,$2,$3,$4) added",
+        [f.workspace, id, revision ?? row.revision, enabled],
+      )
+    ).rows[0].added;
+  };
+  const create = async (label: string, replies = 1) => {
+    const id = randomUUID();
+    await db.query(
+      "insert into public.conversations(id,workspace_id,provider_conversation_id,sender_id,sender_name,contact_name,inbound_revision,label_id) values($1::uuid,$2,$1::uuid::text,1,'Sender','Candidate',$3,$4)",
+      [id, f.workspace, replies, label],
+    );
+    return id;
+  };
+  const hasLead = async (id: string) =>
+    (
+      await db.query(
+        "select 1 from public.leads where workspace_id=$1 and conversation_id=$2",
+        [f.workspace, id],
+      )
+    ).rows.length > 0;
+  const candidate = await create(neutral);
+  const unanswered = await create(neutral, 0);
+  assert.equal(await hasLead(candidate), false);
+  assert.equal(await set(neutral, true), 1);
+  assert.equal(await hasLead(candidate), true);
+  assert.equal(await hasLead(unanswered), false);
+  assert.equal(await hasLead(await create(neutral)), true);
+  await assert.rejects(set(neutral, false, 1), /Label changed/);
+  await f.status("meeting_booked");
+  const completed = await f.lead();
+  await set(positive, false);
+  const excluded = await create(positive);
+  assert.equal(await hasLead(excluded), false);
+  assert.equal(await set(positive, true), 1);
+  assert.equal(await hasLead(excluded), true);
+  assert.deepEqual(await f.lead(), completed);
+  await set(neutral, false);
+  assert.equal(await hasLead(candidate), true);
+  assert.equal(await hasLead(await create(neutral)), false);
+});
+
+test("lead admission settings reject members and cross-workspace labels", async () => {
+  const f = await fixture();
+  const other = await fixture();
+  const label = await f.label("interested");
+  await assert.rejects(
+    db.query("select public.set_label_lead_admission($1,$2,1,false)", [
+      f.workspace,
+      label,
+    ]),
+    /Forbidden/,
+  );
+  await assert.rejects(
+    db.query("select public.set_label_lead_admission($1,$2,1,false)", [
+      other.workspace,
+      label,
+    ]),
+    /Label changed/,
+  );
+  await db.query(
+    "update public.workspace_members set role='member' where workspace_id=$1 and user_id=$2",
+    [other.workspace, other.owner],
+  );
+  await assert.rejects(
+    db.query("select public.set_label_lead_admission($1,$2,1,false)", [
+      other.workspace,
+      await other.label("interested"),
+    ]),
+    /Forbidden/,
+  );
+});
+
 test("positive admission automatically schedules follow-ups after our reply and survives reclassification", async () => {
   const f = await fixture();
   const entered = (await f.lead()).entered_at;

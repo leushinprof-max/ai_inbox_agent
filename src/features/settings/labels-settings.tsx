@@ -5,7 +5,11 @@ import { Button, Notice } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { LabelBadge } from "@/components/label-badge";
 import { intentGroup, labelColor, type LabelDefinition } from "@/domain/labels";
-import { saveLabel, testLabel } from "@/server/label-actions";
+import {
+  saveLabel,
+  testLabel,
+  setLabelLeadAdmission,
+} from "@/server/label-actions";
 
 export function LabelsSettings() {
   const { state, scope, mode, repository } = useInbox();
@@ -20,6 +24,7 @@ export function LabelsSettings() {
     );
   const [editing, setEditing] = useState<LabelDefinition | null>(null);
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
   const [sample, setSample] = useState("");
   const [tested, setTested] = useState<{
@@ -72,6 +77,19 @@ export function LabelsSettings() {
         </Button>
       </div>
       {error && <Notice variant="error">{error}</Notice>}
+      <section className="card">
+        <h2>Which labels add to Leads?</h2>
+        <p className="muted">
+          Turn on Add to Leads for the labels you want to work with. This
+          applies to new and existing conversations with a reply, independently
+          of intent group. Turning it off keeps leads already in progress and
+          their outcomes. Follow-ups still use the assigned agent’s settings.
+        </p>
+        {mode === "demo" && (
+          <p className="muted">Open your workspace to change these rules.</p>
+        )}
+        {saved && <p role="status">{saved}</p>}
+      </section>
       {intentGroup.options.map((group) => (
         <section className="card" key={group}>
           <h2 style={{ textTransform: "capitalize" }}>{group} intent</h2>
@@ -91,6 +109,44 @@ export function LabelsSettings() {
                   </small>
                   <p className="label-description">{label.instruction}</p>
                 </div>
+                <label className="row">
+                  <input
+                    type="checkbox"
+                    aria-label={`Add ${label.name} to Leads`}
+                    checked={label.addToLeads ?? label.group === "positive"}
+                    disabled={!canEdit || busy}
+                    onChange={async (e) => {
+                      const enabled = e.target.checked;
+                      setBusy(true);
+                      setError("");
+                      setSaved("");
+                      try {
+                        const result = await setLabelLeadAdmission({
+                          workspaceId: scope.workspaceId,
+                          labelId: label.id,
+                          revision: label.revision,
+                          enabled,
+                        });
+                        if (!result.ok) throw new Error(result.error);
+                        await repository.refresh?.();
+                        setSaved(
+                          enabled
+                            ? `${label.name}: Add to Leads is on. ${result.added} existing conversations added.`
+                            : `${label.name}: Add to Leads is off. Existing leads are kept.`,
+                        );
+                      } catch (e) {
+                        setError(
+                          e instanceof Error
+                            ? e.message
+                            : "Could not save Leads rule.",
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  />
+                  Add to Leads
+                </label>
                 <Button
                   variant="ghost"
                   disabled={busy}
