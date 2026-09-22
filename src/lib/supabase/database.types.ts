@@ -899,6 +899,7 @@ export type Database = {
       };
       workspace_labels: {
         Row: {
+          add_to_leads: boolean;
           archived: boolean;
           color: string;
           enabled: boolean;
@@ -911,6 +912,7 @@ export type Database = {
           workspace_id: string;
         };
         Insert: {
+          add_to_leads?: boolean;
           archived?: boolean;
           color: string;
           enabled?: boolean;
@@ -923,6 +925,7 @@ export type Database = {
           workspace_id: string;
         };
         Update: {
+          add_to_leads?: boolean;
           archived?: boolean;
           color?: string;
           enabled?: boolean;
@@ -1792,6 +1795,15 @@ export type Database = {
       set_default_agent: {
         Args: { p_agent: string; p_workspace: string };
         Returns: undefined;
+      };
+      set_label_lead_admission: {
+        Args: {
+          p_workspace: string;
+          p_label: string;
+          p_revision: number;
+          p_enabled: boolean;
+        };
+        Returns: number;
       };
       set_lead_status: {
         Args: {

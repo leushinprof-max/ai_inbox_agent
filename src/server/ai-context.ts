@@ -45,6 +45,7 @@ export async function loadLabelCatalog(
       systemKey: l.system_key,
       name: l.name,
       group: l.intent_group,
+      addToLeads: l.add_to_leads,
       color: l.color,
       instruction: l.system_key
         ? release.configuration.labels[
@@ -88,6 +89,7 @@ export async function loadAIContext(
       systemKey: l.system_key,
       name: l.name,
       group: l.intent_group,
+      addToLeads: l.add_to_leads,
       color: l.color,
       instruction: l.system_key
         ? published.configuration.labels[

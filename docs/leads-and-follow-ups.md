@@ -4,7 +4,9 @@ Implemented after the September 14 product interview. Leads is a table of intere
 
 ## Admission and statuses
 
-The first positive classification automatically admits a replied conversation to **Follow-up**. The planner waits for our actual reply, then samples the next follow-up date if the conversation agent and the assigned agent settings are enabled. No manual start is required. Membership is durable: a later negative or neutral classification cannot remove the lead, change its pipeline status, or turn every Not interested conversation into Disqualified. The latest migration converts existing New interest leads to this behavior.
+Settings → Labels has an **Add to Leads** checkbox for every label. Owners and admins choose admission independently of the label’s intent group. Existing labels retain the previous default (Positive on, Neutral/Negative off); new labels initially follow their intent group, then retain their independent admission setting. Turning admission on also adds existing replied conversations with that label. Turning it off prevents new admission but preserves existing leads, outcomes, notes and schedules. Disabled/archived classification labels retain this independent rule for conversations already carrying the label. Conversations without an inbound reply are never admitted.
+
+The first matching classification automatically admits a replied conversation to **Follow-up**. The planner waits for our actual reply, then samples the next follow-up date if the conversation agent and the assigned agent settings are enabled. No manual start is required. Membership is durable: a later negative or neutral classification cannot remove the lead, change its pipeline status, or turn every Not interested conversation into Disqualified. The latest migration converts existing New interest leads to this behavior.
 
 | Status         | Behavior                                                                                                        |
 | -------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -40,6 +42,13 @@ Every follow-up is a draft in the existing review queue. There are no automatic 
 Follow-up preparation follows durable lead membership and the conversation switch independently of the current intent label. Classification and ordinary-reply eligibility retain their current behavior, subject to the switch draft-generation gate. This release introduces no automatic Disqualified transition based on classification.
 
 ## Persistence and execution
+
+Configurable admission requires `20260922071538_configurable_lead_admission.sql`
+before deploying the updated web application. The migration preserves existing
+admission defaults and all lead rows; operators can then enable additional labels
+in Settings → Labels. Only owners/admins can change the rule, with a label revision
+check to reject stale edits. The save reports how many existing conversations were
+added. Admission is independent of ordinary reply-generation eligibility.
 
 `public.leads` is scoped by workspace and conversation. Members can read it under RLS; status writes go through a permission-checked, revision-checked RPC. Viewers cannot change statuses. Scheduling and completion RPCs are service-role only.
 

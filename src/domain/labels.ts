@@ -18,6 +18,7 @@ export const labelDefinition = z.object({
   systemKey: z.string().nullable(),
   name: z.string().trim().min(1).max(80),
   group: intentGroup,
+  addToLeads: z.boolean().optional(),
   color: labelColor,
   instruction: z.string().trim().min(1).max(12000),
   enabled: z.boolean(),
