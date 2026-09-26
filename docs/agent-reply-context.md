@@ -1,27 +1,21 @@
 # Agent reply context
 
-Agent setup now follows Basics, Knowledge, Instructions, Test and Launch.
+The reply writer receives the agent's saved context from the [agent editor](agent-settings.md): About your company and Selling points from Background; the conversation goal, Tone & style and Custom instructions from Communication; reply examples and materials from References; and the assigned sender's name and writing form. Instructions and style are separate from product facts and do not override reply eligibility or stop-contact rules. The agent's internal Description field is stored but not shown in the editor or used as writing instructions.
 
-- **Basics** selects the objective, language and eligible intent groups. The legacy internal Description is retained in storage for compatibility but is no longer shown or used as writing instructions.
-- **Knowledge** contains company/product facts and FAQ. Company name identifies the business represented by the sender. Resources add a name, a link or uploaded PDF, and a plain-language description of when to share it.
-- **Instructions** contains optional behavior rules for this agent and manual meeting coordination instructions. These are separate from product evidence and do not override reply eligibility or stop-contact rules.
-- **Test** accepts the preceding team message, incoming lead message, actual sender and optional operator input. It previews model behavior without sending a message or saving temporary facts to Knowledge.
-- **Launch** assigns senders and explicitly selects their grammatical form. The account's actual name and form are used in reply, completion and rewrite requests. An unspecified form avoids gendered wording; names are never used to infer gender. Sender settings survive provider refreshes and reconnects.
+New agents start with empty instructions and no materials. Every agent version snapshot stores instructions, materials and follow-up settings together with the rest of the agent.
+
+## Sender identity
+
+The agent editor's Settings step sets each sender's writing form under Assigned senders: Not specified, Masculine or Feminine. The form belongs to the sender, so it applies to every agent that serves that sender. The account's actual name and form are used in reply, completion, rewrite and follow-up requests. With Not specified, the prompts ask for wording that needs no guess; the app never infers gender from names. Sender settings survive provider refreshes and reconnects. Changing a sender's form invalidates in-flight generations by advancing the effective agent version.
 
 ## Manual meeting coordination
 
-The agent has no calendar integration. When a useful reply requires the team's availability or confirmation of a proposed time, it produces **Needs input** with a specific question for the operator. It must not invent slots, accept the lead's availability as the team's availability, or claim that an invitation was sent.
+The agent has no calendar integration. When a useful reply requires the team's availability or confirmation of a proposed time, the default reply prompt asks for **Needs input** with a specific question for the operator. It tells the model not to invent slots, accept the lead's availability as the team's availability, or claim that an invitation was sent.
 
-The operator supplies dates, times and timezone. Completion uses those facts to prepare a reviewable draft. Later rewrites retain completed operator answers for the same agent and inbound conversation revision. A new inbound revision excludes those previous temporary answers. Meeting availability is not saved to permanent Knowledge unless the operator explicitly chooses that option; the interface explains why temporary slots should remain conversation-specific.
+The operator supplies dates, times and timezone. Completion uses those facts to prepare a reviewable draft. Later rewrites retain the latest completed operator answers (up to five) for the same agent and inbound conversation revision. A new inbound revision excludes those previous temporary answers. Operator answers are never saved to the agent; permanent facts are edited in the agent editor.
 
-## Resource delivery
+## Materials
 
-PDFs are uploaded directly to Supabase Storage with an admin-authorized, workspace-scoped signed upload token. The bucket limits uploads to PDF MIME type and 20 MiB. Saving verifies the workspace path, configured public URL, stored metadata and PDF signature. Tokens cannot overwrite existing files. There are no direct anonymous upload or bucket listing policies.
+New materials are links. The AI shares the approved URL in an ordinary text draft, which goes through the usual reviewed text send. It does not send a native HeyReach attachment. The model receives each material's name, link, type and when-to-use text; split-format requests (`split_v1` replies and the separate Follow-up prompt) also send its description. PDF contents are never extracted or sent to the model. Removing a material from an agent stops future recommendations but keeps an already shared URL working.
 
-Resource files are intentionally public to anyone with their exact link. The AI shares the approved URL in an ordinary text draft, using the existing reviewed text-send flow. It does not send a native HeyReach attachment. The model sees resource names, intended use and URLs; PDF contents are not automatically extracted into Knowledge. Removing a resource from an agent stops future recommendations but keeps an already shared URL working.
-
-## Rollout and checks
-
-Apply `20260908134028_agent_reply_context.sql` before deploying the web app and worker. Existing agents default to empty guidance/resources and unspecified sender form. Agent snapshots include the new fields, including snapshots made by Save to Knowledge. Changing sender form invalidates in-flight generations by advancing the effective agent version. Published Product Admin prompts and model/reasoning selections are unchanged.
-
-Verification covers schema replay and role/CAS boundaries, sender refresh preservation, legacy configuration compatibility, writer-only context, PDF upload/public access/overwrite rejection, and the database-backed Needs input → completion → rewrite cycle. Live model checks use the existing ReStaff knowledge and published configuration; synthetic resources and operator slots are evaluation inputs only.
+PDF materials are files in the `agent-resources` Supabase Storage bucket. The bucket is public, so each file is readable by anyone with its exact link, and it accepts only PDFs up to 20 MiB. Saving or testing an agent verifies each file's workspace path, configured public URL, stored metadata and PDF signature. There are no direct anonymous upload or bucket listing policies.
