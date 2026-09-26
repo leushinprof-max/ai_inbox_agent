@@ -36,7 +36,7 @@ The local suite above uses synthetic data and provider/model doubles; it is not 
 2. Restaff import, classification, a real incoming webhook, automatic selected-agent draft, triage and an owner-authorized send are verified. The dated evidence is recorded below and in the hosted environment record. Broader model-answer evaluation remains necessary before calling the product production-ready.
 3. Complete the remaining reference-state visual acceptance and owner review. Implemented boundaries without captured fixtures are identified in the visual ledger.
 
-Webhook creation currently uses guided setup in HeyReach with a generated private address. The app does not call CreateWebhook automatically. Invitations are shareable links, not invitation emails. Knowledge is editable approved text; website crawling, uploaded documents and vector retrieval are not included. Archive-workspace and cross-device preference syncing are not implemented. Pause drafting through the selected agent's Launch settings.
+Webhook creation currently uses guided setup in HeyReach with a generated private address. The app does not call CreateWebhook automatically. Invitations are shareable links, not invitation emails. Knowledge is editable approved text; website crawling, uploaded documents and vector retrieval are not included. Archive-workspace and cross-device preference syncing are not implemented. Pause drafting with the active switch in the agent editor header.
 
 The first release intentionally excludes automatic outbound messages, scheduled follow-ups, attachments, billing, analytics and portal/admin features. The hosted design prototype stays separate from the runnable application.
 

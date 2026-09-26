@@ -1,12 +1,12 @@
 # Agent reply context
 
-Agent setup now follows Basics, Knowledge, Instructions, Test and Launch.
+The steps of the agent editor are described in [Agent editor and playground](agent-settings.md). This page covers what those settings contribute to reply generation.
 
-- **Basics** selects the objective, language and eligible intent groups. The legacy internal Description is retained in storage for compatibility but is no longer shown or used as writing instructions.
-- **Knowledge** contains company/product facts and FAQ. Company name identifies the business represented by the sender. Resources add a name, a link or uploaded PDF, and a plain-language description of when to share it.
-- **Instructions** contains optional behavior rules for this agent and manual meeting coordination instructions. These are separate from product evidence and do not override reply eligibility or stop-contact rules.
-- **Test** accepts the preceding team message, incoming lead message, actual sender and optional operator input. It previews model behavior without sending a message or saving temporary facts to Knowledge.
-- **Launch** assigns senders and explicitly selects their grammatical form. The account's actual name and form are used in reply, completion and rewrite requests. An unspecified form avoids gendered wording; names are never used to infer gender. Sender settings survive provider refreshes and reconnects.
+- Company facts, the offer and selling points describe the business represented by the sender. The legacy internal Description is retained in storage for compatibility but is no longer shown or used as writing instructions.
+- Materials have a name, a URL, an optional description and a plain-language note on when to share them. New materials are links; older agents may still hold PDFs uploaded to Supabase Storage.
+- Custom instructions contain optional behavior rules for this agent, including manual meeting coordination. These are separate from product evidence and do not override reply eligibility or stop-contact rules.
+- Test previews model behavior without sending a message or saving temporary facts to Knowledge.
+- Settings assigns senders and explicitly selects their grammatical form. The account's actual name and form are used in reply, completion and rewrite requests. An unspecified form avoids gendered wording; names are never used to infer gender. Sender settings survive provider refreshes and reconnects.
 
 ## Manual meeting coordination
 
@@ -16,7 +16,7 @@ The operator supplies dates, times and timezone. Completion uses those facts to 
 
 ## Resource delivery
 
-PDFs are uploaded directly to Supabase Storage with an admin-authorized, workspace-scoped signed upload token. The bucket limits uploads to PDF MIME type and 20 MiB. Saving verifies the workspace path, configured public URL, stored metadata and PDF signature. Tokens cannot overwrite existing files. There are no direct anonymous upload or bucket listing policies.
+The app no longer uploads PDFs. Stored PDFs stay in the public `agent-resources` Supabase Storage bucket, which accepts only the PDF MIME type up to 20 MiB and has no anonymous upload or bucket listing policies. Saving or testing an agent verifies each stored PDF's workspace path, configured public URL, stored metadata and PDF signature.
 
 Resource files are intentionally public to anyone with their exact link. The AI shares the approved URL in an ordinary text draft, using the existing reviewed text-send flow. It does not send a native HeyReach attachment. The model sees resource names, intended use and URLs; PDF contents are not automatically extracted into Knowledge. Removing a resource from an agent stops future recommendations but keeps an already shared URL working.
 

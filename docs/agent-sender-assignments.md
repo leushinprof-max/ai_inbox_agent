@@ -2,14 +2,14 @@
 
 Implemented locally, 2026-09-07. Sender-based assignments are the chosen routing model. Campaign attribution is not required for this release.
 
-- Launch selects LinkedIn senders and an optional workspace default.
+- The agent editor's Settings step selects LinkedIn senders and an optional workspace default.
 - A sender has one explicit agent; an agent may serve several senders.
 - Routing chooses sender.agent_id before workspace.default_agent_id, then checks that agent is active. An explicitly assigned paused/draft agent blocks generation instead of falling back.
-- Assignments can be saved for draft agents; Launch activates an agent with a selected destination. Settings save and assignment save are separate operations; failure to save assignments is reported without claiming a rollback of saved settings.
+- Assignments can be saved for draft agents; activation is a separate switch in the editor header. Settings save and assignment save are separate operations; failure to save assignments is reported without claiming a rollback of saved settings.
 - Current assignments and replacements are visible. A workspace assignment revision rejects stale writes. Mutations require owner/admin. Sender and agent foreign keys include workspace_id.
 - Automatic classification, manual generation/redraft, and generation completion use the same database resolver. The composer mirrors this rule for eligibility. In-flight results for a different assigned agent are rejected. Existing drafts keep their original agent/version and content.
 - Sender refresh updates provider fields without overwriting agent_id. Reconnecting the provider currently replaces sender records and therefore clears their explicit assignments; the workspace default remains. Reassign after reconnecting.
-- Launch does not send messages or start outreach. Follow-ups remain off.
+- Saving assignments does not send messages or start outreach.
 
 ## Validation
 
