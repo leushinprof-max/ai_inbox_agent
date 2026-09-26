@@ -1,24 +1,12 @@
 # Sender assignments
 
-Implemented locally, 2026-09-07. Sender-based assignments are the chosen routing model. Campaign attribution is not required for this release.
+Replies are routed to agents by LinkedIn sender. Campaigns do not affect routing.
 
-- The agent editor's Settings step selects LinkedIn senders and an optional workspace default.
+- The agent editor's Settings step selects LinkedIn senders under Assigned senders. Its Workspace default switch makes the agent the fallback for senders without an explicit agent.
 - A sender has one explicit agent; an agent may serve several senders.
 - Routing chooses sender.agent_id before workspace.default_agent_id, then checks that agent is active. An explicitly assigned paused/draft agent blocks generation instead of falling back.
-- Assignments can be saved for draft agents; activation is a separate switch in the editor header. Settings save and assignment save are separate operations; failure to save assignments is reported without claiming a rollback of saved settings.
-- Current assignments and replacements are visible. A workspace assignment revision rejects stale writes. Mutations require owner/admin. Sender and agent foreign keys include workspace_id.
-- Automatic classification, manual generation/redraft, and generation completion use the same database resolver. The composer mirrors this rule for eligibility. In-flight results for a different assigned agent are rejected. Existing drafts keep their original agent/version and content.
-- Sender refresh updates provider fields without overwriting agent_id. Reconnecting the provider currently replaces sender records and therefore clears their explicit assignments; the workspace default remains. Reassign after reconnecting.
-- Saving assignments does not send messages or start outreach.
-
-## Validation
-
-60 tests pass, including database routing for sender/default, paused assignment, cross-workspace rejection, non-admin permissions, stale assignment writes, automatic draft creation, manual generation and rejection of stale completion without replacing the existing draft. Typecheck, lint and production build pass.
-
-Browser demo: multiple selections survive saving/reopening; launching a new agent transfers the selected sender; checked desktop and 390px layout. Demo data is synthetic and resets on reload.
-
-Migration 20260906231700_sender_agent_assignments.sql was applied and recorded in the local Supabase database. Local security advisors report no issues. Remote deployment is not performed.
-
-## Deployment
-
-Deploy the migration before the updated application and worker, coordinating the worker upgrade: old workers still select workspace default. The migration changes completion checks to sender routing. No historical drafts are rewritten and no new outreach is initiated by the migration. The two pending photo migrations are independent existing work; this task did not apply them locally.
+- Assignments can be saved for draft agents. Settings save and assignment save are separate operations; failure to save assignments is reported without claiming a rollback of saved settings.
+- Each sender row shows its current agent; selecting a sender moves it to this agent on save. The editor warns before replacing the workspace default. A workspace assignment revision rejects stale writes. Mutations require owner/admin. Sender and agent foreign keys include workspace_id.
+- Automatic classification, manual generation/redraft, manual label drafting, follow-ups and generation completion use the same database resolver. The composer mirrors this rule for eligibility. In-flight results for a different assigned agent are rejected. Existing drafts keep their original agent/version and content.
+- Refreshing senders or reconnecting HeyReach updates provider fields without overwriting agent_id or the writing form. Accounts that HeyReach no longer returns stay stored with their settings and `auth_valid=false`.
+- Assigning senders or activating an agent never sends messages or starts outreach. Replies and follow-ups are drafts that need human approval.
