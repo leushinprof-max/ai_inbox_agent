@@ -228,12 +228,13 @@ test("Manual classification queues one reply, preserves the label through draft 
   );
 });
 
-test("Manual labels save without drafting for disallowed groups, opt-outs, answered or archived conversations, and absent or paused agents", async () => {
+test("Manual labels save without drafting for disallowed groups, opt-outs, answered or archived conversations, conversations with the agent off, and absent or paused agents", async () => {
   for (const reason of [
     "group",
     "stopped",
     "answered",
     "archived",
+    "agent_off",
     "no_agent",
     "paused",
   ] as const) {
@@ -246,6 +247,11 @@ test("Manual labels save without drafting for disallowed groups, opt-outs, answe
     if (reason === "archived")
       await db.query(
         "update public.conversations set archived=true where id=$1",
+        [id],
+      );
+    if (reason === "agent_off")
+      await db.query(
+        "update public.conversations set agent_enabled=false where id=$1",
         [id],
       );
     if (reason === "answered")
