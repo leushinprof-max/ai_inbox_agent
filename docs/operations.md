@@ -80,7 +80,7 @@ Hosted Supabase advisors report expected notices for private tables that have RL
 
 New work lands through a pull request to `main` from a short-lived branch. There is no CI, so run the applicable checks from the [README](../README.md#verify) before merging. Vercel builds no deployments for other branches, so pull requests are verified locally unless a separate preview is requested.
 
-Merging to `main` deploys the web application on Vercel. Configure the Railway worker to deploy from `main` too; check each host's source branch after changing its settings, because a Git merge does not change them. Any push to `main`, including documentation-only changes, can trigger new deployments.
+Merging to `main` deploys the web application on Vercel and the worker on Railway. Check each host's source branch after changing its settings, because a Git merge does not change them. Any push to `main`, including documentation-only changes, can trigger new deployments.
 
 Deployments never apply migrations. Review the exact migration diff, apply it to the hosted project explicitly, starting with `supabase db push --dry-run`, confirm the remote migration history and run the advisors. Then deploy the web and worker code that depends on it, both when a change needs both. Deployed migrations are append-only: fix or roll back a schema change with a new forward migration.
 
