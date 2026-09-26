@@ -80,10 +80,6 @@
 .agent-setting-item textarea {
   margin-bottom: 10px;
 }
-.agent-editor-v2 .agent-resources {
-  border-top: 0;
-  margin-top: 0;
-}
 .agent-editor-v2 .editor-tabs {
   padding-top: 8px;
 }
@@ -107,9 +103,7 @@
   }
 }
 
-.agent-section-heading,
-.agent-resource-heading,
-.agent-resource-actions {
+.agent-section-heading {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -126,45 +120,15 @@
 .agent-section-heading .help {
   margin-bottom: 0;
 }
-.agent-resources,
 .agent-meeting-settings {
   margin-top: 32px;
   padding-top: 28px;
   border-top: 1px solid var(--line);
 }
-.agent-resource {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 16px;
-}
-.agent-resource-heading {
-  margin-bottom: 18px;
-}
-.agent-resource-heading strong {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-weight: 500;
-}
-.agent-resource-heading > .icon {
-  color: var(--muted);
-  flex-shrink: 0;
-}
-.agent-resource .field:last-child {
-  margin-bottom: 0;
-}
-.agent-resource textarea,
 .agent-meeting-settings textarea,
 .agent-test-context textarea,
 .agent-test-answer textarea {
   min-height: 100px;
-}
-.agent-resource-preview {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
 }
 .agent-editor .field textarea.agent-custom-instructions {
   min-height: 260px;
@@ -179,33 +143,6 @@
 .agent-test-answer summary span {
   margin-left: 8px;
   font-size: 13px;
-}
-.agent-sender-voice {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 200px;
-}
-.agent-sender-voice label {
-  color: var(--muted);
-  font-size: 12px;
-}
-.agent-sender-voice select {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-}
-@media (max-width: 640px) {
-  .agent-resource {
-    padding: 16px;
-  }
-  .agent-sender-option {
-    flex-wrap: wrap;
-  }
-  .agent-sender-voice {
-    flex-basis: 100%;
-    margin-left: 28px;
-  }
 }
 
 .agents-sr-only {
@@ -490,9 +427,6 @@
   font-size: 12px;
   color: var(--muted);
 }
-.agent-unsaved {
-  color: var(--amber);
-}
 .agent-editor .editor-tabs {
   padding: 14px 20px;
 }
@@ -730,87 +664,6 @@
   height: 16px;
   margin: 0;
   accent-color: var(--accent);
-}
-.agent-assignment-default,
-.agent-sender-option {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  cursor: pointer;
-}
-.agent-assignment-default input,
-.agent-sender-option input {
-  width: 17px;
-  height: 17px;
-  margin: 0;
-  accent-color: var(--accent);
-  flex-shrink: 0;
-}
-.agent-assignment-default small,
-.agent-sender-option small {
-  display: block;
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.agent-launch-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 32px;
-  margin-bottom: 16px;
-}
-.agent-launch-heading h2 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-}
-.agent-launch .search {
-  width: 100%;
-  margin-bottom: 14px;
-}
-.agent-sender-list {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-.agent-sender-name {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.agent-sender-option:has(input:checked),
-.agent-assignment-default:has(input:checked) {
-  border-color: #514179;
-  background: var(--soft);
-}
-.agent-launch-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 28px;
-  flex-wrap: wrap;
-}
-.agent-launch > .notice {
-  margin-top: 16px;
-}
-@media (max-width: 650px) {
-  .agent-sender-option {
-    flex-wrap: wrap;
-  }
-  .agent-sender-option > .small {
-    width: 100%;
-    padding-left: 31px;
-  }
-}
-.agent-launch > .help {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
 }
 
 /* Kimi surfaces: one native link covers the card, controls sit above it. */
