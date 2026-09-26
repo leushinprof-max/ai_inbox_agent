@@ -58,7 +58,7 @@ The published database version is authoritative for prompts, label definitions a
 | Settings → Labels test                                                     | Whole-catalog classification                   | `ai_runs` row only                                                                |
 | Product admin test                                                         | Selected scenario and editor configuration     | `ai_runs` row only                                                                |
 
-All calls use `buildModelRequest` and `createInboxModel`. Server calls, including tests, record configuration base version, agent version, catalog revision, model, scenario, timing and outcome in `ai_runs`, together with the exact request body, its context summary and the parsed model output; API keys and HTTP headers are not stored. Tests of unsaved edits are identified as tests; the UI explicitly identifies the published base and that editor values are used. `tools/eval-intent.mts` calls the model directly and records no `ai_runs` row.
+All calls use `buildModelRequest` and `createInboxModel`. Server calls, including tests, record configuration base version, agent version, catalog revision, model, scenario, timing and outcome in `ai_runs`, together with the exact request body, its context summary and the parsed model output; API keys and HTTP headers are not stored. Tests of unsaved edits are identified as tests; the UI explicitly identifies the published base and that editor values are used.
 
 ## Database and concurrency
 
@@ -69,7 +69,3 @@ The model response schema restricts evidence IDs to supplied inbound messages an
 Catalog rules and their revision are loaded from one database snapshot. Applying a result locks the workspace and checks inbound revision, manual-assignment revision, catalog revision, the conversation's resolved agent and its version, and published AI version. Outdated configuration raises a retryable application conflict; old inbound/manual results are ignored. Explicit generation additionally checks the expected draft revision. Business instructions cannot bypass these database gates.
 
 A rollback of prompt behavior publishes an earlier AI version. Application code cannot be rolled back across a schema change by redeploying old code; migrations are append-only, so use a forward fix. Reclassify works per conversation; there is no tenant-wide reclassify action.
-
-## Evaluation
-
-Opt-in real-model evaluation: provide `OPENAI_API_KEY` in the process environment and run `npx tsx tools/eval-intent.mts`. It runs 15 synthetic intent cases (repeat them 1–5 times with `INBOX_EVAL_REPEATS`), writes ignored `.artifacts/intent-eval.json` and exits nonzero when any case fails. Three cases also expect `shouldReply=true`, which the classification call never returns, so they always fail. It uses the code defaults and `gpt-4.1-mini-2025-04-14`, not the published configuration. This is a small regression sample, not a claim of universal classification accuracy.

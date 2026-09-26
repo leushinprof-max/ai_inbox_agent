@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../src/lib/supabase/database.types";
 import { createDemoState } from "../src/demo/data";
@@ -169,6 +169,7 @@ for (const c of fixture.conversations.filter(
     if (result.error) throw result.error;
   }
 }
+mkdirSync(".artifacts", { recursive: true });
 writeFileSync(
   ".artifacts/local-fixture.json",
   JSON.stringify(
