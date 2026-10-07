@@ -53,7 +53,7 @@ test("AI audit records the actual model and outcome of each stage, including a w
     } as unknown as SupabaseClient<Database>;
     const requests: string[] = [];
     const model = createInboxModel(
-      "synthetic-key",
+      { openai: "synthetic-key" },
       "ignored-fallback",
       async (_url, options) => {
         const request = JSON.parse(String(options?.body));

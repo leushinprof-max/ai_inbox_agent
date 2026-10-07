@@ -44,7 +44,7 @@ test("Each recorded split stage uses a fresh clock, the same snapshot/transport 
   } as unknown as SupabaseClient<Database>;
   let expectedStageTime = start.getTime();
   const model = createInboxModel(
-    "synthetic-key",
+    { openai: "synthetic-key" },
     undefined,
     async (_url, options) => {
       const request = JSON.parse(String(options?.body));

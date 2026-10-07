@@ -355,31 +355,35 @@ test("Closing reply, rewrite and operator completion each invoke one writer usin
   for (const scenario of ["reply", "rewrite", "needs_input"] as const) {
     const outputs: unknown[] = [];
     let calls = 0;
-    const model = createInboxModel("test", "writer", async (_url, init) => {
-      calls++;
-      const request = JSON.parse(String(init?.body));
-      assert.deepEqual(request.text.format.schema.required, [
-        "draft",
-        "missingKnowledge",
-      ]);
-      return Response.json({
-        status: "completed",
-        output: [
-          {
-            type: "message",
-            content: [
-              {
-                type: "output_text",
-                text: JSON.stringify({
-                  draft: "До встречи!",
-                  missingKnowledge: "",
-                }),
-              },
-            ],
-          },
-        ],
-      });
-    });
+    const model = createInboxModel(
+      { openai: "test" },
+      "writer",
+      async (_url, init) => {
+        calls++;
+        const request = JSON.parse(String(init?.body));
+        assert.deepEqual(request.text.format.schema.required, [
+          "draft",
+          "missingKnowledge",
+        ]);
+        return Response.json({
+          status: "completed",
+          output: [
+            {
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    draft: "До встречи!",
+                    missingKnowledge: "",
+                  }),
+                },
+              ],
+            },
+          ],
+        });
+      },
+    );
     const result = await runModelPipeline(
       { ...input, scenario },
       "writer",
@@ -395,7 +399,7 @@ test("Closing reply, rewrite and operator completion each invoke one writer usin
 
 test("Product-admin reply preview supports an unclassified sample without weakening live eligibility", async () => {
   let calls = 0;
-  const model = createInboxModel("test", "writer", async () => {
+  const model = createInboxModel({ openai: "test" }, "writer", async () => {
     calls++;
     return Response.json({
       status: "completed",

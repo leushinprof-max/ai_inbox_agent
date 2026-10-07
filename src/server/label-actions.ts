@@ -6,7 +6,7 @@ import { authorizeWorkspace } from "./inbox-read";
 import { runRecordedAI } from "./ai-run";
 import { loadAIContext } from "./ai-context";
 import { adminClient } from "./admin";
-import { createInboxModel } from "@/integrations/ai/classify";
+import { createInboxModel, envModelKeys } from "@/integrations/ai/classify";
 
 const editableLabel = z.object({
   id: z.uuid(),
@@ -171,7 +171,7 @@ export async function testLabel(
     }
     const output = await runRecordedAI(
       adminClient(),
-      createInboxModel(process.env.OPENAI_API_KEY, process.env.INBOX_MODEL),
+      createInboxModel(envModelKeys(), process.env.INBOX_MODEL),
       {
         ...ai,
         agent: null,

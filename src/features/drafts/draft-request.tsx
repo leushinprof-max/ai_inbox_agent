@@ -84,17 +84,29 @@ export function DraftRequest({
 }
 
 export function RequestBody({ value }: { value: unknown }) {
-  const request = value as { input?: { role?: string; content?: string }[] };
+  type Message = { role?: string; content?: string };
+  // OpenAI Responses requests use input; Claude Messages requests use system and messages.
+  const request = value as {
+    input?: Message[];
+    system?: { text?: string }[];
+    messages?: Message[];
+  };
+  const messages = Array.isArray(request?.input)
+    ? request.input
+    : [
+        ...(Array.isArray(request?.system) ? request.system : []).map(
+          (block) => ({ role: "system", content: block.text }),
+        ),
+        ...(Array.isArray(request?.messages) ? request.messages : []),
+      ];
   return (
     <>
-      {(Array.isArray(request?.input) ? request.input : []).map(
-        (message, index) => (
-          <section key={index}>
-            <p className="small muted">{message.role}</p>
-            <pre className="request-text">{message.content}</pre>
-          </section>
-        ),
-      )}
+      {messages.map((message, index) => (
+        <section key={index}>
+          <p className="small muted">{message.role}</p>
+          <pre className="request-text">{message.content}</pre>
+        </section>
+      ))}
       <details className="admin-details">
         <summary>Raw API request</summary>
         <pre className="request-text">{JSON.stringify(value, null, 2)}</pre>

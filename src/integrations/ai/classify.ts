@@ -1,3 +1,4 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { readAgentKnowledge } from "@/domain/agent-knowledge";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/domain/follow-ups";
 import { boundedJson } from "@/integrations/heyreach/client";
 import { assertReasoningSupported } from "./model-catalog";
+import { anthropicRequest, isClaudeModel } from "./anthropic";
 import {
   replyAllowed,
   type IntentGroup,
@@ -582,55 +584,116 @@ export function validateModelResult(
     noReplyReason: "",
   };
 }
-export function createInboxModel(
+export interface ModelKeys {
+  openai?: string;
+  anthropic?: string;
+}
+export function envModelKeys(): ModelKeys {
+  return {
+    openai: process.env.OPENAI_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+  };
+}
+type ModelRequest = ReturnType<typeof buildModelRequest>["request"];
+
+/** The exact body sent to the provider that serves the request's model. */
+export function providerRequest(request: ModelRequest) {
+  return isClaudeModel(request.model) ? anthropicRequest(request) : request;
+}
+
+async function callOpenAI(
   apiKey: string | undefined,
+  request: ModelRequest,
+  fetcher: typeof fetch,
+): Promise<unknown> {
+  if (!apiKey) throw new ModelError("model_not_configured");
+  let response: Response;
+  try {
+    response = await fetcher("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+      redirect: "error",
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    throw new ModelError("model_unavailable");
+  }
+  if (!response.ok) throw new ModelError("model_unavailable");
+  try {
+    const envelope = z
+      .object({
+        status: z.literal("completed"),
+        output: z.array(
+          z.object({
+            type: z.string(),
+            content: z
+              .array(
+                z.object({ type: z.string(), text: z.string().optional() }),
+              )
+              .optional(),
+          }),
+        ),
+      })
+      .parse(await boundedJson(response, 65536));
+    const texts = envelope.output
+      .filter((i) => i.type === "message")
+      .flatMap((i) => i.content ?? [])
+      .filter((c) => c.type === "output_text");
+    if (texts.length !== 1 || !texts[0].text) throw new Error();
+    return JSON.parse(texts[0].text);
+  } catch {
+    throw new ModelError("model_invalid_response");
+  }
+}
+
+async function callClaude(
+  apiKey: string | undefined,
+  request: ModelRequest,
+  fetcher: typeof fetch,
+): Promise<unknown> {
+  if (!apiKey) throw new ModelError("model_not_configured");
+  // Jobs retry transient failures themselves; SDK retries would outlast the lease.
+  const client = new Anthropic({
+    apiKey,
+    fetch: fetcher,
+    maxRetries: 0,
+    timeout: 60_000,
+  });
+  let message: Anthropic.Beta.BetaMessage;
+  try {
+    message = await client.beta.messages.create(anthropicRequest(request));
+  } catch {
+    throw new ModelError("model_unavailable");
+  }
+  try {
+    // A refusal or a cut-off answer may not match the schema.
+    if (message.stop_reason !== "end_turn") throw new Error();
+    const texts = message.content.filter((block) => block.type === "text");
+    if (texts.length !== 1 || !texts[0].text) throw new Error();
+    return JSON.parse(texts[0].text);
+  } catch {
+    throw new ModelError("model_invalid_response");
+  }
+}
+
+export function createInboxModel(
+  keys: ModelKeys,
   model = defaultInboxModel,
   fetcher: typeof fetch = fetch,
 ): InboxModel {
   return {
     fallbackModel: model,
     async classify(input, prepared, onOutput) {
-      if (!apiKey) throw new ModelError("model_not_configured");
       const { request } = prepared ?? buildModelRequest(input, model);
-      let response: Response;
+      const value = isClaudeModel(request.model)
+        ? await callClaude(keys.anthropic, request, fetcher)
+        : await callOpenAI(keys.openai, request, fetcher);
+      onOutput?.(value);
       try {
-        response = await fetcher("https://api.openai.com/v1/responses", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(request),
-          redirect: "error",
-          signal: AbortSignal.timeout(60_000),
-        });
-      } catch {
-        throw new ModelError("model_unavailable");
-      }
-      if (!response.ok) throw new ModelError("model_unavailable");
-      try {
-        const envelope = z
-          .object({
-            status: z.literal("completed"),
-            output: z.array(
-              z.object({
-                type: z.string(),
-                content: z
-                  .array(
-                    z.object({ type: z.string(), text: z.string().optional() }),
-                  )
-                  .optional(),
-              }),
-            ),
-          })
-          .parse(await boundedJson(response, 65536));
-        const texts = envelope.output
-          .filter((i) => i.type === "message")
-          .flatMap((i) => i.content ?? [])
-          .filter((c) => c.type === "output_text");
-        if (texts.length !== 1 || !texts[0].text) throw new Error();
-        const value: unknown = JSON.parse(texts[0].text);
-        onOutput?.(value);
         if ((input.scenario ?? "classify") === "classify") {
           return validateModelResult(
             { ...input, generateDraft: false },

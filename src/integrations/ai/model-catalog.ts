@@ -1,5 +1,9 @@
-// Supported effort levels from the official model pages, checked 2026-09-08.
+import { isClaudeModel } from "./anthropic";
+
+// Supported effort levels from the official model pages, checked 2026-09-08
+// (OpenAI) and 2026-10-08 (Claude).
 // https://developers.openai.com/api/docs/models
+// https://platform.claude.com/docs/en/about-claude/models/overview
 export const reasoningEfforts = [
   "none",
   "low",
@@ -9,6 +13,9 @@ export const reasoningEfforts = [
   "max",
 ] as const;
 export type ReasoningEffort = (typeof reasoningEfforts)[number];
+
+// Claude always thinks; effort is the only control, so there is no "none".
+const claudeEfforts = reasoningEfforts.filter((effort) => effort !== "none");
 
 interface ModelOption {
   id: string;
@@ -39,6 +46,18 @@ export const modelOptions: readonly ModelOption[] = [
     efforts: ["none", "low", "medium", "high", "xhigh"],
     defaultEffort: "medium",
   },
+  ...(
+    [
+      ["claude-opus-5-5", "Claude Opus 5.5", "medium"],
+      ["claude-sonnet-5-5", "Claude Sonnet 5.5", "high"],
+      ["claude-haiku-5-5", "Claude Haiku 5.5", "medium"],
+    ] as const
+  ).map(([id, name, defaultEffort]) => ({
+    id,
+    name,
+    efforts: claudeEfforts,
+    defaultEffort,
+  })),
 ];
 
 export function modelOption(model: string) {
@@ -49,7 +68,10 @@ export function modelOption(model: string) {
 
 export function supportedReasoningEfforts(model: string) {
   // Custom models are validated by the provider; don't guess their capabilities.
-  return modelOption(model)?.efforts ?? reasoningEfforts;
+  return (
+    modelOption(model)?.efforts ??
+    (isClaudeModel(model) ? claudeEfforts : reasoningEfforts)
+  );
 }
 
 export function assertReasoningSupported(

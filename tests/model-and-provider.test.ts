@@ -53,7 +53,7 @@ const response = (data: unknown) =>
 test("Model uses strict structured output and treats transcript separately from operator instructions", async () => {
   let calls = 0;
   const model = createInboxModel(
-    "synthetic-key",
+    { openai: "synthetic-key" },
     "test-model",
     async (url, options) => {
       calls++;
@@ -94,8 +94,10 @@ test("Model uses strict structured output and treats transcript separately from 
   assert.equal(calls, 1);
 });
 test("Model cannot draft for history, answered conversations, opt-outs or absent agents", async () => {
-  const model = createInboxModel("synthetic-key", undefined, async () =>
-    response(output),
+  const model = createInboxModel(
+    { openai: "synthetic-key" },
+    undefined,
+    async () => response(output),
   );
   for (const scenario of [
     { ...input, generateDraft: false },
@@ -116,14 +118,19 @@ test("Model cannot draft for history, answered conversations, opt-outs or absent
     assert.equal(result.draft, "");
     assert.equal(result.shouldReply, false);
   }
-  const optout = createInboxModel("synthetic-key", undefined, async () =>
-    response({ ...output, contactStopped: true }),
+  const optout = createInboxModel(
+    { openai: "synthetic-key" },
+    undefined,
+    async () => response({ ...output, contactStopped: true }),
   );
   assert.equal((await optout.classify(input)).draft, "");
 });
 test("Missing knowledge discards a claimed answer; malformed, incomplete and oversized output is rejected", async () => {
-  const missing = createInboxModel("synthetic-key", undefined, async () =>
-    response({ ...output, missingKnowledge: "Approved price is missing" }),
+  const missing = createInboxModel(
+    { openai: "synthetic-key" },
+    undefined,
+    async () =>
+      response({ ...output, missingKnowledge: "Approved price is missing" }),
   );
   assert.equal((await missing.classify(input)).draft, "");
   for (const raw of [
@@ -132,20 +139,20 @@ test("Missing knowledge discards a claimed answer; malformed, incomplete and ove
     { ...output, draft: "", missingKnowledge: "" },
   ])
     await assert.rejects(
-      createInboxModel("synthetic-key", undefined, async () =>
+      createInboxModel({ openai: "synthetic-key" }, undefined, async () =>
         response(raw),
       ).classify(input),
       ModelError,
     );
   await assert.rejects(
-    createInboxModel("synthetic-key", undefined, async () =>
+    createInboxModel({ openai: "synthetic-key" }, undefined, async () =>
       Response.json({ status: "incomplete", output: [] }),
     ).classify(input),
     ModelError,
   );
   await assert.rejects(boundedJson(new Response("x".repeat(101)), 100));
   await assert.rejects(
-    createInboxModel(undefined).classify(input),
+    createInboxModel({}).classify(input),
     /model_not_configured/,
   );
 });

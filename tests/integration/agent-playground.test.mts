@@ -231,7 +231,7 @@ test("playground uses unsaved settings, enforces historical scope and records on
   const before = await snapshot();
   const requests: unknown[] = [];
   const model = createInboxModel(
-    "synthetic-key",
+    { openai: "synthetic-key" },
     "test-writer",
     async (_url, options) => {
       const body = JSON.parse(String(options?.body));
