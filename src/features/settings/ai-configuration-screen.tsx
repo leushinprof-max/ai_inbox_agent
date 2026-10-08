@@ -4,6 +4,7 @@ import { useInbox } from "@/lib/inbox-context";
 import { Button, Icon, Notice, Topbar, type IconName } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { AIModelSettings } from "./ai-model-settings";
+import { ModelKeysSettings } from "./model-keys-settings";
 import { AdminSelect } from "./admin-select";
 import { AIPlayground } from "./ai-playground";
 import { systemLabels } from "@/domain/labels";
@@ -268,6 +269,7 @@ export function AIConfigurationScreen() {
                 disabled={busy || !data}
                 onChange={update}
               />
+              <ModelKeysSettings disabled={busy || !data} />
             </div>
             <div hidden={page !== "instructions"}>
               <fieldset className="admin-instructions" disabled={busy || !data}>

@@ -2,14 +2,11 @@
 
 import { z } from "zod";
 import { agentTestRequest } from "@/domain/agent-test";
-import {
-  createInboxModel,
-  envModelKeys,
-  ModelError,
-} from "@/integrations/ai/classify";
+import { createInboxModel, ModelError } from "@/integrations/ai/classify";
 import { authenticatedClient, databaseError } from "./session";
 import { authorizeWorkspace } from "./inbox-read";
 import { adminClient } from "./admin";
+import { loadModelKeys } from "./model-keys";
 import { runRecordedAI } from "./ai-run";
 import { prepareAgentPlayground } from "./agent-playground-context";
 
@@ -33,7 +30,8 @@ export async function runAgentPlayground(input: unknown) {
     const value = parsed.data;
     const db = await testClient(value.workspaceId);
     const prepared = await prepareAgentPlayground(db, value);
-    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY)
+    const keys = await loadModelKeys();
+    if (!keys.openai && !keys.anthropic)
       throw new ModelError("model_not_configured");
     databaseError(
       (await db.rpc("reserve_agent_test", { p_workspace: value.workspaceId }))
@@ -41,7 +39,7 @@ export async function runAgentPlayground(input: unknown) {
     );
     const output = await runRecordedAI(
       adminClient(),
-      createInboxModel(envModelKeys(), process.env.INBOX_MODEL),
+      createInboxModel(keys, process.env.INBOX_MODEL),
       prepared.input,
       prepared.context,
     );

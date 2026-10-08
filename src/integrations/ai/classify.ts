@@ -588,12 +588,6 @@ export interface ModelKeys {
   openai?: string;
   anthropic?: string;
 }
-export function envModelKeys(): ModelKeys {
-  return {
-    openai: process.env.OPENAI_API_KEY,
-    anthropic: process.env.ANTHROPIC_API_KEY,
-  };
-}
 type ModelRequest = ReturnType<typeof buildModelRequest>["request"];
 
 /** The exact body sent to the provider that serves the request's model. */
@@ -681,7 +675,8 @@ async function callClaude(
 }
 
 export function createInboxModel(
-  keys: ModelKeys,
+  // A loader is read on every call, so changed keys apply without a restart.
+  keys: ModelKeys | (() => Promise<ModelKeys>),
   model = defaultInboxModel,
   fetcher: typeof fetch = fetch,
 ): InboxModel {
@@ -689,9 +684,10 @@ export function createInboxModel(
     fallbackModel: model,
     async classify(input, prepared, onOutput) {
       const { request } = prepared ?? buildModelRequest(input, model);
+      const current = typeof keys === "function" ? await keys() : keys;
       const value = isClaudeModel(request.model)
-        ? await callClaude(keys.anthropic, request, fetcher)
-        : await callOpenAI(keys.openai, request, fetcher);
+        ? await callClaude(current.anthropic, request, fetcher)
+        : await callOpenAI(current.openai, request, fetcher);
       onOutput?.(value);
       try {
         if ((input.scenario ?? "classify") === "classify") {

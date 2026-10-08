@@ -1288,6 +1288,10 @@ export type Database = {
         };
         Returns: string;
       };
+      delete_model_credential: {
+        Args: { p_provider: string };
+        Returns: undefined;
+      };
       disconnect_workspace: {
         Args: { p_workspace: string };
         Returns: undefined;
@@ -1410,6 +1414,7 @@ export type Database = {
           workspace_id: string;
         }[];
       };
+      model_credential_status: { Args: never; Returns: Json };
       name_ai_configuration: {
         Args: { p_version: number; p_name: string };
         Returns: undefined;
@@ -1765,6 +1770,7 @@ export type Database = {
           status: string;
         }[];
       };
+      server_model_credentials: { Args: never; Returns: Json };
       server_refresh_senders: {
         Args: { p_revision: number; p_senders: Json; p_workspace: string };
         Returns: undefined;
@@ -1772,6 +1778,15 @@ export type Database = {
       server_resolve_agent: {
         Args: { p_conversation: string; p_workspace: string };
         Returns: string;
+      };
+      server_set_model_credential: {
+        Args: {
+          p_actor: string;
+          p_ciphertext: string;
+          p_hint: string;
+          p_provider: string;
+        };
+        Returns: undefined;
       };
       server_schedule_follow_ups: { Args: never; Returns: number };
       set_conversation_agent: {

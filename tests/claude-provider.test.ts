@@ -9,6 +9,7 @@ import {
   type ModelInput,
 } from "../src/integrations/ai/classify";
 import { anthropicRequest } from "../src/integrations/ai/anthropic";
+import { verifyModelKey } from "../src/integrations/ai/verify-key";
 import {
   initialAIConfiguration,
   validateConfiguration,
@@ -176,4 +177,63 @@ test("OpenAI requests are recorded unchanged", () => {
   };
   const { request } = buildModelRequest(input, "gpt-5.5");
   assert.equal(providerRequest(request), request);
+});
+
+test("Model keys are read on every call, so a changed key applies without a restart", async () => {
+  const input = writer("claude-opus-5-5");
+  const seen: (string | null)[] = [];
+  let current = "first-key";
+  const model = createInboxModel(
+    async () => ({ anthropic: current }),
+    undefined,
+    async (_url, init) => {
+      seen.push(new Headers(init?.headers).get("x-api-key"));
+      return message(JSON.stringify({ draft: "Draft", missingKnowledge: "" }));
+    },
+  );
+  await model.classify(input);
+  current = "second-key";
+  await model.classify(input);
+  assert.deepEqual(seen, ["first-key", "second-key"]);
+});
+
+test("Saving a key first checks it with the provider's model list", async () => {
+  const calls: string[] = [];
+  const reply =
+    (status: number) => async (url: unknown, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      calls.push(
+        `${new URL(String(url)).host}${new URL(String(url)).pathname} ${headers.get("x-api-key") ?? headers.get("authorization")}`,
+      );
+      return status === 200
+        ? Response.json({
+            data: [],
+            has_more: false,
+            first_id: null,
+            last_id: null,
+          })
+        : Response.json({ error: { type: "error", message: "x" } }, { status });
+    };
+  assert.equal(
+    await verifyModelKey("anthropic", "claude", reply(200)),
+    "valid",
+  );
+  assert.equal(
+    await verifyModelKey("anthropic", "claude", reply(401)),
+    "rejected",
+  );
+  assert.equal(
+    await verifyModelKey("anthropic", "claude", reply(529)),
+    "unavailable",
+  );
+  assert.equal(await verifyModelKey("openai", "gpt", reply(200)), "valid");
+  assert.equal(await verifyModelKey("openai", "gpt", reply(401)), "rejected");
+  assert.equal(
+    await verifyModelKey("openai", "gpt", async () => {
+      throw new Error("offline");
+    }),
+    "unavailable",
+  );
+  assert.deepEqual(calls.slice(0, 1), ["api.anthropic.com/v1/models claude"]);
+  assert.equal(calls[3], "api.openai.com/v1/models Bearer gpt");
 });

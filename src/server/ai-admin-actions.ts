@@ -6,6 +6,7 @@ import { authorizeWorkspace } from "./inbox-read";
 import { adminClient } from "./admin";
 import { runRecordedAI } from "./ai-run";
 import { loadAIContext } from "./ai-context";
+import { loadModelKeys } from "./model-keys";
 import {
   defaultInboxModel,
   validateConfiguration,
@@ -15,7 +16,6 @@ import { planModelRun } from "@/integrations/ai/pipeline";
 import {
   prepareModelRequest,
   createInboxModel,
-  envModelKeys,
   providerRequest,
   type ModelInput,
 } from "@/integrations/ai/classify";
@@ -275,7 +275,7 @@ export async function testAIAdmin(value: unknown, config: unknown) {
   const calls: { model: string; scenario: string }[] = [];
   const output = await runRecordedAI(
     adminClient(),
-    createInboxModel(envModelKeys(), process.env.INBOX_MODEL),
+    createInboxModel(() => loadModelKeys(), process.env.INBOX_MODEL),
     input,
     {
       workspaceId,
