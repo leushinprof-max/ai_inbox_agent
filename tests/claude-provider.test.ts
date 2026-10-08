@@ -8,7 +8,10 @@ import {
   providerRequest,
   type ModelInput,
 } from "../src/integrations/ai/classify";
-import { anthropicRequest } from "../src/integrations/ai/anthropic";
+import {
+  anthropicRequest,
+  claudeSchema,
+} from "../src/integrations/ai/anthropic";
 import { verifyModelKey } from "../src/integrations/ai/verify-key";
 import {
   initialAIConfiguration,
@@ -236,4 +239,40 @@ test("Saving a key first checks it with the provider's model list", async () => 
   );
   assert.deepEqual(calls.slice(0, 1), ["api.anthropic.com/v1/models claude"]);
   assert.equal(calls[3], "api.openai.com/v1/models Bearer gpt");
+});
+
+test("Claude classification schemas express nullable enums as anyOf, never as a type array", () => {
+  const input: ModelInput = {
+    labels: demoLabels("test"),
+    messages: [
+      { id: "lead", direction: "inbound", body: "Hello" },
+      { id: "team", direction: "outbound", body: "Hi" },
+    ],
+    agent: null,
+    generateDraft: false,
+  };
+  const { request } = buildModelRequest(input, "claude-haiku-5-5");
+  const schema = anthropicRequest(request).output_config!.format!.schema as {
+    properties: Record<string, unknown>;
+  };
+  assert.deepEqual(schema.properties.evidenceMessageId, {
+    anyOf: [{ type: "string", enum: ["lead"] }, { type: "null" }],
+  });
+  assert.deepEqual(
+    schema.properties.labelId,
+    request.text.format.schema.properties.labelId,
+  );
+  assert.equal(JSON.stringify(schema).includes('"type":["'), false);
+  // With no citable message only null remains, which an empty enum would reject.
+  assert.deepEqual(
+    claudeSchema({
+      properties: { id: { type: ["string", "null"], enum: [null] } },
+    }).properties.id,
+    { type: "null" },
+  );
+  // The OpenAI request keeps its original schema.
+  assert.deepEqual(request.text.format.schema.properties.evidenceMessageId, {
+    type: ["string", "null"],
+    enum: ["lead", null],
+  });
 });
