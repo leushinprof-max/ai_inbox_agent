@@ -820,3 +820,84 @@ test("Version names are owner-only metadata and preserve prompts, publications a
     null,
   );
 });
+
+test("Model keys are written by the server for platform owners; owners see only hints and can remove them", async () => {
+  const owner = randomUUID();
+  const outsider = randomUUID();
+  await db.query(
+    "insert into auth.users(id,email) values($1,'key-owner@example.test'),($2,'key-outsider@example.test')",
+    [owner, outsider],
+  );
+  await db.query(
+    "insert into app_private.platform_owners(user_id) values($1)",
+    [owner],
+  );
+  await db.exec("set role service_role");
+  await assert.rejects(
+    db.query(
+      "select public.server_set_model_credential('anthropic',$1,'v1.secret','abcd')",
+      [outsider],
+    ),
+    /Forbidden/,
+  );
+  await db.query(
+    "select public.server_set_model_credential('anthropic',$1,'v1.secret','abcd')",
+    [owner],
+  );
+  await db.query(
+    "select public.server_set_model_credential('anthropic',$1,'v1.replaced','wxyz')",
+    [owner],
+  );
+  assert.deepEqual(
+    (
+      await db.query<{ keys: unknown }>(
+        "select public.server_model_credentials() keys",
+      )
+    ).rows[0].keys,
+    { anthropic: "v1.replaced" },
+  );
+  await assert.rejects(
+    db.query(
+      "select public.server_set_model_credential('mistral',$1,'v1.secret','abcd')",
+      [owner],
+    ),
+  );
+  await db.exec("reset role; set role authenticated");
+  try {
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      outsider,
+    ]);
+    await assert.rejects(
+      db.query("select public.model_credential_status()"),
+      /Forbidden/,
+    );
+    await assert.rejects(
+      db.query("select public.delete_model_credential('anthropic')"),
+      /Forbidden/,
+    );
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+      owner,
+    ]);
+    const status = (
+      await db.query<{ status: { provider: string; keyHint: string }[] }>(
+        "select public.model_credential_status() status",
+      )
+    ).rows[0].status;
+    assert.deepEqual(
+      status.map(({ provider, keyHint }) => ({ provider, keyHint })),
+      [{ provider: "anthropic", keyHint: "wxyz" }],
+    );
+    assert.equal(JSON.stringify(status).includes("v1."), false);
+    await db.query("select public.delete_model_credential('anthropic')");
+    assert.deepEqual(
+      (
+        await db.query<{ status: unknown }>(
+          "select public.model_credential_status() status",
+        )
+      ).rows[0].status,
+      [],
+    );
+  } finally {
+    await db.exec("reset role");
+  }
+});

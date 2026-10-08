@@ -20,6 +20,7 @@
     "telegram:setup": "node --conditions=react-server --import tsx tools/configure-telegram.mts --apply"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0",
     "@supabase/ssr": "0.12.6",
     "@supabase/supabase-js": "2.115.0",
     "exceljs": "4.4.0",

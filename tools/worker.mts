@@ -2,14 +2,16 @@ import { createServer } from "node:http";
 import { setTimeout } from "node:timers/promises";
 import { adminClient } from "../src/server/admin";
 import { runNextJob } from "../src/server/runtime";
-import { createInboxModel } from "../src/integrations/ai/classify";
+import {
+  createInboxModel,
+  type ModelKeys,
+} from "../src/integrations/ai/classify";
+import { cachedModelKeys } from "../src/server/model-keys";
 import { runNextNotification } from "../src/server/notification-runtime";
 
 const db = adminClient();
-const model = createInboxModel(
-  process.env.OPENAI_API_KEY,
-  process.env.INBOX_MODEL,
-);
+const modelKeys = cachedModelKeys();
+const model = createInboxModel(modelKeys, process.env.INBOX_MODEL);
 let stopping = false;
 let lastCycle = Date.now();
 let healthy = true;
@@ -20,10 +22,11 @@ const server = createServer(async (req, res) => {
     res.writeHead(404).end();
     return;
   }
+  const keys = await modelKeys().catch(() => ({}) as ModelKeys);
   let ready =
     healthy &&
     Date.now() - lastCycle < 180000 &&
-    !!process.env.OPENAI_API_KEY &&
+    !!(keys.openai || keys.anthropic) &&
     Buffer.from(process.env.INBOX_ENCRYPTION_KEY ?? "", "base64").length === 32;
   if (req.url === "/ready") {
     const result = await db.from("workspaces").select("id").limit(1);

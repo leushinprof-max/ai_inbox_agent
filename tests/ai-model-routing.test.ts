@@ -54,7 +54,7 @@ const reply = {
 function harness(outputs: unknown[]) {
   const requests: ReturnType<typeof buildModelRequest>["request"][] = [];
   const model = createInboxModel(
-    "synthetic-key",
+    { openai: "synthetic-key" },
     "server-default",
     async (_url, options) => {
       requests.push(JSON.parse(String(options?.body)));
@@ -226,10 +226,23 @@ test("Reasoning validates values and known model capabilities, including inherit
   assert.deepEqual(custom.reasoning, { effort: "medium" });
 });
 
-test("The curated catalog starts at GPT-5.5 and distinguishes model default from no reasoning", () => {
+test("The curated catalog starts at GPT-5.5, lists current Claude models and distinguishes model default from no reasoning", () => {
   assert.deepEqual(
     modelOptions.map((m) => m.id),
-    ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5"],
+    [
+      "gpt-6-astra",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-5.5",
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+      "claude-haiku-5-5",
+    ],
+  );
+  assert.equal(
+    reasoningSelectionLabel("claude-opus-5-5", null),
+    "Model default · Medium",
   );
   assert.equal(
     supportedReasoningEfforts("gpt-6-astra").includes("none"),

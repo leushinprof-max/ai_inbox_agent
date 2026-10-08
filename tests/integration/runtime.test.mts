@@ -253,7 +253,7 @@ test("The live classification-to-writer worker preserves provider event times in
     ).id;
     const requests: Record<string, unknown>[] = [];
     const writer = createInboxModel(
-      "synthetic-key",
+      { openai: "synthetic-key" },
       undefined,
       async (_url, options) => {
         const request = JSON.parse(String(options?.body));

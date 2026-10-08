@@ -5,6 +5,7 @@ import type { Json } from "@/lib/supabase/database.types";
 import {
   ModelError,
   prepareModelRequest,
+  providerRequest,
   type InboxModel,
   type ModelInput,
 } from "@/integrations/ai/classify";
@@ -65,7 +66,7 @@ async function recordModelCall(
       catalog_revision: context.catalogRevision,
       agent_id: context.agentId,
       agent_version: context.agentVersion,
-      request_snapshot: prepared.request,
+      request_snapshot: providerRequest(prepared.request) as Json,
       request_context: prepared.context,
       ...call,
     })

@@ -139,28 +139,32 @@ for (const configuration of [
       );
     }
     let calls = 0;
-    const model = createInboxModel("fake-test-key", undefined, async () => {
-      calls++;
-      return new Response(
-        JSON.stringify({
-          status: "completed",
-          output: [
-            {
-              type: "message",
-              content: [
-                {
-                  type: "output_text",
-                  text: JSON.stringify({
-                    draft: "Has your timeline changed?",
-                    missingKnowledge: "",
-                  }),
-                },
-              ],
-            },
-          ],
-        }),
-      );
-    });
+    const model = createInboxModel(
+      { openai: "fake-test-key" },
+      undefined,
+      async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            status: "completed",
+            output: [
+              {
+                type: "message",
+                content: [
+                  {
+                    type: "output_text",
+                    text: JSON.stringify({
+                      draft: "Has your timeline changed?",
+                      missingKnowledge: "",
+                    }),
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+      },
+    );
     const result = await runModelPipeline(stage, undefined, (current) =>
       model.classify(current),
     );

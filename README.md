@@ -39,7 +39,7 @@ src/features/             Product section screens, auth and workspace onboarding
 src/components/           Shared UI: app shell, sidebar, dialogs and section states
 src/domain/               Domain types, gateway contract, permissions and send orchestration
 src/server/               Authenticated operations, encrypted credentials and job runtime
-src/integrations/         Validated HeyReach, OpenAI and Telegram adapters
+src/integrations/         Validated HeyReach, OpenAI, Claude and Telegram adapters
 src/lib/                  Live UI gateway, Supabase clients, generated types and shared helpers
 src/demo/                 Explicit synthetic gateway, data and state previews
 src/proxy.ts              Supabase session refresh and sign-in redirects

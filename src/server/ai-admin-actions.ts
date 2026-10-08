@@ -6,6 +6,7 @@ import { authorizeWorkspace } from "./inbox-read";
 import { adminClient } from "./admin";
 import { runRecordedAI } from "./ai-run";
 import { loadAIContext } from "./ai-context";
+import { loadModelKeys } from "./model-keys";
 import {
   defaultInboxModel,
   validateConfiguration,
@@ -15,6 +16,7 @@ import { planModelRun } from "@/integrations/ai/pipeline";
 import {
   prepareModelRequest,
   createInboxModel,
+  providerRequest,
   type ModelInput,
 } from "@/integrations/ai/classify";
 import { followUpSettings } from "@/domain/follow-ups";
@@ -250,8 +252,10 @@ async function adminInput(value: unknown, configValue: unknown) {
 export async function previewAIAdmin(value: unknown, config: unknown) {
   const { input } = await adminInput(value, config);
   const plan = planModelRun(input, process.env.INBOX_MODEL);
+  const { prepared } = prepareModelRequest(plan.first, process.env.INBOX_MODEL);
   return {
-    ...prepareModelRequest(plan.first, process.env.INBOX_MODEL).prepared,
+    ...prepared,
+    request: providerRequest(prepared.request),
     draftModel: plan.hasReplyStage ? plan.models.draft : null,
   };
 }
@@ -271,7 +275,7 @@ export async function testAIAdmin(value: unknown, config: unknown) {
   const calls: { model: string; scenario: string }[] = [];
   const output = await runRecordedAI(
     adminClient(),
-    createInboxModel(process.env.OPENAI_API_KEY, process.env.INBOX_MODEL),
+    createInboxModel(() => loadModelKeys(), process.env.INBOX_MODEL),
     input,
     {
       workspaceId,

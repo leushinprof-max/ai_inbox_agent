@@ -219,6 +219,33 @@
 .admin-custom-model {
   grid-column: 1 / -1;
 }
+.product-admin-layout .admin-model-keys {
+  margin-top: 20px;
+}
+.admin-model-keys-intro {
+  padding: 24px 30px 0;
+}
+.admin-model-keys-intro h2 {
+  font-size: 15px;
+  font-weight: 550;
+  margin: 0 0 6px;
+}
+.admin-model-title .help {
+  margin: 2px 0 0;
+}
+.admin-model-key-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.admin-model-key-form label .pill {
+  margin-left: 8px;
+}
+.admin-model-key-actions {
+  display: flex;
+  gap: 8px;
+}
 .admin-instructions {
   display: grid;
   grid-template-columns: 158px minmax(0, 1fr);
@@ -645,6 +672,7 @@
   }
 }
 @media (max-width: 480px) {
+  .admin-model-key-form,
   .admin-model-controls,
   .admin-test-fields {
     grid-template-columns: 1fr;
