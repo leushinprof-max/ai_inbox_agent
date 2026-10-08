@@ -616,7 +616,13 @@ async function callOpenAI(
   } catch {
     throw new ModelError("model_unavailable");
   }
-  if (!response.ok) throw new ModelError("model_unavailable");
+  if (!response.ok) {
+    // The provider's reason reaches only server logs; it never contains the key.
+    console.error(
+      `OpenAI request failed: ${response.status} ${(await response.text().catch(() => "")).slice(0, 500)}`,
+    );
+    throw new ModelError("model_unavailable");
+  }
   try {
     const envelope = z
       .object({
@@ -660,12 +666,21 @@ async function callClaude(
   let message: Anthropic.Beta.BetaMessage;
   try {
     message = await client.beta.messages.create(anthropicRequest(request));
-  } catch {
+  } catch (error) {
+    // The provider's reason reaches only server logs; it never contains the key.
+    console.error(
+      `Anthropic request failed for ${request.model}: ${error instanceof Error ? error.message.slice(0, 500) : "unknown error"}`,
+    );
     throw new ModelError("model_unavailable");
   }
   try {
     // A refusal or a cut-off answer may not match the schema.
-    if (message.stop_reason !== "end_turn") throw new Error();
+    if (message.stop_reason !== "end_turn") {
+      console.error(
+        `Anthropic response for ${request.model} stopped with ${message.stop_reason}`,
+      );
+      throw new Error();
+    }
     const texts = message.content.filter((block) => block.type === "text");
     if (texts.length !== 1 || !texts[0].text) throw new Error();
     return JSON.parse(texts[0].text);
