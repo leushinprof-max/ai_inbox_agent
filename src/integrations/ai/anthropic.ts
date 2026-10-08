@@ -14,6 +14,41 @@ const userTurn = "Return the output defined by the instructions.";
 // https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback
 const withFallback = /^claude-(opus|sonnet|fable)-/;
 
+type Property = { type?: unknown; enum?: unknown[] } & Record<string, unknown>;
+
+/**
+ * Claude rejects an enum under a type array ("Enum value ... does not match
+ * declared type ['string', 'null']"), so such a property becomes one anyOf
+ * branch per type, each with the enum values of that type.
+ */
+export function claudeSchema(schema: { properties: object }) {
+  return {
+    ...schema,
+    properties: Object.fromEntries(
+      Object.entries(schema.properties as Record<string, Property>).map(
+        ([name, property]) => {
+          const { type, enum: values, ...rest } = property;
+          if (!Array.isArray(type) || !values) return [name, property];
+          const branches = type
+            .map((t: string) =>
+              t === "null"
+                ? { type: "null" }
+                : { type: t, enum: values.filter((v) => v !== null) },
+            )
+            // An empty enum is invalid; drop the type it would leave unusable.
+            .filter((branch) => !branch.enum || branch.enum.length > 0);
+          return [
+            name,
+            branches.length === 1
+              ? { ...rest, ...branches[0] }
+              : { ...rest, anyOf: branches },
+          ];
+        },
+      ),
+    ),
+  };
+}
+
 /**
  * Translates the shared request into the Messages API. Instructions before the
  * first user message become the top-level system prompt; later ones stay in
@@ -41,7 +76,10 @@ export function anthropicRequest(
       ...(request.reasoning && request.reasoning.effort !== "none"
         ? { effort: request.reasoning.effort }
         : {}),
-      format: { type: "json_schema", schema: request.text.format.schema },
+      format: {
+        type: "json_schema",
+        schema: claudeSchema(request.text.format.schema),
+      },
     },
     ...(withFallback.test(request.model)
       ? {
