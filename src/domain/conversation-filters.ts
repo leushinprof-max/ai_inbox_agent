@@ -9,6 +9,7 @@ export const filterFields = {
   first_reply: "First reply",
   sender: "Last message from",
   read: "Read status",
+  account: "LinkedIn account",
 } as const;
 export type FilterField = keyof typeof filterFields;
 export const conversationFilter = z
@@ -20,6 +21,7 @@ export const conversationFilter = z
       "first_reply",
       "sender",
       "read",
+      "account",
     ]),
     operator: z.enum(["is", "is_not"]),
     values: z.array(z.string().trim().min(1).max(200)).min(1).max(50),
@@ -66,6 +68,12 @@ export const conversationFilter = z
             : filter.field === "read"
               ? ["unread", "read"]
               : null;
+    if (filter.field === "account") {
+      // HeyReach sender IDs, kept as strings to match the other filter values.
+      if (filter.values.some((value) => !/^[1-9][0-9]{0,15}$/.test(value)))
+        ctx.addIssue({ code: "custom", message: "Choose a valid account." });
+      return;
+    }
     if (
       (filter.field !== "labels" && filter.values.length !== 1) ||
       (allowed && filter.values.some((value) => !allowed.includes(value)))
@@ -157,6 +165,9 @@ export function matchesConversationFilters(
       case "read":
         if (conversation.readStatePending) return true;
         matches = conversation.unread === (values[0] === "unread");
+        break;
+      case "account":
+        matches = values.includes(String(conversation.senderId));
     }
     return operator === "is" ? matches : !matches;
   });
@@ -168,7 +179,9 @@ export function filterSignature(filters: ConversationFilter[]): string {
       .map((filter) => ({
         ...filter,
         values:
-          filter.field === "labels" ? [...filter.values].sort() : filter.values,
+          filter.field === "labels" || filter.field === "account"
+            ? [...filter.values].sort()
+            : filter.values,
       }))
       .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
   );

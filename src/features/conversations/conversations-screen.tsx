@@ -100,6 +100,12 @@ export function ConversationsScreen({
       !hidden.has(c.senderId),
   );
   const selected = conversations.find((c) => c.id === selectedId);
+  const accounts = (state.senders ?? [])
+    .filter(
+      (s) =>
+        !s.hidden && (!s.workspaceId || s.workspaceId === scope.workspaceId),
+    )
+    .map((s) => ({ id: String(s.id), name: s.name }));
   const catalog = (state.labelCatalog ?? []).filter(
     (l) => l.workspaceId === scope.workspaceId && !l.archived,
   );
@@ -304,6 +310,7 @@ export function ConversationsScreen({
               timezone={workspace.timezone}
               applied={filters}
               catalog={catalog}
+              accounts={accounts}
               canPin={views.length < 30}
               onApply={applyFilters}
               onPin={(name, next) => {

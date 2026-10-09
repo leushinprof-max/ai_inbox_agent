@@ -233,6 +233,30 @@ test("Filter validation and matching: combinations, exclusions, rolling dates an
     filterSignature([a, b]),
     filterSignature([b, { ...a, values: ["b", "a"] }]),
   );
+  const own = String(c.senderId);
+  assert.equal(
+    matchesConversationFilters(c, [condition("account", [own, "999999"])]),
+    true,
+  );
+  assert.equal(
+    matchesConversationFilters(c, [condition("account", [own], "is_not")]),
+    false,
+  );
+  assert.equal(
+    matchesConversationFilters(c, [condition("account", ["999999"])]),
+    false,
+  );
+  for (const values of [[], ["0"], ["abc"], ["12.5"], ["12345678901234567"]])
+    assert.equal(
+      conversationFilters.safeParse([condition("account", values)]).success,
+      false,
+      JSON.stringify(values),
+    );
+  const accounts = condition("account", ["7", "11"]);
+  assert.equal(
+    filterSignature([accounts]),
+    filterSignature([{ ...accounts, values: ["11", "7"] }]),
+  );
 });
 
 test("SQL filters apply before pagination, match intent groups, latest sender, and enforce workspace RLS", async () => {
@@ -424,6 +448,34 @@ test("SQL filters apply before pagination, match intent groups, latest sender, a
     assert.equal(
       (await page([...both, condition("intent", ["negative"])])).length,
       0,
+    );
+    await db.exec("reset role");
+    await db.query(
+      "insert into public.senders(workspace_id,provider_id,name,auth_valid) values($1,43,'Second',true)",
+      [workspace],
+    );
+    await db.query(
+      "update public.conversations set sender_id=43 where workspace_id=$1 and provider_conversation_id in ('filter-2','filter-3','filter-4','filter-5','filter-6')",
+      [workspace],
+    );
+    await db.exec("set role authenticated");
+    const second43 = [condition("account", ["43"])];
+    assert.equal(Number(await count(second43)), 5);
+    assert.deepEqual(
+      (await page(second43)).map((c) => c.provider_conversation_id).sort(),
+      ["filter-2", "filter-3", "filter-4", "filter-5", "filter-6"],
+    );
+    assert.equal(
+      Number(await count([condition("account", ["43"], "is_not")])),
+      115,
+    );
+    assert.equal(
+      Number(await count([condition("account", ["42", "43"])])),
+      120,
+    );
+    assert.equal(
+      Number(await count([...second43, condition("labels", [labels[0].id])])),
+      5,
     );
     await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
       outsider,
