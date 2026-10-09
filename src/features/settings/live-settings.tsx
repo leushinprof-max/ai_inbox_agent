@@ -10,6 +10,7 @@ import {
   startHistory,
   controlHistory,
 } from "@/server/connection-actions";
+import { setSenderHidden } from "@/server/agent-actions";
 
 function useSettingsAction() {
   const { repository } = useInbox();
@@ -67,6 +68,13 @@ export function LiveConnectionSettings({
             Use the API key from this exact HeyReach workspace. Its LinkedIn
             accounts will be available as senders.
           </p>
+          {connected && state.senders?.length ? (
+            <p className="help">
+              Turn a sender off to keep its replies out of Conversations, Drafts
+              and Leads. Its replies are not labelled or drafted until you turn
+              it back on.
+            </p>
+          ) : null}
           {!connected && admin ? (
             <form
               onSubmit={(e) => {
@@ -120,11 +128,33 @@ export function LiveConnectionSettings({
                   <div className="grow">
                     <strong>{s.name}</strong>
                     <br />
-                    <small>Sender from this HeyReach workspace</small>
+                    <small>
+                      {s.hidden
+                        ? "Hidden: replies stay out of the inbox and get no drafts"
+                        : "Sender from this HeyReach workspace"}
+                    </small>
                   </div>
                   <Badge color={s.authValid ? "green" : "amber"}>
                     {s.authValid ? "Connected" : "Reconnect in HeyReach"}
                   </Badge>
+                  <button
+                    className={`switch ${s.hidden ? "" : "on"}`}
+                    role="switch"
+                    aria-label={`Show ${s.name} in the inbox`}
+                    aria-checked={!s.hidden}
+                    title="Show in inbox"
+                    disabled={busy || !admin}
+                    onClick={() =>
+                      void run(async () => {
+                        const result = await setSenderHidden({
+                          workspaceId: scope.workspaceId,
+                          senderId: s.id,
+                          hidden: !s.hidden,
+                        });
+                        if (!result.ok) throw new Error(result.error);
+                      })
+                    }
+                  />
                 </div>
               ))
             : null}

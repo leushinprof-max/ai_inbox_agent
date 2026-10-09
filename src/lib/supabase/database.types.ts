@@ -350,6 +350,7 @@ export type Database = {
           reply_catalog_revision: number | null;
           reply_config_version: number | null;
           reply_decision_revision: number | null;
+          sender_hidden: boolean;
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
@@ -389,6 +390,7 @@ export type Database = {
           reply_catalog_revision?: number | null;
           reply_config_version?: number | null;
           reply_decision_revision?: number | null;
+          sender_hidden?: boolean;
           sender_id: number;
           sender_name: string;
           sender_photo_url?: string | null;
@@ -428,6 +430,7 @@ export type Database = {
           reply_catalog_revision?: number | null;
           reply_config_version?: number | null;
           reply_decision_revision?: number | null;
+          sender_hidden?: boolean;
           sender_id?: number;
           sender_name?: string;
           sender_photo_url?: string | null;
@@ -857,6 +860,7 @@ export type Database = {
           agent_id: string | null;
           auth_valid: boolean;
           grammatical_form: string;
+          hidden: boolean;
           name: string;
           provider_id: number;
           updated_at: string;
@@ -866,6 +870,7 @@ export type Database = {
           agent_id?: string | null;
           auth_valid: boolean;
           grammatical_form?: string;
+          hidden?: boolean;
           name: string;
           provider_id: number;
           updated_at?: string;
@@ -875,6 +880,7 @@ export type Database = {
           agent_id?: string | null;
           auth_valid?: boolean;
           grammatical_form?: string;
+          hidden?: boolean;
           name?: string;
           provider_id?: number;
           updated_at?: string;
@@ -1129,6 +1135,7 @@ export type Database = {
           reply_catalog_revision: number | null;
           reply_config_version: number | null;
           reply_decision_revision: number | null;
+          sender_hidden: boolean;
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
@@ -1185,6 +1192,7 @@ export type Database = {
           reply_catalog_revision: number | null;
           reply_config_version: number | null;
           reply_decision_revision: number | null;
+          sender_hidden: boolean;
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
@@ -1242,6 +1250,7 @@ export type Database = {
           reply_catalog_revision: number | null;
           reply_config_version: number | null;
           reply_decision_revision: number | null;
+          sender_hidden: boolean;
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
@@ -1382,6 +1391,7 @@ export type Database = {
           reply_catalog_revision: number | null;
           reply_config_version: number | null;
           reply_decision_revision: number | null;
+          sender_hidden: boolean;
           sender_id: number;
           sender_name: string;
           sender_photo_url: string | null;
@@ -1518,6 +1528,14 @@ export type Database = {
           p_default: boolean;
           p_revision: number;
           p_senders: number[];
+          p_workspace: string;
+        };
+        Returns: undefined;
+      };
+      set_sender_hidden: {
+        Args: {
+          p_hidden: boolean;
+          p_sender: number;
           p_workspace: string;
         };
         Returns: undefined;

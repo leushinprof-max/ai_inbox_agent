@@ -1,4 +1,5 @@
 import type { Conversation, Draft, InboxState } from "@/domain/inbox";
+import { hiddenSenderIds } from "@/domain/sender-agent";
 import { getGenerationProgress } from "./draft-generation-progress";
 
 export interface DraftQueueItem {
@@ -10,9 +11,10 @@ export interface DraftQueueItem {
 
 /** Keep the same conversation selected while its pending reply becomes a draft. */
 export function getDraftQueue(state: InboxState, workspaceId: string) {
+  const hidden = hiddenSenderIds(state, workspaceId);
   const conversations = new Map(
     state.conversations
-      .filter((c) => c.workspaceId === workspaceId)
+      .filter((c) => c.workspaceId === workspaceId && !hidden.has(c.senderId))
       .map((c) => [c.id, c]),
   );
   const drafts = new Map(

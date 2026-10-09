@@ -6,7 +6,7 @@ One product bot serves all users. Users never supply a bot token or a chat ID. T
 
 ## Delivery and review
 
-- A new reply draft or needs-input draft creates an outbox row in the same database transaction for each subscribed member with a connected, unblocked Telegram account. Connecting does not send an existing backlog; imports create no drafts. Follow-up drafts never notify. Redrafts and edits do not send a new message; they update the existing card.
+- A new reply draft or needs-input draft creates an outbox row in the same database transaction for each subscribed member with a connected, unblocked Telegram account. Connecting does not send an existing backlog; imports create no drafts. Follow-up drafts never notify. Hiding a sender skips its unsent notifications. Redrafts and edits do not send a new message; they update the existing card.
 - The worker processes notifications in a separate loop so a model request cannot block delivery. Claims use leases, bounded retries and Telegram's `retry_after`. A blocked bot appears disconnected in Settings.
 - The complete draft must fit in the notification before Approve & send is offered. Needs-input, viewer and truncated previews offer only Open in platform.
 - Approval validates the current bot, private Telegram identity, connection, workspace role, draft body and revision, source inbound revision and sender connection. The UI and Telegram call the same private send reservation. Each notification retains one operation ID; simultaneous callbacks and UI sends cannot dispatch twice. Provider timeouts remain Unknown and are never automatically resent.

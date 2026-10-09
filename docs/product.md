@@ -10,7 +10,7 @@ Workspace is the tenant boundary. A workspace owns its members, HeyReach connect
 
 ## Conversations
 
-Only conversations with at least one canonical inbound message from the lead appear in Conversations, search and counts. Outbound-only outreach is retained for synchronization but stays outside the operator inbox and classification. The first inbound reply admits the conversation with its complete prior history. A later team reply does not hide it again, and the qualifying inbound reply need not fall within the import window or latest transcript page.
+Only conversations with at least one canonical inbound message from the lead appear in Conversations, search and counts. Conversations from [hidden senders](agent-sender-assignments.md#hidden-senders) never appear there, in Drafts or in Leads. Outbound-only outreach is retained for synchronization but stays outside the operator inbox and classification. The first inbound reply admits the conversation with its complete prior history. A later team reply does not hide it again, and the qualifying inbound reply need not fall within the import window or latest transcript page.
 
 Admitted conversations keep their full message history in Conversations, independent of the draft queue. Search matches contact name, company and the latest message. Operators can read context, see labels and notes, and write a manual message. Manual composition must not inherit a stale AI draft's revision fence.
 
