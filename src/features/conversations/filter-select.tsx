@@ -16,6 +16,7 @@ const paths: Record<FilterField, string> = {
   activity: "M12 8v5l3 2 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0",
   sender: "M20 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 18 0Z M7 10h8 M7 14h5",
   read: "M4 6h16v13H4V6Z m0 1 8 6 8-6",
+  account: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M4 20a8 8 0 0 1 16 0",
 };
 function ChoiceIcon({ option }: { option?: FilterOption }) {
   if (option?.color)

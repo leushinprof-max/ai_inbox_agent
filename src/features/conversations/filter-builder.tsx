@@ -55,7 +55,8 @@ function newFilter(field: FilterField): ConversationFilter {
   return {
     field,
     operator: "is",
-    values: field === "labels" ? [] : [options[field][0].id],
+    values:
+      field === "labels" || field === "account" ? [] : [options[field][0].id],
   };
 }
 export function PinIcon() {
@@ -68,6 +69,7 @@ export function PinIcon() {
 export function FilterBuilder({
   applied,
   catalog,
+  accounts,
   onApply,
   onPin,
   canPin,
@@ -75,6 +77,7 @@ export function FilterBuilder({
 }: {
   applied: ConversationFilter[];
   catalog: LabelDefinition[];
+  accounts: { id: string; name: string }[];
   onApply: (filters: ConversationFilter[]) => void;
   onPin: (name: string, filters: ConversationFilter[]) => boolean;
   canPin: boolean;
@@ -123,7 +126,7 @@ export function FilterBuilder({
                 {
                   id: "is",
                   name:
-                    row.field === "labels"
+                    row.field === "labels" || row.field === "account"
                       ? "has any of"
                       : row.field === "activity" || row.field === "first_reply"
                         ? "within"
@@ -132,7 +135,7 @@ export function FilterBuilder({
                 {
                   id: "is_not",
                   name:
-                    row.field === "labels"
+                    row.field === "labels" || row.field === "account"
                       ? "has none of"
                       : row.field === "first_reply"
                         ? "outside"
@@ -164,6 +167,19 @@ export function FilterBuilder({
                 open={menu}
                 setOpen={setMenu}
                 placeholder="Select labels…"
+                onChange={(values) => update(index, { ...row, values })}
+              />
+            ) : row.field === "account" ? (
+              <FilterSelect
+                id={`${index}-accounts`}
+                label={`Filter ${index + 1} LinkedIn accounts`}
+                multiple
+                options={accounts}
+                values={row.values}
+                open={menu}
+                setOpen={setMenu}
+                placeholder="Select accounts…"
+                fallbackName="Unavailable account"
                 onChange={(values) => update(index, { ...row, values })}
               />
             ) : row.field === "first_reply" ? (
