@@ -12,7 +12,7 @@
 - [Reply agent](reply-agent.md): writer template, request formats, preview and testing, rollback and prompt evaluation.
 - [Agent editor](agent-settings.md): editor steps and the Test lead chat.
 - [Agent reply context](agent-reply-context.md): sender identity, materials and manual meeting coordination through Needs input.
-- [Sender assignments](agent-sender-assignments.md): routing replies to agents by LinkedIn sender.
+- [Sender assignments](agent-sender-assignments.md): routing replies to agents by LinkedIn sender and hiding senders from the inbox.
 - [Telegram notifications](telegram-notifications.md): personal workspace subscriptions, draft approvals and bot setup.
 
 Current code, tests and migrations define implemented behavior. The prototype is approved design input, not provider documentation or security guidance. Nothing in these documents authorizes production operations.

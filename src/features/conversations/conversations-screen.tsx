@@ -22,6 +22,7 @@ import {
 import "./conversations.css";
 import { useRouter } from "next/navigation";
 import { useConversationNavigation } from "@/lib/use-conversation-navigation";
+import { hiddenSenderIds } from "@/domain/sender-agent";
 
 export function ConversationsScreen({
   initialId,
@@ -91,8 +92,12 @@ export function ConversationsScreen({
   );
   const search = useRef<HTMLInputElement>(null);
   const filterWrap = useRef<HTMLDivElement>(null);
+  const hidden = hiddenSenderIds(state, scope.workspaceId);
   const conversations = state.conversations.filter(
-    (c) => c.workspaceId === scope.workspaceId && !c.archived,
+    (c) =>
+      c.workspaceId === scope.workspaceId &&
+      !c.archived &&
+      !hidden.has(c.senderId),
   );
   const selected = conversations.find((c) => c.id === selectedId);
   const catalog = (state.labelCatalog ?? []).filter(

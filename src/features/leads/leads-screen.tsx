@@ -10,7 +10,7 @@ import { LeadNote } from "./lead-note";
 import { ConversationLabel } from "@/components/label-badge";
 import { trackCursorGlow } from "@/components/cursor-glow";
 import { defaultFollowUps } from "@/domain/follow-ups";
-import { resolveSenderAgent } from "@/domain/sender-agent";
+import { hiddenSenderIds, resolveSenderAgent } from "@/domain/sender-agent";
 import type { Conversation } from "@/domain/inbox";
 import { LeadStatusControl } from "./lead-status-control";
 import { ColumnResizeHandle } from "./column-resize-handle";
@@ -74,8 +74,10 @@ export function LeadsScreen() {
       clearTimeout(timer);
     };
   }, [repository, query, group, attempt]);
+  const hidden = hiddenSenderIds(state, scope.workspaceId);
   const all = state.conversations.filter(
-    (c) => c.workspaceId === scope.workspaceId && c.lead,
+    (c) =>
+      c.workspaceId === scope.workspaceId && c.lead && !hidden.has(c.senderId),
   );
   const counts = state.paging?.leadCounts ?? {
     all: all.length,

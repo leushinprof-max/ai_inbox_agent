@@ -132,6 +132,7 @@ export interface InboxState {
     agentId?: string | null;
     grammaticalForm?: GrammaticalForm;
     photoUrl?: string | null;
+    hidden?: boolean;
   }[];
   imports?: {
     id: string;

@@ -224,9 +224,13 @@ export async function draftCounts(db: DB, workspaceId: string) {
     statuses.map((status) =>
       db
         .from("drafts")
-        .select("id", { count: "exact", head: true })
+        .select("id,conversations!inner(sender_hidden)", {
+          count: "exact",
+          head: true,
+        })
         .eq("workspace_id", workspaceId)
-        .eq("status", status),
+        .eq("status", status)
+        .eq("conversations.sender_hidden", false),
     ),
   );
   counts.forEach((result) => databaseError(result.error));
@@ -448,10 +452,11 @@ export async function readWorkspace(
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspaceId)
       .gt("inbound_revision", 0)
-      .eq("archived", false),
+      .eq("archived", false)
+      .eq("sender_hidden", false),
     db
       .from("senders")
-      .select("provider_id,name,auth_valid,agent_id,grammatical_form")
+      .select("provider_id,name,auth_valid,agent_id,grammatical_form,hidden")
       .eq("workspace_id", workspaceId)
       .order("name")
       .limit(1000),
@@ -578,6 +583,7 @@ export async function readWorkspace(
       authValid: s.auth_valid,
       agentId: s.agent_id,
       grammaticalForm: grammaticalForm.parse(s.grammatical_form),
+      hidden: s.hidden,
     })),
     imports: (imports.data ?? []).map((r) => ({
       id: r.id,

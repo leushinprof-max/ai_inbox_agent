@@ -36,6 +36,39 @@ export async function saveSenderVoice(input: unknown) {
   }
 }
 
+export async function setSenderHidden(input: unknown) {
+  const parsed = z
+    .object({
+      workspaceId: z.uuid(),
+      senderId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      hidden: z.boolean(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "Invalid sender." };
+  try {
+    const { db, user } = await authenticatedClient();
+    const v = parsed.data;
+    const role = await authorizeWorkspace(db, user.id, v.workspaceId);
+    if (!["owner", "admin"].includes(role))
+      return {
+        ok: false as const,
+        error: "Only workspace admins can hide senders.",
+      };
+    const result = await db.rpc("set_sender_hidden", {
+      p_workspace: v.workspaceId,
+      p_sender: v.senderId,
+      p_hidden: v.hidden,
+    });
+    databaseError(result.error);
+    return { ok: true as const };
+  } catch {
+    return {
+      ok: false as const,
+      error: "Could not change this sender. Refresh the page and try again.",
+    };
+  }
+}
+
 export async function saveSenderAssignments(input: unknown) {
   const parsed = z
     .object({
